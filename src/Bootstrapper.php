@@ -8,19 +8,23 @@ if (!defined('ABSPATH')) {
 }
 
 class Bootstrapper {
+
+	// Hardcoded rules for performance: things that shouldn't load on frontend
+	private static array $frontend_skip_paths = [
+		'plugins/sp-content-manager/', 
+		'plugins/sp-video-preview/', 
+		'plugins/sp-google-reviews/stars-column.php'
+	];
+
 	public static function run(array $config = []): void {
-		$root = dirname(__DIR__); // Get the directory containing src/, platform/, plugins/
+		$root = dirname(__DIR__);
 
 		$is_cli_request = defined('WP_CLI') && WP_CLI;
 		$is_admin_like  = is_admin() || wp_doing_ajax() || wp_doing_cron() || $is_cli_request;
 		$is_frontend    = !$is_admin_like;
 
-		$frontend_skip_paths = $config['frontend_skip_paths'] ?? [];
-		$global_skip_paths = $config['skip_paths'] ?? [];
-
-		// Allow themes to modify the skip paths via filters if needed (legacy compatibility)
-		$frontend_skip_paths = apply_filters('theme_core_frontend_skip_paths', $frontend_skip_paths);
-		$frontend_skip_paths = is_array($frontend_skip_paths) ? $frontend_skip_paths : [];
+		$platform_modules = $config['platform'] ?? [];
+		$plugins_modules  = $config['plugins'] ?? [];
 
 		$normalize_relative = static function (string $path) use ($root): string {
 			$root_norm = str_replace('\\', '/', rtrim($root, DIRECTORY_SEPARATOR));
@@ -29,14 +33,17 @@ class Bootstrapper {
 			return trim($relative);
 		};
 
-		$should_skip = static function (string $path) use ($is_frontend, $frontend_skip_paths, $global_skip_paths, $normalize_relative): bool {
+		$should_skip_on_frontend = static function (string $path) use ($is_frontend, $normalize_relative): bool {
+			if (!$is_frontend) {
+				return false;
+			}
+
 			$relative = $normalize_relative($path);
 			if ($relative === '') {
 				return false;
 			}
 
-			// Check global skip paths first
-			foreach ($global_skip_paths as $skip_path) {
+			foreach (self::$frontend_skip_paths as $skip_path) {
 				$skip = trim(str_replace('\\', '/', (string) $skip_path), '/');
 				if ($skip === '') {
 					continue;
@@ -55,33 +62,11 @@ class Bootstrapper {
 				}
 			}
 
-			// Check frontend skip paths if on frontend
-			if ($is_frontend) {
-				foreach ($frontend_skip_paths as $skip_path) {
-					$skip = trim(str_replace('\\', '/', (string) $skip_path), '/');
-					if ($skip === '') {
-						continue;
-					}
-
-					$is_dir_rule = str_ends_with((string) $skip_path, '/') || str_ends_with((string) $skip_path, '\\');
-					if ($is_dir_rule) {
-						if (str_starts_with($relative . '/', $skip . '/')) {
-							return true;
-						}
-						continue;
-					}
-
-					if ($relative === $skip) {
-						return true;
-					}
-				}
-			}
-
 			return false;
 		};
 
-		$autoload = static function (string $dir) use (&$autoload, $should_skip): void {
-			if (!is_dir($dir) || !is_readable($dir) || $should_skip($dir)) {
+		$autoload = static function (string $dir) use (&$autoload, $should_skip_on_frontend): void {
+			if (!is_dir($dir) || !is_readable($dir) || $should_skip_on_frontend($dir)) {
 				return;
 			}
 
@@ -89,24 +74,6 @@ class Bootstrapper {
 			if ($items === false) {
 				return;
 			}
-
-			usort($items, static function (string $a, string $b): int {
-				$priority = static function (string $item): int {
-					return match ($item) {
-						'platform' => 1,
-						default    => 2,
-					};
-				};
-
-				$a_priority = $priority($a);
-				$b_priority = $priority($b);
-
-				if ($a_priority !== $b_priority) {
-					return $a_priority <=> $b_priority;
-				}
-
-				return strcasecmp($a, $b);
-			});
 
 			foreach ($items as $item) {
 				if ($item === '.' || $item === '..') {
@@ -123,7 +90,7 @@ class Bootstrapper {
 
 				$path = $dir . DIRECTORY_SEPARATOR . $item;
 
-				if ($should_skip($path)) {
+				if ($should_skip_on_frontend($path)) {
 					continue;
 				}
 
@@ -144,8 +111,24 @@ class Bootstrapper {
 			}
 		};
 
-		// Load platform and plugins from the kit
-		$autoload($root . '/platform');
-		$autoload($root . '/plugins');
+		// 1. Load explicitly requested platform files
+		foreach ($platform_modules as $module) {
+			$path = $root . '/platform/' . $module . '.php';
+			if (is_file($path) && !$should_skip_on_frontend($path)) {
+				require_once $path;
+			}
+		}
+
+		// 2. Load explicitly requested plugins (scan their directories recursively)
+		foreach ($plugins_modules as $plugin) {
+			$dir = $root . '/plugins/' . $plugin;
+			if (is_dir($dir)) {
+				$autoload($dir);
+			} elseif (is_file($dir . '.php')) {
+				if (!$should_skip_on_frontend($dir . '.php')) {
+					require_once $dir . '.php';
+				}
+			}
+		}
 	}
 }
