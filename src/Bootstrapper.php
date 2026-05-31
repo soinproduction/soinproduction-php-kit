@@ -8,20 +8,17 @@ if (!defined('ABSPATH')) {
 }
 
 class Bootstrapper {
-	public static function run(): void {
-		$root = __DIR__;
+	public static function run(array $config = []): void {
+		$root = dirname(__DIR__); // Get the directory containing src/, platform/, plugins/
 
 		$is_cli_request = defined('WP_CLI') && WP_CLI;
 		$is_admin_like  = is_admin() || wp_doing_ajax() || wp_doing_cron() || $is_cli_request;
 		$is_frontend    = !$is_admin_like;
 
-		$frontend_skip_paths = [
-			'plugins/sp-content-manager/', 
-			'plugins/sp-video-preview/', 
-			'plugins/sp-google-reviews/stars-column.php'
-		];
+		$frontend_skip_paths = $config['frontend_skip_paths'] ?? [];
+		$global_skip_paths = $config['skip_paths'] ?? [];
 
-		// Allow themes to modify the skip paths
+		// Allow themes to modify the skip paths via filters if needed (legacy compatibility)
 		$frontend_skip_paths = apply_filters('theme_core_frontend_skip_paths', $frontend_skip_paths);
 		$frontend_skip_paths = is_array($frontend_skip_paths) ? $frontend_skip_paths : [];
 
@@ -32,17 +29,14 @@ class Bootstrapper {
 			return trim($relative);
 		};
 
-		$should_skip_on_frontend = static function (string $path) use ($is_frontend, $frontend_skip_paths, $normalize_relative): bool {
-			if (!$is_frontend) {
-				return false;
-			}
-
+		$should_skip = static function (string $path) use ($is_frontend, $frontend_skip_paths, $global_skip_paths, $normalize_relative): bool {
 			$relative = $normalize_relative($path);
 			if ($relative === '') {
 				return false;
 			}
 
-			foreach ($frontend_skip_paths as $skip_path) {
+			// Check global skip paths first
+			foreach ($global_skip_paths as $skip_path) {
 				$skip = trim(str_replace('\\', '/', (string) $skip_path), '/');
 				if ($skip === '') {
 					continue;
@@ -61,11 +55,33 @@ class Bootstrapper {
 				}
 			}
 
+			// Check frontend skip paths if on frontend
+			if ($is_frontend) {
+				foreach ($frontend_skip_paths as $skip_path) {
+					$skip = trim(str_replace('\\', '/', (string) $skip_path), '/');
+					if ($skip === '') {
+						continue;
+					}
+
+					$is_dir_rule = str_ends_with((string) $skip_path, '/') || str_ends_with((string) $skip_path, '\\');
+					if ($is_dir_rule) {
+						if (str_starts_with($relative . '/', $skip . '/')) {
+							return true;
+						}
+						continue;
+					}
+
+					if ($relative === $skip) {
+						return true;
+					}
+				}
+			}
+
 			return false;
 		};
 
-		$autoload = static function (string $dir) use (&$autoload, $should_skip_on_frontend): void {
-			if (!is_dir($dir) || !is_readable($dir) || $should_skip_on_frontend($dir)) {
+		$autoload = static function (string $dir) use (&$autoload, $should_skip): void {
+			if (!is_dir($dir) || !is_readable($dir) || $should_skip($dir)) {
 				return;
 			}
 
@@ -107,7 +123,7 @@ class Bootstrapper {
 
 				$path = $dir . DIRECTORY_SEPARATOR . $item;
 
-				if ($should_skip_on_frontend($path)) {
+				if ($should_skip($path)) {
 					continue;
 				}
 
@@ -133,6 +149,3 @@ class Bootstrapper {
 		$autoload($root . '/plugins');
 	}
 }
-
-// Run the bootstrapper when this file is required by Composer
-Bootstrapper::run();
