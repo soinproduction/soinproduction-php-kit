@@ -1,0 +1,10 @@
+{
+    "name": "soinproduction/php-kit",
+    "description": "Shared PHP utilities for SoinProduction projects",
+    "type": "library",
+    "autoload": {
+        "psr-4": {
+            "SoinProduction\\Kit\\": "src/"
+        }
+    }
+}
