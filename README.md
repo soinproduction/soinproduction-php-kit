@@ -27,7 +27,9 @@
 
 ## Использование (Подключение модулей)
 
-Пакет использует систему **Opt-In** — по умолчанию ничего не загружается. Вы сами указываете, какие функции платформы и какие плагины вам нужны в конкретном проекте. Пакет сам знает, какие из его файлов не нужно грузить на фронтенде (для оптимизации производительности), поэтому вам об этом думать не нужно.
+Пакет использует систему **Opt-In** — по умолчанию ничего не загружается. Вы сами указываете, какие функции платформы, ACF-типы и модули вам нужны в конкретном проекте. Пакет сам знает, какие из его файлов не нужно грузить на фронтенде (для оптимизации производительности), поэтому вам об этом думать не нужно.
+
+Чтобы сохранить модуль в конфигурации, но отключить его, добавьте `_` перед именем. Например, `sp-share` будет загружен, а `_sp-share` — нет. Правило одинаково работает в списках `platform`, `acf` и `plugins`.
 
 ### Интеграция в тему
 
@@ -39,7 +41,7 @@
 // 1. Подключаем автозагрузчик
 require_once THEME_DIR . '/vendor/autoload.php';
 
-// 2. Подключаем кит (он сам загрузит платформу -> затем вашу тему -> затем плагины)
+// 2. Подключаем конфиг кита (платформа и ACF-типы -> тема -> модули)
 require_once THEME_DIR . '/kit.php';
 
 // ... далее идут настройки темы (theme_setup и прочее)
@@ -54,33 +56,40 @@ require_once THEME_DIR . '/kit.php';
 declare(strict_types=1);
 
 $platform = [
-	'author-meta',
+	'_author-meta',
 	'dev-user',
 	'reading-time',
 	'remove-post-slug',
 	'reset'
 ];
 
+$acf = [
+	'smart-relationship',
+	'_smart-taxonomy',
+];
+
 $plugins = [
 	'sp-allow-svg-upload',
-	'sp-cf7-mail-viewer',
 	'sp-content-manager',
 	'sp-cpt-archives',
 	'sp-dev-mode',
 	'sp-favorite-posts',
-	'sp-flowchimp',
-	'sp-google-reviews',
 	'sp-redirects',
+	'_sp-share',
+	'sp-tag-manager',
 	'sp-uploads-webp-convert',
 	'sp-video-preview'
 ];
 
-// 1. Загружаем платформу из кита (ДО загрузки ядра темы)
+// 1. Загружаем платформу и ACF-типы из кита ДО регистрации групп полей темы.
 if (class_exists(\SoinProduction\Kit\Bootstrapper::class)) {
-	\SoinProduction\Kit\Bootstrapper::run(['platform' => $platform]);
+	\SoinProduction\Kit\Bootstrapper::run([
+		'platform' => $platform,
+		'acf'      => $acf,
+	]);
 }
 
-// 2. Грузим ядро темы (здесь загрузятся CPT и хелперы темы)
+// 2. Грузим ACF-группы, CPT и хелперы конкретной темы.
 // Замените эти пути на актуальные для вашей архитектуры:
 require_once THEME_DIR . '/acf/index.php';
 require_once THEME_DIR . '/core/bootstrap.php';
@@ -90,4 +99,3 @@ if (class_exists(\SoinProduction\Kit\Bootstrapper::class)) {
 	\SoinProduction\Kit\Bootstrapper::run(['plugins' => $plugins]);
 }
 ```
-

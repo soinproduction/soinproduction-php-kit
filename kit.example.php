@@ -3,34 +3,48 @@ declare(strict_types=1);
 
 /**
  * Configuration for SoinProduction PHP Kit
- * Comment out or remove items you don't want to load in this theme.
+ * Prefix a module name with "_" to keep it listed but disabled.
  */
 $platform = [
-//	'author-meta',
+	'_author-meta',
 	'dev-user',
 	'reading-time',
 	'remove-post-slug',
 	'reset'
 ];
 
+$acf = [
+	'_icon-link-list',
+	'_related-posts',
+	'_smart-relationship',
+	'_smart-taxonomy',
+	'_table',
+	'_taxonomy-urls',
+	'_universal-media',
+	'_archive-builder',
+];
+
 $plugins = [
 	'sp-allow-svg-upload',
-	'sp-cf7-mail-viewer',
 	'sp-content-manager',
 	'sp-cpt-archives',
 	'sp-dev-mode',
 	'sp-favorite-posts',
-	'sp-flowchimp',
-	'sp-google-reviews',
 	'sp-redirects',
+	'_sp-share',
+	'sp-tag-manager',
 	'sp-uploads-webp-convert',
 	'sp-video-preview'
 ];
 
 if (class_exists(\SoinProduction\Kit\Bootstrapper::class)) {
-	\SoinProduction\Kit\Bootstrapper::run(['platform' => $platform]);
+	\SoinProduction\Kit\Bootstrapper::run([
+		'platform' => $platform,
+		'acf'      => $acf,
+	]);
 }
 
+// Theme-specific ACF field groups and theme runtime.
 require_once THEME_DIR . '/acf/index.php';
 require_once THEME_DIR . '/core/bootstrap.php';
 

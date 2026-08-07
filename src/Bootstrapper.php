@@ -9,11 +9,11 @@ if (!defined('ABSPATH')) {
 
 class Bootstrapper {
 
-	// Hardcoded rules for performance: things that shouldn't load on frontend
-	private static array $frontend_skip_paths = [
-		'plugins/sp-content-manager/', 
-		'plugins/sp-video-preview/', 
-		'plugins/sp-google-reviews/stars-column.php'
+	private const DISABLED_MODULE_PREFIX = '_';
+
+	private const DEFAULT_FRONTEND_SKIP_PATHS = [
+		'plugins/sp-content-manager/',
+		'plugins/sp-video-preview/',
 	];
 
 	public static function run(array $config = []): void {
@@ -23,8 +23,12 @@ class Bootstrapper {
 		$is_admin_like  = is_admin() || wp_doing_ajax() || wp_doing_cron() || $is_cli_request;
 		$is_frontend    = !$is_admin_like;
 
-		$platform_modules = $config['platform'] ?? [];
-		$plugins_modules  = $config['plugins'] ?? [];
+		$platform_modules = self::normalize_modules($config['platform'] ?? []);
+		$acf_modules      = self::normalize_modules($config['acf'] ?? []);
+		$plugins_modules  = self::normalize_modules($config['plugins'] ?? []);
+		$frontend_skip_paths = self::normalize_skip_paths(
+			$config['frontend_skip_paths'] ?? self::DEFAULT_FRONTEND_SKIP_PATHS
+		);
 
 		$normalize_relative = static function (string $path) use ($root): string {
 			$root_norm = str_replace('\\', '/', rtrim($root, DIRECTORY_SEPARATOR));
@@ -33,7 +37,7 @@ class Bootstrapper {
 			return trim($relative);
 		};
 
-		$should_skip_on_frontend = static function (string $path) use ($is_frontend, $normalize_relative): bool {
+		$should_skip_on_frontend = static function (string $path) use ($is_frontend, $normalize_relative, $frontend_skip_paths): bool {
 			if (!$is_frontend) {
 				return false;
 			}
@@ -43,7 +47,7 @@ class Bootstrapper {
 				return false;
 			}
 
-			foreach (self::$frontend_skip_paths as $skip_path) {
+			foreach ($frontend_skip_paths as $skip_path) {
 				$skip = trim(str_replace('\\', '/', (string) $skip_path), '/');
 				if ($skip === '') {
 					continue;
@@ -111,7 +115,21 @@ class Bootstrapper {
 			}
 		};
 
-		// 1. Load explicitly requested platform files
+		$load_directories = static function (string $category, array $modules) use ($root, $autoload, $should_skip_on_frontend): void {
+			foreach ($modules as $module) {
+				$dir = $root . '/' . $category . '/' . $module;
+
+				if (is_dir($dir)) {
+					$autoload($dir);
+				} elseif (is_file($dir . '.php')) {
+					if (!$should_skip_on_frontend($dir . '.php')) {
+						require_once $dir . '.php';
+					}
+				}
+			}
+		};
+
+		// Platform modules are individual files and must load before theme runtime.
 		foreach ($platform_modules as $module) {
 			$path = $root . '/platform/' . $module . '.php';
 			if (is_file($path) && !$should_skip_on_frontend($path)) {
@@ -119,16 +137,48 @@ class Bootstrapper {
 			}
 		}
 
-		// 2. Load explicitly requested plugins (scan their directories recursively)
-		foreach ($plugins_modules as $plugin) {
-			$dir = $root . '/plugins/' . $plugin;
-			if (is_dir($dir)) {
-				$autoload($dir);
-			} elseif (is_file($dir . '.php')) {
-				if (!$should_skip_on_frontend($dir . '.php')) {
-					require_once $dir . '.php';
-				}
-			}
+		// ACF field types/helpers should load before the theme registers field groups.
+		$load_directories('acf', $acf_modules);
+
+		// Feature modules load after the theme's own runtime is available.
+		$load_directories('plugins', $plugins_modules);
+	}
+
+	private static function normalize_modules($modules): array {
+		if (!is_array($modules)) {
+			return [];
 		}
+
+		$enabled = [];
+
+		foreach ($modules as $module) {
+			if (!is_string($module)) {
+				continue;
+			}
+
+			$module = trim($module);
+
+			if ($module === '' || str_starts_with($module, self::DISABLED_MODULE_PREFIX)) {
+				continue;
+			}
+
+			if (preg_match('/^[a-z0-9][a-z0-9_-]*$/i', $module) !== 1) {
+				continue;
+			}
+
+			$enabled[$module] = true;
+		}
+
+		return array_keys($enabled);
+	}
+
+	private static function normalize_skip_paths($paths): array {
+		if (!is_array($paths)) {
+			return self::DEFAULT_FRONTEND_SKIP_PATHS;
+		}
+
+		return array_values(array_filter($paths, static function ($path): bool {
+			return is_string($path) && $path !== '' && !str_contains($path, '..');
+		}));
 	}
 }
