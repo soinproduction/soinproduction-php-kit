@@ -1,0 +1,1019 @@
+<?php
+	if ( ! defined( 'ABSPATH' ) ) {
+		exit;
+	}
+
+	function cf7cs_render_select( array $a ) {
+		$a = wp_parse_args( $a, [
+			'class'       => 'custom-select',
+			'type'        => 'single',
+			'placeholder' => '',
+			'name'        => '',
+			'id'          => '',
+			'options'     => '',
+			'active'      => '',
+			'disabled'    => '',
+		] );
+
+		$opts = array_filter( array_map( 'trim', explode( '|', (string) $a['options'] ) ) );
+		if ( ! $a['name'] || ! $opts ) {
+			return '';
+		}
+
+		$active   = $a['active']   !== '' ? array_map( 'trim', explode( '|', (string) $a['active']   ) ) : [];
+		$disabled = $a['disabled'] !== '' ? array_map( 'trim', explode( '|', (string) $a['disabled'] ) ) : [];
+
+		$id_attr = $a['id'] ? ' id="' . esc_attr( $a['id'] ) . '"' : '';
+
+		ob_start(); ?>
+		<div class="custom-select <?php echo esc_attr( $a['class'] ); ?>"
+			<?php echo $id_attr; ?>
+			 data-type="<?php echo esc_attr( $a['type'] ); ?>"
+			 data-placeholder="<?php echo esc_attr( $a['placeholder'] ); ?>"
+			 data-name="<?php echo esc_attr( $a['name'] ); ?>"
+			 role="combobox" aria-haspopup="listbox" aria-expanded="false">
+			<div class="select-field custom-select-field">
+				<div class="selected-options"><span class="placeholder"></span></div>
+				<div class="arrow-down">
+					<?php sprite(24, 24, 'chevron-down'); ?>
+				</div>
+			</div>
+			<ul class="options-container" role="listbox">
+				<?php foreach ( $opts as $v ):
+					$cls = 'option'
+						   . ( in_array( $v, $active,   true ) ? ' active'   : '' )
+						   . ( in_array( $v, $disabled, true ) ? ' disabled' : '' ); ?>
+					<li class="<?php echo esc_attr( $cls ); ?>" data-value="<?php echo esc_attr( $v ); ?>">
+						<span class="option-text"><?php echo esc_html( $v ); ?></span>
+					</li>
+				<?php endforeach; ?>
+			</ul>
+		</div>
+		<?php
+		return ob_get_clean();
+	}
+
+	add_shortcode( 'custom_select', function ( $atts ) {
+		return cf7cs_render_select( shortcode_atts( [
+			'class'       => 'custom-select',
+			'type'        => 'single',
+			'placeholder' => '',
+			'name'        => '',
+			'id'          => '',
+			'options'     => '',
+			'active'      => '',
+			'disabled'    => '',
+		], $atts, 'custom_select' ) );
+	} );
+
+	function cf7cs_register_tag() {
+		if ( ! function_exists( 'wpcf7_add_form_tag' ) ) {
+			return;
+		}
+
+		wpcf7_add_form_tag( [ 'custom_select', 'custom_select*' ], function ( $tag ) {
+			$tag  = new WPCF7_FormTag( $tag );
+			$name = $tag->name;
+			if ( ! $name ) {
+				return '';
+			}
+
+			$classes    = (array) $tag->get_class_option();
+			$class_attr = trim( implode( ' ', array_map( 'sanitize_html_class', $classes ) ) );
+
+			$placeholder = ( (array) $tag->get_option( 'placeholder', '', true ) )[0] ?? '';
+			$type        = ( (array) $tag->get_option( 'type', '', true ) )[0] ?? 'single';
+			$id          = ( (array) $tag->get_option( 'id', '', true ) )[0] ?? '';
+
+			$options = ( (array) $tag->get_option( 'options', '', true ) )[0] ?? '';
+			if ( $options === '' && ! empty( $tag->values ) ) {
+				$options = implode( '|', array_map( 'trim', $tag->values ) );
+			}
+			$active   = ( (array) $tag->get_option( 'active', '', true ) )[0] ?? '';
+			$disabled = ( (array) $tag->get_option( 'disabled', '', true ) )[0] ?? '';
+
+			return cf7cs_render_select( [
+				'class'       => $class_attr,
+				'type'        => $type,
+				'placeholder' => $placeholder,
+				'name'        => $name,
+				'id'          => $id,
+				'options'     => $options,
+				'active'      => $active,
+				'disabled'    => $disabled,
+			] );
+		}, [ 'name-attr' => true, 'selectable-values' => true ] );
+	}
+
+	add_action( 'wpcf7_init', 'cf7cs_register_tag', 5 );
+	add_action( 'wpcf7_admin_init', 'cf7cs_register_tag', 5 );
+
+	add_filter( 'wpcf7_validate_custom_select*', function ( $result, $tag ) {
+		$name = is_object( $tag ) ? ( $tag->name ?? '' ) : '';
+		if ( ! $name ) {
+			return $result;
+		}
+		$val = isset( $_POST[ $name ] ) ? trim( wp_unslash( $_POST[ $name ] ) ) : '';
+		if ( $val === '' && method_exists( $result, 'invalidate' ) ) {
+			$result->invalidate( $tag, wpcf7_get_message( 'invalid_required' ) );
+		}
+
+		return $result;
+	}, 10, 2 );
+
+	add_filter( 'wpcf7_form_elements', function ( $html ) {
+		if ( strpos( $html, '[custom_select' ) === false ) {
+			return $html;
+		}
+
+		return preg_replace_callback( '/\[(custom_select\*?|custom_select)\s+([^\]]+)\]/', function ( $m ) {
+			$raw = trim( $m[2] );
+			preg_match_all( '/([^\s"]+)(?:\s+"([^"]*)")?/', $raw, $parts, PREG_SET_ORDER );
+			$name = '';
+			$a    = [
+				'class'       => 'custom-select',
+				'type'        => 'single',
+				'placeholder' => '',
+				'id'          => '',
+				'options'     => '',
+				'active'      => '',
+				'disabled'    => '',
+			];
+			foreach ( $parts as $i => $p ) {
+				$key = $p[1];
+				$val = $p[2] ?? '';
+				if ( $i === 0 && strpos( $key, ':' ) === false ) {
+					$name = $key;
+					continue;
+				}
+				if ( $val === '' && strpos( $key, ':' ) !== false ) {
+					[ $key, $val ] = explode( ':', $key, 2 );
+				}
+				if ( $key === 'class' ) {
+					$a['class'] = trim( $val ) ?: 'custom-select';
+				} elseif ( $key === 'type' ) {
+					$a['type'] = $val ?: 'single';
+				} elseif ( $key === 'placeholder' ) {
+					$a['placeholder'] = $val;
+				} elseif ( $key === 'id' ) {
+					$a['id'] = $val;
+				} elseif ( $key === 'options' ) {
+					$a['options'] = $val;
+				} elseif ( $key === 'active' ) {
+					$a['active'] = $val;
+				} elseif ( $key === 'disabled' ) {
+					$a['disabled'] = $val;
+				}
+			}
+			if ( ! $name ) {
+				return '';
+			}
+			$a['name'] = $name;
+
+			return cf7cs_render_select( $a );
+		}, $html );
+	}, 5 );
+
+	function cf7cs_extract_names( $tpl ) {
+		$names = [];
+		if ( ! is_string( $tpl ) || $tpl === '' ) {
+			return $names;
+		}
+
+		if ( preg_match_all( '!\[custom_select\*?\s+[^\]]*?\sname\s*=\s*"([^"]+)"!i', $tpl, $mA ) ) {
+			foreach ( $mA[1] as $raw ) {
+				$raw = sanitize_key( $raw );
+				if ( $raw !== '' ) {
+					$names[] = $raw;
+				}
+			}
+		}
+
+		if ( preg_match_all( '!\[(?:custom_select\*?|custom_select)\s+([^\s\]"]+)!i', $tpl, $mB ) ) {
+			foreach ( $mB[1] as $raw ) {
+				if ( strpos( $raw, ':' ) !== false ) {
+					continue;
+				}
+				$raw = sanitize_key( $raw );
+				if ( $raw !== '' ) {
+					$names[] = $raw;
+				}
+			}
+		}
+		$names = array_values( array_unique( $names ) );
+
+		return $names;
+	}
+
+	function cf7cs_pick_cf( $a2 = null, $a3 = null ) {
+		if ( is_object( $a2 ) && method_exists( $a2, 'prop' ) ) {
+			return $a2;
+		}
+		if ( is_object( $a3 ) && method_exists( $a3, 'prop' ) ) {
+			return $a3;
+		}
+
+		return null;
+	}
+
+	add_filter( 'wpcf7_collect_mail_tags', function ( $list, $a2 = null, $a3 = null ) {
+		$list = (array) $list;
+
+		$cf = cf7cs_pick_cf( $a2, $a3 );
+		if ( ! $cf ) {
+			return $list;
+		}
+
+		$template = (string) $cf->prop( 'form' );
+		$names = [];
+
+		if ( function_exists( 'wpcf7_scan_form_tags' ) ) {
+			$scanned = wpcf7_scan_form_tags( $template );
+			foreach ( (array) $scanned as $t ) {
+				$type = is_object( $t ) ? ( $t->type ?? $t->basetype ?? '' ) : ( $t['type'] ?? $t['basetype'] ?? '' );
+				$name = is_object( $t ) ? ( $t->name ?? '' ) : ( $t['name'] ?? '' );
+				if ( strtolower( $type ) === 'custom_select' && $name ) {
+					$names[] = sanitize_key( $name );
+				}
+			}
+		}
+
+		$names = array_merge( $names, cf7cs_extract_names( $template ) );
+		$out = array_values( array_unique( array_merge( $list, $names ) ) );
+
+		return $out;
+	}, 9999, 3 );
+
+	add_filter( 'wpcf7_mail_tag_replaced', function ( $replaced, $submitted, $is_html, $mail_tag ) {
+		$name = is_object( $mail_tag ) ? ( $mail_tag->name ?? '' ) : '';
+		if ( ! $name || ! isset( $_POST[ $name ] ) ) {
+			return $replaced;
+		}
+		$val = wp_unslash( $_POST[ $name ] );
+
+		return is_array( $val ) ? implode( ', ', array_map( 'sanitize_text_field', $val ) )
+			: sanitize_text_field( (string) $val );
+	}, 10, 4 );
+
+	add_action( 'wpcf7_admin_init', function () {
+		if ( ! function_exists( 'wpcf7_add_tag_generator' ) ) {
+			return;
+		}
+
+		wpcf7_add_tag_generator(
+			'custom_select',
+			__( 'Select', 'contact-form-7' ),
+			'cf7cs-taggen',
+			'cf7cs_taggen_callback'
+		);
+	} );
+
+	function cf7cs_taggen_callback( $form, $args = '' ) {
+		?>
+		<div class="cf7cs-generator sp-admin-component" data-sp-admin-component>
+
+			<div class="cf7cs-row">
+				<div class="cf7cs-col">
+					<label class="cf7cs-toggle">
+						<input type="checkbox" id="cf7cs-required">
+						<span class="cf7cs-toggle-slider"></span>
+						<span class="cf7cs-toggle-label">Required</span>
+					</label>
+				</div>
+				<div class="cf7cs-col">
+					<div class="cf7cs-btn-group">
+						<label class="cf7cs-btn-radio">
+							<input type="radio" name="cf7cs-type" value="single" checked>
+							<span>Single</span>
+						</label>
+						<label class="cf7cs-btn-radio">
+							<input type="radio" name="cf7cs-type" value="multiple">
+							<span>Multiple</span>
+						</label>
+					</div>
+				</div>
+			</div>
+
+			<!-- Row 2: Name + ID -->
+			<div class="cf7cs-row">
+				<div class="cf7cs-col">
+					<label class="cf7cs-field-label" for="cf7cs-name">Name <span class="cf7cs-required">*</span></label>
+					<div class="cf7cs-input-wrap">
+						<span class="cf7cs-input-icon dashicons dashicons-tag"></span>
+						<input type="text" class="cf7cs-input has-icon" id="cf7cs-name" placeholder="field_name">
+					</div>
+				</div>
+				<div class="cf7cs-col">
+					<label class="cf7cs-field-label" for="cf7cs-id">ID <span class="cf7cs-optional">(optional)</span></label>
+					<div class="cf7cs-input-wrap">
+						<span class="cf7cs-input-icon dashicons dashicons-admin-links"></span>
+						<input type="text" class="cf7cs-input has-icon" id="cf7cs-id" placeholder="my-select">
+					</div>
+				</div>
+			</div>
+
+			<!-- Row 3: Placeholder + Class -->
+			<div class="cf7cs-row">
+				<div class="cf7cs-col">
+					<label class="cf7cs-field-label" for="cf7cs-placeholder">Placeholder</label>
+					<input type="text" class="cf7cs-input" id="cf7cs-placeholder" placeholder="Select an option...">
+				</div>
+				<div class="cf7cs-col">
+					<label class="cf7cs-field-label" for="cf7cs-class">CSS Class</label>
+					<input type="text" class="cf7cs-input" id="cf7cs-class" placeholder="my-class another-class">
+				</div>
+			</div>
+
+			<!-- Row 4: Options -->
+			<div class="cf7cs-row">
+				<div class="cf7cs-col-full">
+					<label class="cf7cs-field-label" for="cf7cs-options">
+						Options
+						<span class="cf7cs-badge">one per line</span>
+					</label>
+					<textarea class="cf7cs-textarea" id="cf7cs-options" rows="5" placeholder="Option 1&#10;Option 2&#10;Option 3"></textarea>
+				</div>
+			</div>
+
+			<!-- Row 5: Active + Disabled -->
+			<div class="cf7cs-row">
+				<div class="cf7cs-col">
+					<label class="cf7cs-field-label" for="cf7cs-active">
+						Pre-selected
+						<span class="cf7cs-badge">one per line</span>
+					</label>
+					<textarea class="cf7cs-textarea" id="cf7cs-active" rows="2" placeholder="Option 1"></textarea>
+				</div>
+				<div class="cf7cs-col">
+					<label class="cf7cs-field-label" for="cf7cs-disabled">
+						Disabled
+						<span class="cf7cs-badge">one per line</span>
+					</label>
+					<textarea class="cf7cs-textarea" id="cf7cs-disabled" rows="2" placeholder="Option 3"></textarea>
+				</div>
+			</div>
+
+		</div>
+
+		<div class="insert-box cf7cs-insert-box sp-admin-component" data-sp-admin-component>
+			<label class="cf7cs-field-label">Generated Shortcode</label>
+			<div class="cf7cs-code-wrap">
+				<input type="text" name="custom_select" class="tag code cf7cs-code" readonly onfocus="this.select()">
+				<button type="button" class="cf7cs-copy-btn" id="cf7cs-copy" title="Copy to clipboard">
+					<span class="dashicons dashicons-admin-page"></span>
+				</button>
+			</div>
+			<div class="submitbox">
+				<input type="button" class="button button-primary cf7cs-insert-btn insert-tag" value="<?php echo esc_attr( __( 'Insert Tag', 'contact-form-7' ) ); ?>">
+			</div>
+		</div>
+		<?php
+	}
+
+// CSS
+	add_action( 'admin_head', function() {
+		$screen = get_current_screen();
+		if ( ! $screen || strpos( $screen->id, 'wpcf7' ) === false ) {
+			return;
+		}
+		?>
+		<style>
+            #tag-generator-list {
+                padding: 12px 0;
+                display: flex;
+                align-items: center;
+                justify-content: flex-start;
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            #tag-generator-list button {
+                text-transform: capitalize;
+                margin: 0 !important;
+                display: inline-flex !important;
+                align-items: center;
+                justify-content: center;
+                gap: 3px;
+                padding: 5px 7px !important;
+                font-size: 13px !important;
+                font-weight: 500 !important;
+                color: var(--sp-admin-text-2, #525b66) !important;
+                background: var(--sp-admin-surface, #fff) !important;
+                border: 1px solid var(--sp-admin-border, #e7eaee) !important;
+                border-radius: 0 !important;
+                cursor: pointer;
+                transition: border-color var(--sp-admin-transition, 160ms ease), background var(--sp-admin-transition, 160ms ease), color var(--sp-admin-transition, 160ms ease), box-shadow var(--sp-admin-transition, 160ms ease) !important;
+                box-shadow: none !important;
+                line-height: 1.4 !important;
+                height: initial !important;
+            }
+            #tag-generator-list button:hover {
+                background: var(--sp-admin-accent-softer, #f7f8ff) !important;
+                border-color: var(--sp-admin-accent, #3858e9) !important;
+                color: var(--sp-admin-text, #1a1f24) !important;
+                box-shadow: none !important;
+                transform: none;
+            }
+            #tag-generator-list button:active {
+                background: var(--sp-admin-accent-soft, #edf0ff) !important;
+                transform: none;
+                box-shadow: none !important;
+            }
+            #tag-generator-list button:focus {
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            #tag-generator-list button:focus-visible {
+                border-color: var(--sp-admin-accent, #3858e9) !important;
+                box-shadow: var(--sp-admin-focus, 0 0 0 3px rgb(56 88 233 / 18%)) !important;
+            }
+            #tag-generator-list button::before {
+                font-family: dashicons;
+                font-size: 16px;
+                line-height: 1;
+            }
+
+            /* Icons */
+            #tag-generator-list button[data-target*="-custom_select"]::before { content: "\f163"; }
+            #tag-generator-list button[data-target*="-text"]::before { content: "\f215"; }
+            #tag-generator-list button[data-target*="-email"]::before { content: "\f466"; }
+            #tag-generator-list button[data-target*="-url"]::before { content: "\f103"; }
+            #tag-generator-list button[data-target*="-tel"]::before { content: "\f525"; }
+            #tag-generator-list button[data-target*="-number"]::before { content: "\f524"; }
+            #tag-generator-list button[data-target*="-date"]::before { content: "\f145"; }
+            #tag-generator-list button[data-target*="-textarea"]::before { content: "\f480"; }
+            #tag-generator-list button[data-target*="-menu"]::before { content: "\f163"; }
+            #tag-generator-list button[data-target*="-checkbox"]::before { content: "\f147"; }
+            #tag-generator-list button[data-target*="-radio"]::before { content: "\f159"; }
+            #tag-generator-list button[data-target*="-acceptance"]::before { content: "\f147"; }
+            #tag-generator-list button[data-target*="-quiz"]::before { content: "\f223"; }
+            #tag-generator-list button[data-target*="-file"]::before { content: "\f318"; }
+            #tag-generator-list button[data-target*="-submit"]::before { content: "\f474"; }
+
+
+            /* Close Button */
+            .tag-generator-dialog .close-button {
+                position: absolute !important;
+                top: 12px !important;
+                right: 12px !important;
+                width: 36px !important;
+                height: 36px !important;
+                padding: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                background: var(--sp-admin-surface-subtle, #f8fafc) !important;
+                border: 1px solid var(--sp-admin-border, #e7eaee) !important;
+                border-radius: 0 !important;
+                color: var(--sp-admin-muted, #525b66) !important;
+                font-size: 0 !important;
+                cursor: pointer !important;
+                transition: all 0.2s ease !important;
+                z-index: 10 !important;
+            }
+            .tag-generator-dialog .close-button::before {
+                content: "\f335";
+                font-family: dashicons;
+                font-size: 20px;
+                line-height: 1;
+            }
+            .tag-generator-dialog .close-button:hover {
+                background: color-mix(in srgb, var(--sp-admin-danger, #e74c3c) 10%, #fff) !important;
+                border-color: var(--sp-admin-danger, #e74c3c) !important;
+                color: var(--sp-admin-danger, #e74c3c) !important;
+                box-shadow: none !important;
+                transform: none !important;
+            }
+            .tag-generator-dialog .close-button:focus {
+                outline: none !important;
+                box-shadow: none !important;
+            }
+            .tag-generator-dialog .close-button:focus-visible {
+                box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-admin-danger, #e74c3c) 18%, transparent) !important;
+            }
+
+
+            .cf7cs-generator {
+                padding: 20px 0 10px;
+                color: var(--sp-admin-text);
+                font-family: var(--sp-admin-font);
+            }
+
+            .cf7cs-row {
+                display: flex;
+                gap: 20px;
+                margin-bottom: 20px;
+            }
+            .cf7cs-col {
+                flex: 1;
+                min-width: 0;
+            }
+            .cf7cs-col-full {
+                flex: 1 1 100%;
+            }
+
+            .cf7cs-field-label {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                font-weight: 600;
+                font-size: 12px;
+                color: var(--sp-admin-text);
+                margin-bottom: 8px;
+                text-transform: uppercase;
+                letter-spacing: 0.5px;
+            }
+            .cf7cs-required {
+                color: var(--sp-admin-danger);
+            }
+            .cf7cs-optional {
+                font-weight: 400;
+                color: var(--sp-admin-subtle);
+                text-transform: none;
+                font-size: 11px;
+            }
+            .cf7cs-badge {
+                font-weight: 500;
+                font-size: 10px;
+                color: var(--sp-admin-accent-hover);
+                background: var(--sp-admin-accent-soft);
+                padding: 2px 8px;
+                border-radius: 0;
+                text-transform: none;
+                letter-spacing: 0;
+            }
+
+            .cf7cs-input-wrap {
+                position: relative;
+            }
+            .cf7cs-input-icon {
+                position: absolute;
+                left: 12px;
+                top: 50%;
+                transform: translateY(-50%);
+                color: var(--sp-admin-subtle);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                pointer-events: none;
+                font-size: 18px;
+                width: 20px;
+                height: 20px;
+            }
+            .cf7cs-input-icon.dashicons {
+                font-size: 18px;
+                width: 20px;
+                height: 20px;
+                line-height: 20px;
+            }
+            .cf7cs-input.has-icon {
+                padding-left: 42px;
+            }
+
+            .cf7cs-input,
+            .cf7cs-textarea {
+                width: 100%;
+                padding: 10px 14px;
+                font-size: 14px;
+                line-height: 1.5;
+                color: var(--sp-admin-text);
+                background: var(--sp-admin-input-bg);
+                border: 1px solid var(--sp-admin-border-strong);
+                border-radius: var(--sp-admin-radius-sm);
+                transition: border-color var(--sp-admin-transition), box-shadow var(--sp-admin-transition), background var(--sp-admin-transition);
+                box-sizing: border-box;
+            }
+            .cf7cs-input:hover,
+            .cf7cs-textarea:hover {
+                border-color: var(--sp-admin-accent-bright);
+            }
+            .cf7cs-input:focus,
+            .cf7cs-textarea:focus {
+                outline: none;
+                border-color: var(--sp-admin-accent);
+                box-shadow: var(--sp-admin-focus);
+            }
+            .cf7cs-input::placeholder,
+            .cf7cs-textarea::placeholder {
+                color: var(--sp-admin-subtle);
+            }
+            .cf7cs-textarea {
+                resize: vertical;
+                min-height: 44px;
+                font-family: inherit;
+            }
+
+            .cf7cs-toggle {
+                display: inline-flex;
+                align-items: center;
+                gap: 12px;
+                cursor: pointer;
+                padding: 8px 0;
+                user-select: none;
+            }
+            .cf7cs-toggle input {
+                position: absolute;
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .cf7cs-toggle-slider {
+                position: relative;
+                width: 42px;
+                height: 24px;
+                box-sizing: border-box;
+                border: 1px solid var(--sp-admin-border-strong);
+                background: var(--sp-admin-border-strong);
+                border-radius: 0;
+                transition: border-color var(--sp-admin-transition), background var(--sp-admin-transition), box-shadow var(--sp-admin-transition);
+            }
+            .cf7cs-toggle-slider::after {
+                content: '';
+                position: absolute;
+                top: 2px;
+                left: 2px;
+                width: 18px;
+                height: 18px;
+                background: var(--sp-admin-surface);
+                border-radius: 0;
+                transition: transform var(--sp-admin-transition);
+                box-shadow: none;
+                transform: translateX(0);
+            }
+            .cf7cs-toggle input:checked + .cf7cs-toggle-slider {
+                border-color: var(--sp-admin-accent);
+                background: var(--sp-admin-accent);
+            }
+            .cf7cs-toggle input:checked + .cf7cs-toggle-slider::after {
+                left: 2px;
+                transform: translateX(18px);
+            }
+            .cf7cs-toggle input:focus + .cf7cs-toggle-slider {
+                box-shadow: none;
+                outline: 0;
+            }
+            .cf7cs-toggle input:focus-visible + .cf7cs-toggle-slider {
+                outline: 2px solid var(--sp-admin-accent);
+                outline-offset: 2px;
+            }
+            .cf7cs-toggle-label {
+                font-weight: 600;
+                font-size: 13px;
+                color: var(--sp-admin-text-2);
+            }
+
+            .cf7cs-btn-group {
+                display: inline-flex;
+                background: var(--sp-admin-surface-subtle);
+                border: 1px solid var(--sp-admin-border);
+                border-radius: var(--sp-admin-radius-sm);
+                padding: 4px;
+            }
+            .cf7cs-btn-radio {
+                position: relative;
+                cursor: pointer;
+            }
+            .cf7cs-btn-radio input {
+                position: absolute;
+                opacity: 0;
+                width: 0;
+                height: 0;
+            }
+            .cf7cs-btn-radio span {
+                display: block;
+                padding: 8px 20px;
+                font-size: 13px;
+                font-weight: 500;
+                color: var(--sp-admin-muted);
+                border-radius: var(--sp-admin-radius-xs);
+                transition: color var(--sp-admin-transition), background var(--sp-admin-transition), box-shadow var(--sp-admin-transition);
+            }
+            .cf7cs-btn-radio:hover span {
+                color: var(--sp-admin-accent-hover);
+            }
+            .cf7cs-btn-radio input:checked + span {
+                background: var(--sp-admin-surface);
+                color: var(--sp-admin-text);
+                box-shadow: var(--sp-admin-shadow-xs), inset 0 -2px 0 var(--sp-admin-accent);
+            }
+            .cf7cs-btn-radio input:focus + span {
+                box-shadow: var(--sp-admin-focus);
+            }
+
+            .cf7cs-insert-box {
+                margin-top: 20px;
+                padding-top: 20px;
+                border-top: 1px solid var(--sp-admin-border);
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+
+            }
+            .cf7cs-insert-box .tag { width: 100% !important; }
+            .cf7cs-insert-box .submitbox { display: flex; justify-content: center; }
+            .cf7cs-insert-box .cf7cs-field-label {
+                margin-bottom: 10px;
+            }
+            .cf7cs-code-wrap {
+                position: relative;
+                margin-bottom: 16px;
+            }
+            .cf7cs-code {
+                width: 100%;
+                padding: 12px 50px 12px 16px !important;
+                font-family: 'SF Mono', Consolas, Monaco, 'Courier New', monospace !important;
+                font-size: 13px !important;
+                background: var(--sp-admin-surface-subtle) !important;
+                border: 1px solid var(--sp-admin-border-strong) !important;
+                border-radius: var(--sp-admin-radius-sm) !important;
+                color: var(--sp-admin-text) !important;
+                margin: 0 !important;
+            }
+            .cf7cs-code:focus {
+                border-color: var(--sp-admin-accent) !important;
+                box-shadow: var(--sp-admin-focus) !important;
+                outline: none !important;
+            }
+            .cf7cs-copy-btn {
+                position: absolute;
+                right: 4px;
+                top: 50%;
+                transform: translateY(-50%);
+                width: 36px;
+                height: 36px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: transparent;
+                border: none;
+                border-radius: var(--sp-admin-radius-xs);
+                color: var(--sp-admin-muted);
+                cursor: pointer;
+                transition: all 0.2s ease;
+            }
+            .cf7cs-copy-btn:hover {
+                background: var(--sp-admin-accent-soft);
+                color: var(--sp-admin-accent-hover);
+            }
+            .cf7cs-copy-btn:active {
+                background: var(--sp-admin-border);
+            }
+            .cf7cs-copy-btn .dashicons {
+                font-size: 18px;
+                width: 18px;
+                height: 18px;
+            }
+            .cf7cs-copy-btn.copied {
+                color: var(--sp-admin-success);
+                background: color-mix(in srgb, var(--sp-admin-success) 12%, var(--sp-admin-surface));
+            }
+            .cf7cs-copy-btn.copied:hover {
+                background: color-mix(in srgb, var(--sp-admin-success) 18%, var(--sp-admin-surface));
+            }
+            .cf7cs-insert-btn {
+                padding: 10px 24px !important;
+                font-size: 14px !important;
+                font-weight: 600 !important;
+                border-radius: 0 !important;
+                height: auto !important;
+                line-height: 1.5 !important;
+                transition: all 0.2s ease !important;
+            }
+            .cf7cs-insert-btn:hover {
+                transform: none;
+                box-shadow: none;
+            }
+            .cf7cs-insert-btn:active {
+                transform: none;
+            }
+
+
+
+            /* Code Editor Textarea */
+            #wpcf7-form {
+                font-family: 'SF Mono', Consolas, Monaco, 'Courier New', monospace !important;
+                font-size: 13px !important;
+                line-height: 1.6 !important;
+                padding: 16px !important;
+                background: var(--sp-admin-input-bg, #fdfefe) !important;
+                color: var(--sp-admin-text, #1a1f24) !important;
+                border: 1px solid var(--sp-admin-border-strong, #d6dbe1) !important;
+                border-radius: 0 !important;
+                -moz-tab-size: 4 !important;
+                tab-size: 4 !important;
+                white-space: pre-wrap !important;
+                word-wrap: break-word !important;
+                resize: vertical !important;
+            }
+            #wpcf7-form:focus {
+                outline: none !important;
+                border-color: var(--sp-admin-accent, #3858e9) !important;
+                box-shadow: var(--sp-admin-focus, 0 0 0 3px rgb(56 88 233 / 18%)) !important;
+            }
+
+		</style>
+		<?php
+	} );
+
+// JS
+	add_action( 'admin_footer', function() {
+		$screen = get_current_screen();
+		if ( ! $screen || strpos( $screen->id, 'wpcf7' ) === false ) {
+			return;
+		}
+		?>
+		<script>
+            jQuery(function($) {
+                var $editor = $('#wpcf7-form');
+                if (!$editor.length) return;
+
+                $editor.on('keydown', function(e) {
+                    if (e.key === 'Tab') {
+                        e.preventDefault();
+                        var start = this.selectionStart;
+                        var end = this.selectionEnd;
+                        var value = this.value;
+
+                        if (e.shiftKey) {
+                            var beforeCursor = value.substring(0, start);
+                            var lineStart = beforeCursor.lastIndexOf('\n') + 1;
+                            var line = value.substring(lineStart, end);
+
+                            if (line.startsWith('\t')) {
+                                this.value = value.substring(0, lineStart) + line.substring(1) + value.substring(end);
+                                this.selectionStart = this.selectionEnd = start - 1;
+                            } else if (line.startsWith('    ')) {
+                                this.value = value.substring(0, lineStart) + line.substring(4) + value.substring(end);
+                                this.selectionStart = this.selectionEnd = start - 4;
+                            }
+                        } else {
+                            this.value = value.substring(0, start) + '\t' + value.substring(end);
+                            this.selectionStart = this.selectionEnd = start + 1;
+                        }
+                    }
+
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        var start = this.selectionStart;
+                        var value = this.value;
+                        var beforeCursor = value.substring(0, start);
+                        var lineStart = beforeCursor.lastIndexOf('\n') + 1;
+                        var currentLine = beforeCursor.substring(lineStart);
+                        var indent = currentLine.match(/^[\t ]*/)[0];
+
+                        this.value = value.substring(0, start) + '\n' + indent + value.substring(this.selectionEnd);
+                        this.selectionStart = this.selectionEnd = start + 1 + indent.length;
+                    }
+                });
+
+                //
+
+                var nameDirty = false;
+                var initialized = false;
+
+                function lines(str) {
+                    return (str || '').split(/\r?\n/).map(function(s) { return s.trim(); }).filter(Boolean);
+                }
+
+                function escq(s) {
+                    return String(s || '').replace(/"/g, '&quot;');
+                }
+
+                function genName() {
+                    var $n = $('#cf7cs-name');
+                    if (nameDirty || ($n.val() || '').trim()) return;
+                    $n.val('custom_select_' + Math.floor(Math.random() * 1000));
+                }
+
+                function build() {
+                    var req = $('#cf7cs-required').prop('checked') ? '*' : '';
+                    var type = $('input[name="cf7cs-type"]:checked').val() || 'single';
+                    var name = ($('#cf7cs-name').val() || '').trim();
+
+                    if (!name && !nameDirty) {
+                        genName();
+                        name = ($('#cf7cs-name').val() || '').trim();
+                    }
+
+                    if (!name) return '[custom_select]';
+
+                    var parts = [];
+                    parts.push('type "' + escq(type) + '"');
+
+                    var id = ($('#cf7cs-id').val() || '').trim();
+                    if (id) parts.push('id "' + escq(id) + '"');
+
+                    var ph = ($('#cf7cs-placeholder').val() || '').trim();
+                    if (ph) parts.push('placeholder "' + escq(ph) + '"');
+
+                    var opts = lines($('#cf7cs-options').val()).join('|');
+                    if (opts) parts.push('options "' + escq(opts) + '"');
+
+                    var active = lines($('#cf7cs-active').val()).join('|');
+                    if (active) parts.push('active "' + escq(active) + '"');
+
+                    var disabled = lines($('#cf7cs-disabled').val()).join('|');
+                    if (disabled) parts.push('disabled "' + escq(disabled) + '"');
+
+                    var cls = ($('#cf7cs-class').val() || '').trim();
+                    if (cls) parts.push('class:' + cls);
+
+                    return '[custom_select' + req + ' ' + name + ' ' + parts.join(' ') + ']';
+                }
+
+                function refresh() {
+                    var $gen = $('.cf7cs-generator');
+                    if (!$gen.length) return;
+
+                    var $code = $gen.closest('[id^="wpcf7-tg-pane-"]').find('input.tag.code');
+                    if (!$code.length) {
+                        $code = $gen.siblings('.insert-box').find('input.tag.code');
+                    }
+                    if (!$code.length) {
+                        $code = $('.cf7cs-code');
+                    }
+                    if ($code.length) {
+                        $code.val(build());
+                    }
+                }
+
+                function init() {
+                    if (initialized) return;
+                    if (!$('#cf7cs-name').length) return;
+
+                    initialized = true;
+                    genName();
+                    refresh();
+                    console.log('CF7CS ready');
+                }
+
+                $(document).on('input change keyup', '#cf7cs-name, #cf7cs-id, #cf7cs-placeholder, #cf7cs-options, #cf7cs-active, #cf7cs-disabled, #cf7cs-class', function() {
+                    if ($(this).attr('id') === 'cf7cs-name') nameDirty = true;
+                    refresh();
+                });
+
+                $(document).on('change', '#cf7cs-required, input[name="cf7cs-type"]', function() {
+                    refresh();
+                });
+
+                $(document).on('blur', '#cf7cs-name', function() {
+                    if (!$(this).val().trim()) {
+                        nameDirty = false;
+                        genName();
+                    }
+                    refresh();
+                });
+
+                $(document).on('click', '[data-target*="-custom_select"]', function() {
+                    refresh();
+                });
+
+
+                $(document).on('click', '#cf7cs-copy', function() {
+                    var $btn = $(this);
+                    var $code = $('.cf7cs-code');
+                    var text = $code.val();
+
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(function() {
+                            showCopied($btn);
+                        });
+                    } else {
+                        $code.select();
+                        document.execCommand('copy');
+                        showCopied($btn);
+                    }
+                });
+
+                function showCopied($btn) {
+                    $btn.addClass('copied');
+                    $btn.find('.dashicons').removeClass('dashicons-admin-page').addClass('dashicons-yes');
+                    setTimeout(function() {
+                        $btn.removeClass('copied');
+                        $btn.find('.dashicons').removeClass('dashicons-yes').addClass('dashicons-admin-page');
+                    }, 1500);
+                }
+
+                init();
+                setTimeout(init, 100);
+                setTimeout(init, 500);
+
+                $(document).on('click', function() {
+                    setTimeout(function() {
+                        if (!initialized && $('#cf7cs-name').length) {
+                            initialized = false;
+                            init();
+                        }
+                    }, 50);
+                });
+
+                if (typeof MutationObserver !== 'undefined') {
+                    new MutationObserver(function() {
+                        if (!initialized && $('#cf7cs-name').length) {
+                            init();
+                        }
+                    }).observe(document.body, { childList: true, subtree: true });
+                }
+            });
+		</script>
+		<?php
+	}, 9999 );

@@ -42,6 +42,7 @@ ACF-типы и общие ACF-хелперы загружаются до рег
 
 - **[sp-allow-svg-upload](../plugins/sp-allow-svg-upload/index.php)** — разрешает загрузку SVG файлов администраторам.
 - **[sp-accelerator](../plugins/sp-accelerator/index.php)** — page cache, оптимизация assets, markup и object-cache интеграция.
+- **[sp-cf7](../plugins/sp-cf7/README.ru.md)** — единая структурированная коллекция CF7-интеграций с отдельной документацией каждого подмодуля.
 - **[sp-content-manager](../plugins/sp-content-manager/index.php)** — (SP Content Manager) дублирование записей/страниц/CPT и изменение порядка (drag-and-drop) для записей, таксономий и пунктов меню админки.
 - **[sp-cpt-archives](../plugins/sp-cpt-archives/index.php)** — управление страницами архивов CPT (создание фейковых страниц для вывода архивов).
 - **[sp-dev-mode](../plugins/sp-dev-mode/index.php)** — панель отладки на фронтенде, отображающая потребление памяти, количество запросов к БД и время генерации страницы.

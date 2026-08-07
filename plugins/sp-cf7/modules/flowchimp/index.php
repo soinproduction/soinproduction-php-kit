@@ -8,6 +8,7 @@ final class SP_Flowchimp
 
 	private const OPT_KEY  = 'sp_flowchimp_options';
 	private const PAGE_SLUG = 'sp-flowchimp';
+	private static string $page_hook = '';
 
 	public static function init(): void
 	{
@@ -22,20 +23,16 @@ final class SP_Flowchimp
 
 	public static function add_admin_page(): void
 	{
-
-		add_options_page(
-			'Mailchimp — Subscribe Settings',
-			'<span style="display:flex;align-items:center;gap:5px;">
-			<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="20" height="20" viewBox="0 0 490 490">
-				<path fill="currentColor" d="M279.8 490V357.8l50.5 51.5 49.7-48.6-135-137.6-135 137.6 49.7 48.6 50.5-51.5V490zM159.5 387.6l-27.8-27.1L245 245l113.3 115.5-27.8 27.1-66-67.3v154.4h-39V320.3zM57.9 111.1c-5.6 0-11.1-1.8-14.6-3.6l-2.7 10.9c3.3 1.8 9.8 3.5 16.5 3.5 16 0 23.6-8.3 23.6-18 0-8.3-4.9-13.7-15.2-17.5-7.5-2.8-10.8-4.5-10.8-8.2 0-3 2.8-5.6 8.5-5.6s9.8 1.6 12.2 2.7l3-10.6c-3.6-1.6-8.4-3-15-3-13.7 0-22 7.7-22 17.6 0 8.5 6.3 13.9 16 17.3 7 2.5 9.7 4.5 9.7 8.2 0 3.8-3.2 6.3-9.2 6.3"/>
-				<path fill="currentColor" d="M29.9 191.5H460a30 30 0 0 0 29.9-29.8V29.9A30 30 0 0 0 460.1 0H30A30 30 0 0 0 0 29.9v131.8a30 30 0 0 0 29.9 29.8M15.3 30c0-8 6.5-14.6 14.6-14.6H460c8 0 14.6 6.5 14.6 14.6v131.8c0 8-6.5 14.5-14.6 14.5H30c-8 0-14.6-6.5-14.6-14.5z"/>
-				<path fill="currentColor" d="M110.7 122c15.2 0 24.3-8.6 24.3-26.6V62.7H122v33.6q-.2 15.3-10.8 15.1c-6.7 0-10.5-5-10.5-15.1V62.7H87.3v32.6c0 18.6 8.7 26.7 23.4 26.7M181.5 116.4c3.7-3 6.1-7.1 6.1-12.4 0-7.5-5-12.6-11.6-14.4v-.1c6.6-2.5 9.6-7.3 9.6-12.5s-3-9.3-7-11.4c-4.2-2.6-9.2-3.3-17.2-3.3-6.6 0-13.6.5-17 1.2v57.3q4.4.8 14.2.9c11.6 0 18.7-2 23-5.3m-24.1-44.2q1.5-.2 5.6-.3 9.2 0 9.4 6.7c0 4.4-3.8 7.2-10.7 7.2h-4.3zm0 23h4.5c6.6 0 11.9 2.4 11.9 8.3 0 6.1-5.3 8.4-11.3 8.4q-3.3 0-5.1-.2zM209.5 111.1c-5.6 0-11-1.8-14.6-3.6l-2.7 10.9c3.3 1.8 9.9 3.5 16.5 3.5 16 0 23.6-8.3 23.6-18 0-8.3-4.9-13.7-15.2-17.5-7.5-2.8-10.8-4.5-10.8-8.2 0-3 2.8-5.6 8.5-5.6s9.9 1.6 12.2 2.7l3-10.6c-3.5-1.6-8.4-3-15-3-13.7 0-22 7.7-22 17.6 0 8.5 6.3 13.9 16 17.3 7 2.5 9.8 4.5 9.8 8.2 0 3.8-3.2 6.3-9.3 6.3M267 122c7 0 12.5-1.4 15-2.6l-2-10.3c-2.7 1-7 2-11 2-11.8 0-18.8-7.4-18.8-19.1 0-13 8.2-19.3 18.6-19.3 4.7 0 8.4 1 11.1 2.1l2.7-10.4a34 34 0 0 0-14.4-2.6c-17.6 0-31.8 11-31.8 31 0 16.6 10.4 29.1 30.5 29.1M301.5 98.1h4c5.3.1 7.9 2 9.4 9.4 1.8 7.1 3.1 12 4 13.6h13.6c-1.1-2.3-3-10-4.8-16.5-1.4-5.4-3.7-9.3-7.8-10.9v-.3c5-1.8 10.3-6.9 10.3-14.3q-.1-8.1-5.3-12.2c-4.2-3.3-10.2-4.6-18.9-4.6-7 0-13.3.5-17.6 1.2V121h13.1zm0-25.6q1.4-.4 6-.4c6 0 9.7 2.7 9.7 8s-4 8.5-10.5 8.5h-5.2zM337.6 62.7h13.2V121h-13.2zM397.4 116.4c3.6-3 6-7.1 6-12.4 0-7.5-5-12.6-11.6-14.4v-.1c6.6-2.5 9.6-7.3 9.6-12.5s-3-9.3-7-11.4c-4.2-2.6-9.2-3.3-17.2-3.3-6.6 0-13.6.5-17 1.2v57.3q4.4.8 14.2.9c11.6 0 18.7-2 23-5.3m-24.2-44.2q1.5-.2 5.6-.3c6 0 9.4 2.3 9.4 6.7s-3.7 7.2-10.7 7.2h-4.3zm0 23h4.5c6.6 0 11.9 2.4 11.9 8.3 0 6.1-5.3 8.4-11.3 8.4q-3.2 0-5.1-.2zM447.5 110.2h-24V96.4H445V85.6h-21.5V73.5h22.8V62.7h-36v58.4h37.2z"/>
-			</svg>
-			Mailchimp</span>',
+		$page_hook = add_submenu_page(
+			'wpcf7',
+			'Flowchimp — Mailchimp Subscribe Settings',
+			'Flowchimp',
 			'manage_options',
 			self::PAGE_SLUG,
 			[__CLASS__, 'render_page']
 		);
+
+		self::$page_hook = is_string($page_hook) ? $page_hook : '';
 	}
 
 	// ─── Settings ─────────────────────────────────────────────────────────────
@@ -100,7 +97,7 @@ final class SP_Flowchimp
 
 	public static function enqueue_assets(string $hook): void
 	{
-		if ($hook !== 'settings_page_' . self::PAGE_SLUG) {
+		if ($hook !== self::$page_hook) {
 			return;
 		}
 
@@ -124,36 +121,46 @@ final class SP_Flowchimp
 		$api_set = trim($opt['api_key']) !== '';
 		$forms_count = count($opt['forms']);
 ?>
-		<div class="wrap sp-fc-wrap">
-			<h1>CF7 → Mailchimp</h1>
-			<p class="description">Connect Contact Form 7 subscription forms to Mailchimp audience lists.</p>
+		<div class="wrap sp-fc-wrap sp-admin-page">
+			<header class="sp-admin-header">
+				<div class="sp-admin-header__identity">
+					<span class="sp-admin-header__icon dashicons dashicons-email-alt" aria-hidden="true"></span>
+					<div class="sp-admin-header__copy">
+						<h1>Flowchimp</h1>
+						<p>Connect Contact Form 7 subscription forms to Mailchimp audience lists.</p>
+					</div>
+				</div>
+				<div class="sp-admin-header__actions">
+					<button type="submit" class="button button-primary" form="sp-flowchimp-settings">Save settings</button>
+				</div>
+			</header>
 
-			<div class="sp-fc-metrics">
-				<div class="sp-fc-metric">
+			<div class="sp-fc-metrics sp-admin-metrics">
+				<div class="sp-fc-metric sp-admin-metric">
 					<span class="sp-fc-metric__label">API Key</span>
 					<span class="sp-fc-metric__value">
 						<span class="sp-fc-badge <?= $api_set ? 'is-ok' : 'is-warn'; ?>"><?= $api_set ? 'Set' : 'Missing'; ?></span>
 					</span>
 				</div>
-				<div class="sp-fc-metric">
+				<div class="sp-fc-metric sp-admin-metric">
 					<span class="sp-fc-metric__label">Mapped forms</span>
 					<span class="sp-fc-metric__value"><?= esc_html($forms_count); ?></span>
 				</div>
-				<div class="sp-fc-metric">
+				<div class="sp-fc-metric sp-admin-metric">
 					<span class="sp-fc-metric__label">Opt-in mode</span>
 					<span class="sp-fc-metric__value"><?= $opt['status_if_new'] === 'pending' ? 'Double opt-in' : 'Instant'; ?></span>
 				</div>
-				<div class="sp-fc-metric">
+				<div class="sp-fc-metric sp-admin-metric">
 					<span class="sp-fc-metric__label">Skip CF7 mail</span>
 					<span class="sp-fc-metric__value"><?= $opt['skip_cf7_mail'] ? 'Yes' : 'No'; ?></span>
 				</div>
 			</div>
 
-			<form method="post" action="options.php" class="sp-fc-form">
+			<form id="sp-flowchimp-settings" method="post" action="options.php" class="sp-fc-form">
 				<?php settings_fields(self::OPT_KEY); ?>
 
-				<section class="sp-fc-card">
-					<div class="sp-fc-card-head">
+				<section class="sp-fc-card sp-admin-card">
+					<div class="sp-fc-card-head sp-admin-card__header">
 						<h2>API Settings</h2>
 					</div>
 					<table class="form-table sp-fc-table">
@@ -197,8 +204,8 @@ final class SP_Flowchimp
 					</table>
 				</section>
 
-				<section class="sp-fc-card">
-					<div class="sp-fc-card-head">
+				<section class="sp-fc-card sp-admin-card">
+					<div class="sp-fc-card-head sp-admin-card__header">
 						<h2>Form → Audience Mapping</h2>
 						<button type="button" class="button sp-fc-add-row">+ Add form</button>
 					</div>
@@ -219,9 +226,6 @@ final class SP_Flowchimp
 					</template>
 				</section>
 
-				<div class="sp-fc-submit-row">
-					<?php submit_button('Save Settings', 'primary', 'submit', false); ?>
-				</div>
 			</form>
 		</div>
 	<?php
@@ -363,30 +367,33 @@ final class SP_Flowchimp
 	{
 		return <<<'CSS'
 .sp-fc-wrap { max-width: 960px; }
-.sp-fc-subtitle { font-size: 14px; font-weight: 400; color: #667085; margin-left: 8px; }
-.sp-fc-wrap .description { color: #667085; }
+.sp-fc-subtitle { font-size: 14px; font-weight: 400; color: var(--sp-admin-muted); margin-left: 8px; }
+.sp-fc-wrap .description { color: var(--sp-admin-muted); }
 .sp-fc-metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 14px 0; }
-.sp-fc-metric { background: #fff; border: 1px solid #dcdcde; border-radius: 10px; padding: 12px 14px; }
-.sp-fc-metric__label { display: block; font-size: 12px; color: #667085; margin-bottom: 4px; }
-.sp-fc-metric__value { display: block; font-size: 16px; font-weight: 600; color: #1d2939; }
+.sp-fc-metric { background: var(--sp-admin-surface); border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius); padding: 12px 14px; box-shadow: var(--sp-admin-shadow-xs); }
+.sp-fc-metric__label { display: block; font-size: 12px; color: var(--sp-admin-muted); margin-bottom: 4px; }
+.sp-fc-metric__value { display: block; font-size: 16px; font-weight: 650; color: var(--sp-admin-text); }
 .sp-fc-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid transparent; }
-.sp-fc-badge.is-ok { color: #0f5132; background: #d1e7dd; border-color: #badbcc; }
-.sp-fc-badge.is-warn { color: #7a2e0f; background: #fff4e5; border-color: #ffd8a8; }
-.sp-fc-card { background: #fff; border: 1px solid #dcdcde; border-radius: 12px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 1px 0 rgba(16,24,40,.03); }
+.sp-fc-badge.is-ok { color: var(--sp-admin-success); background: color-mix(in srgb, var(--sp-admin-success) 11%, var(--sp-admin-surface)); border-color: color-mix(in srgb, var(--sp-admin-success) 32%, var(--sp-admin-border)); }
+.sp-fc-badge.is-warn { color: color-mix(in srgb, var(--sp-admin-warning) 55%, var(--sp-admin-text)); background: color-mix(in srgb, var(--sp-admin-warning) 13%, var(--sp-admin-surface)); border-color: color-mix(in srgb, var(--sp-admin-warning) 38%, var(--sp-admin-border)); }
+.sp-fc-card { background: var(--sp-admin-surface); border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius); padding: 16px 20px; margin-bottom: 14px; box-shadow: var(--sp-admin-shadow-xs); }
 .sp-fc-card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
-.sp-fc-card-head h2 { margin: 0; font-size: 16px; line-height: 1.35; }
+.sp-fc-card-head h2 { margin: 0; font-size: 16px; line-height: 1.35; color: var(--sp-admin-text); }
 .sp-fc-table { margin-top: 0 !important; }
-.sp-fc-table th { width: 220px; color: #344054; }
+.sp-fc-table th { width: 220px; color: var(--sp-admin-text-2); }
 .sp-fc-form .regular-text { max-width: 440px; width: 100%; }
-.sp-fc-row { display: flex; align-items: flex-start; gap: 10px; background: #f9fafb; border: 1px solid #eaecf0; border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+.sp-fc-row { display: flex; align-items: flex-start; gap: 10px; background: var(--sp-admin-surface-subtle); border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius-sm); padding: 12px; margin-bottom: 8px; transition: border-color var(--sp-admin-transition), box-shadow var(--sp-admin-transition); }
+.sp-fc-row:focus-within { border-color: var(--sp-admin-accent); box-shadow: var(--sp-admin-focus); }
 .sp-fc-row__fields { flex: 1; display: grid; grid-template-columns: .6fr 1fr .75fr; gap: 10px; }
 .sp-fc-row__field { display: flex; flex-direction: column; gap: 4px; }
-.sp-fc-row__field label { font-size: 12px; font-weight: 600; color: #344054; }
-.sp-fc-row__field select, .sp-fc-row__field input[type=text] { height: 36px; padding: 0 10px; border: 1px solid #d0d5dd; border-radius: 6px; font-size: 13px; }
+.sp-fc-row__field label { font-size: 12px; font-weight: 600; color: var(--sp-admin-text-2); }
+.sp-fc-row__field select, .sp-fc-row__field input[type=text] { height: 36px; padding: 0 10px; border: 1px solid var(--sp-admin-border-strong); border-radius: var(--sp-admin-radius-xs); background: var(--sp-admin-input-bg); color: var(--sp-admin-text); font-size: 13px; }
+.sp-fc-row__field select:focus, .sp-fc-row__field input[type=text]:focus { border-color: var(--sp-admin-accent); box-shadow: var(--sp-admin-focus); outline: 0; }
 .sp-fc-row__field--wide { grid-column: 1 / -1; }
-.sp-fc-hint { font-weight: 400; color: #667085; }
-.sp-fc-remove-row { flex-shrink: 0; margin-top: 22px; background: none; border: 1px solid #fda29b; color: #b42318; border-radius: 6px; width: 28px; height: 28px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; }
-.sp-fc-remove-row:hover { background: #fef3f2; }
+.sp-fc-hint { font-weight: 400; color: var(--sp-admin-subtle); }
+.sp-fc-remove-row { flex-shrink: 0; margin-top: 22px; background: color-mix(in srgb, var(--sp-admin-danger) 6%, var(--sp-admin-surface)); border: 1px solid color-mix(in srgb, var(--sp-admin-danger) 35%, var(--sp-admin-border)); color: var(--sp-admin-danger); border-radius: var(--sp-admin-radius-xs); width: 30px; height: 30px; cursor: pointer; font-size: 12px; display: flex; align-items: center; justify-content: center; transition: background var(--sp-admin-transition), border-color var(--sp-admin-transition), box-shadow var(--sp-admin-transition); }
+.sp-fc-remove-row:hover { background: color-mix(in srgb, var(--sp-admin-danger) 12%, var(--sp-admin-surface)); border-color: var(--sp-admin-danger); }
+.sp-fc-remove-row:focus-visible { outline: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--sp-admin-danger) 20%, transparent); }
 .sp-fc-submit-row { margin-top: 4px; }
 @media (max-width: 782px) { .sp-fc-metrics { grid-template-columns: repeat(2, 1fr); } .sp-fc-row__fields { grid-template-columns: 1fr; } }
 CSS;

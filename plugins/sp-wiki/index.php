@@ -12,6 +12,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 		private const PLUGIN_ICONS = [
 			'sp-accelerator'          => 'performance',
 			'sp-allow-svg-upload'     => 'format-image',
+			'sp-cf7'                  => 'email-alt',
 			'sp-content-manager'      => 'admin-users',
 			'sp-cpt-archives'         => 'archive',
 			'sp-dev-mode'             => 'editor-code',

@@ -8,6 +8,7 @@ final class SP_CF7_Mail_Viewer
 	private const POST_TYPE = 'sp_cf7_mail';
 	private const PAGE_SLUG = 'sp-cf7-mail-viewer';
 	private const MAX_LOGS  = 300;
+	private static string $page_hook = '';
 
 	public static function init(): void
 	{
@@ -32,20 +33,21 @@ final class SP_CF7_Mail_Viewer
 
 	public static function add_admin_page(): void
 	{
-		add_menu_page(
+		$page_hook = add_submenu_page(
+			'wpcf7',
 			'CF7 Mail Viewer',
-			'CF7 Mail Viewer',
+			'Mail Viewer',
 			'manage_options',
 			self::PAGE_SLUG,
-			[__CLASS__, 'render_page'],
-			'dashicons-list-view',
-			99
+			[__CLASS__, 'render_page']
 		);
+
+		self::$page_hook = is_string($page_hook) ? $page_hook : '';
 	}
 
 	public static function enqueue_assets(string $hook): void
 	{
-		if ($hook !== 'toplevel_page_' . self::PAGE_SLUG) {
+		if ($hook !== self::$page_hook) {
 			return;
 		}
 
@@ -109,17 +111,20 @@ final class SP_CF7_Mail_Viewer
 		$current  = $selected ? get_post($selected) : ($logs[0] ?? null);
 		$count    = count($logs);
 		?>
-		<div class="wrap sp-cf7-mail">
-			<div class="sp-cf7-mail__top">
-				<div>
+		<div class="wrap sp-cf7-mail sp-admin-page">
+			<header class="sp-cf7-mail__top sp-admin-header">
+				<div class="sp-admin-header__identity">
+					<span class="sp-admin-header__icon dashicons dashicons-email-alt" aria-hidden="true"></span>
+					<div class="sp-admin-header__copy">
 					<h1>CF7 Mail Viewer</h1>
-					<p class="description">Captured outgoing Contact Form 7 emails after mail-tag replacement.</p>
+					<p>Captured outgoing Contact Form 7 emails after mail-tag replacement.</p>
+					</div>
 				</div>
-				<div class="sp-cf7-mail__actions">
+				<div class="sp-cf7-mail__actions sp-admin-header__actions">
 					<span class="sp-cf7-mail__metric"><?= esc_html(number_format_i18n($count)); ?> stored</span>
 					<a class="button button-secondary" href="<?= esc_url(wp_nonce_url(admin_url('admin-post.php?action=sp_cf7_mail_clear'), 'sp_cf7_mail_clear')); ?>">Clear logs</a>
 				</div>
-			</div>
+			</header>
 
 			<div class="sp-cf7-mail__layout">
 				<aside class="sp-cf7-mail__list">
@@ -168,7 +173,7 @@ final class SP_CF7_Mail_Viewer
 		$posted  = is_array($posted) ? $posted : [];
 		$body_rows = self::parse_body_rows((string) $mail->post_content);
 		?>
-		<section class="sp-cf7-mail__card">
+		<section class="sp-cf7-mail__card sp-admin-card">
 			<div class="sp-cf7-mail__subject">
 				<span>Subject</span>
 				<h2><?= esc_html(get_the_title($mail)); ?></h2>
@@ -180,8 +185,8 @@ final class SP_CF7_Mail_Viewer
 			</div>
 		</section>
 
-		<section class="sp-cf7-mail__card">
-			<h2>Email Content</h2>
+		<section class="sp-cf7-mail__card sp-admin-card">
+			<div class="sp-admin-card__header"><h2>Email Content</h2></div>
 			<?php if (!empty($body_rows)) : ?>
 				<table class="widefat striped sp-cf7-mail__fields sp-cf7-mail__body-table">
 					<thead>
@@ -210,8 +215,8 @@ final class SP_CF7_Mail_Viewer
 			<?php endif; ?>
 		</section>
 
-		<section class="sp-cf7-mail__card">
-			<h2>Submitted Fields</h2>
+		<section class="sp-cf7-mail__card sp-admin-card">
+			<div class="sp-admin-card__header"><h2>Submitted Fields</h2></div>
 			<?php if (empty($posted)) : ?>
 				<p class="description">No posted fields captured.</p>
 			<?php else : ?>
@@ -347,32 +352,34 @@ final class SP_CF7_Mail_Viewer
 	{
 		return <<<'CSS'
 .sp-cf7-mail { max-width: 1180px; }
-.sp-cf7-mail .description { color: #667085; }
+.sp-cf7-mail .description { color: var(--sp-admin-muted); }
 .sp-cf7-mail__top { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin: 12px 0 14px; }
 .sp-cf7-mail__top h1 { margin: 0 0 6px; }
 .sp-cf7-mail__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.sp-cf7-mail__metric { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 600; color: #0f5132; background: #d1e7dd; border: 1px solid #badbcc; }
+.sp-cf7-mail__metric { display: inline-flex; align-items: center; height: 28px; padding: 0 10px; border-radius: 999px; font-size: 12px; font-weight: 650; color: var(--sp-admin-success); background: color-mix(in srgb, var(--sp-admin-success) 11%, var(--sp-admin-surface)); border: 1px solid color-mix(in srgb, var(--sp-admin-success) 32%, var(--sp-admin-border)); }
 .sp-cf7-mail__layout { display: grid; grid-template-columns: 340px minmax(0, 1fr); gap: 14px; }
-.sp-cf7-mail__list { background: #fff; border: 1px solid #dcdcde; border-radius: 12px; max-height: calc(100vh - 190px); overflow: auto; box-shadow: 0 1px 0 rgba(16,24,40,.03); }
-.sp-cf7-mail__item { display: grid; grid-template-columns: 32px minmax(0,1fr); column-gap: 10px; padding: 12px 14px; border-bottom: 1px solid #eaecf0; text-decoration: none; color: #1d2939; }
-.sp-cf7-mail__item:hover, .sp-cf7-mail__item.is-active { background: #f9fafb; }
-.sp-cf7-mail__item.is-active { box-shadow: inset 3px 0 0 #2271b1; }
-.sp-cf7-mail__item-icon { grid-row: 1 / 4; display: flex !important; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 8px; background: #f0f6fc; color: #2271b1; font-size: 15px; }
+.sp-cf7-mail__list { background: var(--sp-admin-surface); border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius); max-height: calc(100vh - 190px); overflow: auto; box-shadow: var(--sp-admin-shadow-xs); }
+.sp-cf7-mail__item { display: grid; grid-template-columns: 32px minmax(0,1fr); column-gap: 10px; padding: 12px 14px; border-bottom: 1px solid var(--sp-admin-border); text-decoration: none; color: var(--sp-admin-text); transition: background var(--sp-admin-transition), box-shadow var(--sp-admin-transition); }
+.sp-cf7-mail__item:hover, .sp-cf7-mail__item.is-active { background: var(--sp-admin-surface-subtle); }
+.sp-cf7-mail__item.is-active { box-shadow: inset 3px 0 0 var(--sp-admin-accent); }
+.sp-cf7-mail__item:focus-visible { outline: 0; box-shadow: inset 3px 0 0 var(--sp-admin-accent), var(--sp-admin-focus); }
+.sp-cf7-mail__item-icon { grid-row: 1 / 4; display: flex !important; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: var(--sp-admin-radius-xs); background: var(--sp-admin-accent-soft); color: var(--sp-admin-accent); font-size: 15px; }
 .sp-cf7-mail__item strong { display: block; font-size: 13px; line-height: 1.35; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sp-cf7-mail__item span:not(.sp-cf7-mail__item-icon), .sp-cf7-mail__item small { display: block; margin-top: 4px; color: #667085; }
+.sp-cf7-mail__item span:not(.sp-cf7-mail__item-icon), .sp-cf7-mail__item small { display: block; margin-top: 4px; color: var(--sp-admin-muted); }
 .sp-cf7-mail__preview { min-width: 0; }
-.sp-cf7-mail__card { background: #fff; border: 1px solid #dcdcde; border-radius: 12px; padding: 16px; margin-bottom: 14px; box-shadow: 0 1px 0 rgba(16,24,40,.03); }
-.sp-cf7-mail__card h2 { margin: 0 0 12px; font-size: 17px; line-height: 1.35; }
-.sp-cf7-mail__subject span, .sp-cf7-mail__meta span { display: block; font-size: 12px; color: #667085; margin-bottom: 4px; }
-.sp-cf7-mail__subject h2 { margin: 0; font-size: 20px; line-height: 1.3; color: #1d2939; }
+.sp-cf7-mail__card { background: var(--sp-admin-surface); border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius); padding: 16px; margin-bottom: 14px; box-shadow: var(--sp-admin-shadow-xs); }
+.sp-cf7-mail__card h2 { margin: 0 0 12px; font-size: 17px; line-height: 1.35; color: var(--sp-admin-text); }
+.sp-cf7-mail__subject span, .sp-cf7-mail__meta span { display: block; font-size: 12px; color: var(--sp-admin-muted); margin-bottom: 4px; }
+.sp-cf7-mail__subject h2 { margin: 0; font-size: 20px; line-height: 1.3; color: var(--sp-admin-text); }
 .sp-cf7-mail__meta { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
-.sp-cf7-mail__meta div { border: 1px solid #eaecf0; border-radius: 10px; background: #f9fafb; padding: 10px; }
-.sp-cf7-mail__meta strong { display: block; font-size: 14px; font-weight: 600; color: #1d2939; overflow-wrap: anywhere; }
-.sp-cf7-mail__body { padding: 14px; border: 1px solid #eaecf0; background: #f9fafb; border-radius: 8px; overflow: auto; }
+.sp-cf7-mail__meta div { border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius-sm); background: var(--sp-admin-surface-subtle); padding: 10px; }
+.sp-cf7-mail__meta strong { display: block; font-size: 14px; font-weight: 600; color: var(--sp-admin-text); overflow-wrap: anywhere; }
+.sp-cf7-mail__body { padding: 14px; border: 1px solid var(--sp-admin-border); background: var(--sp-admin-surface-subtle); border-radius: var(--sp-admin-radius-sm); overflow: auto; }
 .sp-cf7-mail__body.is-plain { font-size: 14px; line-height: 1.65; }
-.sp-cf7-mail__fields th { width: 220px; color: #344054; }
-.sp-cf7-mail pre { white-space: pre-wrap; margin: 0; padding: 14px; background: #f9fafb; border: 1px solid #eaecf0; border-radius: 8px; color: #1d2939; }
-.sp-cf7-mail__empty { padding: 24px; color: #667085; text-align: center; }
+.sp-cf7-mail__fields { border-color: var(--sp-admin-border); }
+.sp-cf7-mail__fields th { width: 220px; color: var(--sp-admin-text-2); }
+.sp-cf7-mail pre { white-space: pre-wrap; margin: 0; padding: 14px; background: var(--sp-admin-surface-subtle); border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius-sm); color: var(--sp-admin-text); }
+.sp-cf7-mail__empty { padding: 24px; color: var(--sp-admin-muted); text-align: center; }
 @media(max-width:1100px){.sp-cf7-mail__layout{grid-template-columns:1fr}.sp-cf7-mail__meta{grid-template-columns:1fr}.sp-cf7-mail__top{flex-direction:column}}
 CSS;
 	}

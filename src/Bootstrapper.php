@@ -19,6 +19,7 @@ class Bootstrapper {
 
 	private const DEFAULT_AUTOLOAD_SKIP_PATHS = [
 		'plugins/sp-accelerator/includes/',
+		'plugins/sp-cf7/modules/',
 	];
 
 	public static function pathToUrl(string $path): string {

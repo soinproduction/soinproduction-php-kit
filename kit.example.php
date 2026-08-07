@@ -31,6 +31,7 @@ $acf = [
 $plugins = [
 	'sp-accelerator',
 	'sp-allow-svg-upload',
+	'sp-cf7',
 	'sp-content-manager',
 	'sp-cpt-archives',
 	'sp-dev-mode',
