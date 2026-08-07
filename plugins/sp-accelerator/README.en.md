@@ -297,3 +297,11 @@ If a deployment causes an immediate critical error:
 4. Upload one complete matching module version, restore the directory name, then reinstall/update both managed drop-ins from **Settings → Accelerator**.
 
 SP Accelerator refuses destructive operations on drop-ins it does not own.
+
+## Regression tests
+
+If PHP Kit is outside a WordPress installation, pass its root explicitly:
+
+```bash
+SP_ACCELERATOR_WP_ROOT=/path/to/wordpress php _tests/run.php
+```

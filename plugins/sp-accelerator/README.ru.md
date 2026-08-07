@@ -306,3 +306,11 @@ curl -I https://example.com/control-page/
 4. Загрузите один полный совпадающий релиз, верните имя каталога, затем переустановите/обновите оба drop-in через **Настройки → Accelerator**.
 
 SP Accelerator отказывается от destructive operations над drop-ins, которыми он не владеет.
+
+## Регрессионные тесты
+
+Если PHP Kit находится вне установки WordPress, передайте её корень явно:
+
+```bash
+SP_ACCELERATOR_WP_ROOT=/path/to/wordpress php _tests/run.php
+```

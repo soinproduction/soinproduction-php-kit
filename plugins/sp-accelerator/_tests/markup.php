@@ -12,7 +12,23 @@ if ( PHP_SAPI !== 'cli' ) {
 if ( ! function_exists( 'trailingslashit' ) ) {
 	function trailingslashit( $path ) { return rtrim( (string) $path, '/\\' ) . '/'; }
 }
-$wp_root = dirname( __DIR__, 7 );
+$wp_root = trim( (string) getenv( 'SP_ACCELERATOR_WP_ROOT' ) );
+
+if ( $wp_root === '' ) {
+	$candidate = __DIR__;
+	while ( dirname( $candidate ) !== $candidate ) {
+		$candidate = dirname( $candidate );
+		if ( is_file( $candidate . '/wp-includes/class-wp-token-map.php' ) ) {
+			$wp_root = $candidate;
+			break;
+		}
+	}
+}
+
+if ( $wp_root === '' || ! is_file( $wp_root . '/wp-includes/class-wp-token-map.php' ) ) {
+	fwrite( STDERR, "Set SP_ACCELERATOR_WP_ROOT to a WordPress installation before running markup.php.\n" );
+	exit( 2 );
+}
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', trailingslashit( $wp_root ) );
 }
