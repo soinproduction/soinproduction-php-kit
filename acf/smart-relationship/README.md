@@ -5,7 +5,7 @@
 The field implementation lives in:
 
 ```text
-core/acf/smart-relationship/index.php
+acf/smart-relationship/index.php
 ```
 
 ## Field Config

@@ -259,7 +259,7 @@ Legacy SQLite обрабатывается отдельно от page entries. `
 
 ## Ввод в эксплуатацию
 
-1. Разверните `core/bootstrap.php` и весь каталог `core/plugins/sp-accelerator` одной версией. Не смешивайте разные релизы пофайловой FTP-загрузкой.
+1. Разворачивайте PHP Kit одной версией, зафиксированной Composer lock. Не смешивайте разные релизы пофайловой FTP-загрузкой.
 2. Откройте **Настройки → Accelerator**, сохраните настройки и проверьте анонимную страницу без drop-ins.
 3. Добавьте `WP_CACHE` в `wp-config.php`. Используйте отдельный абсолютный `SP_ACCELERATOR_CACHE_DIR`, basename которого содержит `sp-accelerator`; никогда не указывайте широкий WordPress, document или system-temp root. Вынесите каталог за фактический document root либо проверьте точный deny и задайте соответствующий assertion. Если server/CLI не сообщает реальный публичный root, определите `SP_ACCELERATOR_DOCUMENT_ROOT`; затем установите/обновите управляемый `advanced-cache.php`.
 4. Проверьте последовательность `MISS` → `HIT`, включая security headers и GZIP.
@@ -300,7 +300,7 @@ curl -I https://example.com/control-page/
 
 Если сразу после deployment возник critical error:
 
-1. Переименуйте `core/plugins/sp-accelerator` в `_sp-accelerator-disabled`.
+1. Замените `sp-accelerator` на `_sp-accelerator` в конфигурации PHP Kit проекта.
 2. Если нужно, временно переименуйте только управляемые `wp-content/object-cache.php` и `wp-content/advanced-cache.php`.
 3. Прочитайте точный fatal в `wp-content/debug.log` или PHP error log хостинга.
 4. Загрузите один полный совпадающий релиз, верните имя каталога, затем переустановите/обновите оба drop-in через **Настройки → Accelerator**.

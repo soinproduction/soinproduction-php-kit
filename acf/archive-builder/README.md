@@ -5,7 +5,7 @@
 The active field implementation lives in:
 
 ```text
-core/acf/archive-builder/index.php
+acf/archive-builder/index.php
 ```
 
 The theme autoloader loads this file automatically because it scans `core/` recursively.

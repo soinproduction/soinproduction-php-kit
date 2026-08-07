@@ -5,7 +5,7 @@
 The field implementation lives in:
 
 ```text
-core/acf/taxonomy-urls/index.php
+acf/taxonomy-urls/index.php
 ```
 
 ## Field Config

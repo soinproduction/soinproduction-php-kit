@@ -5,7 +5,7 @@
 The field implementation lives in:
 
 ```text
-core/acf/smart-taxonomy/index.php
+acf/smart-taxonomy/index.php
 ```
 
 ## Field Config

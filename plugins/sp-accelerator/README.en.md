@@ -259,7 +259,7 @@ On a theme switch, SP Accelerator first persists runtime disable, then disables 
 
 ## Deployment
 
-1. Deploy `core/bootstrap.php` and the complete `core/plugins/sp-accelerator` directory as one release. Do not merge different releases file by file.
+1. Deploy PHP Kit through one Composer-locked version. Do not merge different releases file by file.
 2. Open **Settings → Accelerator**, save settings, and test an anonymous page without drop-ins.
 3. Add `WP_CACHE` to `wp-config.php`. Use a dedicated absolute `SP_ACCELERATOR_CACHE_DIR` whose basename contains `sp-accelerator`; never point it at a broad WordPress, document, or system-temp root. Place it outside the actual document root or verify the exact cache-directory deny and set the matching assertion. Define `SP_ACCELERATOR_DOCUMENT_ROOT` when the server/CLI value is not the real public root; then install/update the managed `advanced-cache.php`.
 4. Verify a `MISS` followed by a `HIT`, including security headers and GZIP behavior.
@@ -291,7 +291,7 @@ The installed drop-ins live in `wp-content`, outside the theme. A theme upload c
 
 If a deployment causes an immediate critical error:
 
-1. Rename `core/plugins/sp-accelerator` to `_sp-accelerator-disabled`.
+1. Change `sp-accelerator` to `_sp-accelerator` in the project's PHP Kit configuration.
 2. If needed, temporarily rename only the managed `wp-content/object-cache.php` and `wp-content/advanced-cache.php` files.
 3. Read the exact fatal error from `wp-content/debug.log` or the hosting PHP error log.
 4. Upload one complete matching module version, restore the directory name, then reinstall/update both managed drop-ins from **Settings → Accelerator**.

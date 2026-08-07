@@ -142,7 +142,7 @@ They are **not installed automatically**. A read-only `.htaccess` is reported wi
 
 ## Installation
 
-1. Deploy `core/bootstrap.php` and the complete `core/plugins/sp-accelerator` directory as one release.
+1. Deploy PHP Kit through one Composer-locked version.
 2. Open **Settings → Accelerator**, save the required settings, and test logged-out requests before installing drop-ins.
 3. Add the following to `wp-config.php` before WordPress' “stop editing” line:
 
@@ -187,7 +187,7 @@ Also verify HTML identity, CSP/security headers, logged-in behavior, cart/accoun
 
 If WordPress fails immediately after deployment:
 
-1. Rename `core/plugins/sp-accelerator` to `_sp-accelerator-disabled`.
+1. Change `sp-accelerator` to `_sp-accelerator` in the project's PHP Kit configuration.
 2. If the error remains, temporarily rename only the managed `wp-content/object-cache.php` and `wp-content/advanced-cache.php` files.
 3. Read the exact fatal error from `wp-content/debug.log` or the hosting PHP log.
 4. Upload one complete module version, restore the directory name, then reinstall/update both managed drop-ins from **Settings → Accelerator**.

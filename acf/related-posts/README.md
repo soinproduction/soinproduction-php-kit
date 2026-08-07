@@ -5,7 +5,7 @@
 The field implementation lives in:
 
 ```text
-core/acf/related-posts/index.php
+acf/related-posts/index.php
 ```
 
 ## Field Config

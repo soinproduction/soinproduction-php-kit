@@ -5,7 +5,7 @@
 The field implementation lives in:
 
 ```text
-core/acf/universal-media/index.php
+acf/universal-media/index.php
 ```
 
 ## Field Config

@@ -5,7 +5,7 @@ Dynamic in-admin documentation browser for the custom theme and every connected 
 ## Discovery Rules
 
 - Theme chapters are read from `docs/en/*.md` or `docs/ru/*.md`.
-- Module documentation is discovered under `core/plugins/*`.
+- Module documentation is discovered beside loaded modules under the PHP Kit `plugins/*` directory.
 - A module is listed only when its folder is not prefixed with `_`, contains `index.php`, and at least one PHP file from that folder is loaded in the current admin request.
 - The Wiki itself does not activate or include other modules.
 

@@ -5,7 +5,7 @@
 The field implementation lives in:
 
 ```text
-core/acf/table/index.php
+acf/table/index.php
 ```
 
 ## Field Config
