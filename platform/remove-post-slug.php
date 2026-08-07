@@ -6,23 +6,84 @@
 	const SP_REMOVE_SLUG_POST_TYPES_OPTION = 'sp_remove_slug_post_types';
 	const SP_REMOVE_SLUG_TAXONOMIES_OPTION = 'sp_remove_slug_taxonomies';
 
-	function sp_remove_post_type_slug_from_link( string $post_link, WP_Post $post ): string {
+	function sp_get_remove_slug_post_types(): array {
 		$post_types = get_option( SP_REMOVE_SLUG_POST_TYPES_OPTION, [] );
 
+		if ( ! is_array( $post_types ) ) {
+			return [];
+		}
+
+		$post_types = array_map( 'sanitize_key', $post_types );
+
+		return array_values( array_unique( array_filter( $post_types ) ) );
+	}
+
+	function sp_get_post_type_slug_bases( string $post_type ): array {
+		$bases = [ $post_type ];
+
+		$post_type_object = get_post_type_object( $post_type );
+		if ( $post_type_object && ! empty( $post_type_object->rewrite['slug'] ) ) {
+			$bases[] = (string) $post_type_object->rewrite['slug'];
+		}
+
+		if ( function_exists( 'fa_get_single_base_from_fake_archive_if_has_parent' ) ) {
+			$bases[] = (string) fa_get_single_base_from_fake_archive_if_has_parent( $post_type );
+		}
+
+		$bases = array_map( static function ( $base ): string {
+			return trim( (string) $base, '/' );
+		}, $bases );
+		$bases = array_values( array_unique( array_filter( $bases ) ) );
+
+		usort( $bases, static function ( string $a, string $b ): int {
+			return strlen( $b ) <=> strlen( $a );
+		} );
+
+		return $bases;
+	}
+
+	function sp_remove_post_type_slug_from_link( string $post_link, WP_Post $post ): string {
+		$post_types = sp_get_remove_slug_post_types();
+
 		if ( ! empty( $post_types ) && in_array( $post->post_type, $post_types, true ) ) {
-			$post_link = str_replace( '/' . $post->post_type . '/', '/', $post_link );
+			foreach ( sp_get_post_type_slug_bases( $post->post_type ) as $base ) {
+				$search = '/' . $base . '/';
+
+				if ( strpos( $post_link, $search ) !== false ) {
+					$post_link = str_replace( $search, '/', $post_link );
+					break;
+				}
+			}
 		}
 
 		return $post_link;
 	}
-	add_filter( 'post_type_link', 'sp_remove_post_type_slug_from_link', 10, 2 );
+	add_filter( 'post_type_link', 'sp_remove_post_type_slug_from_link', 999, 2 );
 
 	function sp_fix_main_query_for_removed_post_type_slugs( WP_Query $query ): void {
 		if ( is_admin() || ! $query->is_main_query() ) {
 			return;
 		}
 
-		if ( empty( $query->query['name'] ) ) {
+		$requested_slug = '';
+
+		if ( ! empty( $query->query['name'] ) ) {
+			$requested_slug = (string) $query->query['name'];
+		} elseif ( ! empty( $query->query['pagename'] ) ) {
+			$requested_path = trim( (string) $query->query['pagename'], '/' );
+
+			if ( $requested_path !== '' && get_page_by_path( $requested_path, OBJECT, 'page' ) ) {
+				return;
+			}
+
+			if ( str_contains( $requested_path, '/' ) ) {
+				return;
+			}
+
+			$requested_slug = basename( $requested_path );
+		}
+
+		if ( $requested_slug === '' ) {
 			return;
 		}
 
@@ -35,12 +96,24 @@
 			}
 		}
 
-		$post_types = get_option( SP_REMOVE_SLUG_POST_TYPES_OPTION, [] );
+		$post_types = sp_get_remove_slug_post_types();
 		if ( empty( $post_types ) ) {
 			return;
 		}
 
-		$query->set( 'post_type', array_merge( [ 'post', 'page' ], $post_types ) );
+		$post = get_page_by_path( $requested_slug, OBJECT, $post_types );
+		if ( ! ( $post instanceof WP_Post ) ) {
+			return;
+		}
+
+		$query->set( 'post_type', $post->post_type );
+		$query->set( 'name', $post->post_name );
+		$query->set( 'pagename', '' );
+		$query->set( 'page_id', '' );
+
+		$query->is_page     = false;
+		$query->is_single   = true;
+		$query->is_singular = true;
 	}
 	add_action( 'pre_get_posts', 'sp_fix_main_query_for_removed_post_type_slugs' );
 

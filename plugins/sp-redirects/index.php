@@ -67,47 +67,48 @@ final class SP_Redirects
 		$rules = self::get_rules();
 		$enabled_count = count(array_filter($rules, static fn($rule) => (int) ($rule['enabled'] ?? 1) === 1));
 		?>
-		<div class="wrap sp-redirects">
-			<h1>SP Redirects</h1>
-			<p class="description">Manage exact URL redirects and import migration maps from CSV or TSV files.</p>
+		<div class="wrap sp-redirects sp-admin-page">
+			<header class="sp-admin-header">
+				<div class="sp-admin-header__identity">
+					<span class="sp-admin-header__icon dashicons dashicons-randomize" aria-hidden="true"></span>
+					<div class="sp-admin-header__copy">
+						<h1>SP Redirects</h1>
+						<p>Manage exact URL redirects and import migration maps from CSV or TSV files.</p>
+					</div>
+				</div>
+				<div class="sp-admin-header__actions">
+					<button type="submit" class="button button-primary" form="sp-redirects-settings">Save redirects</button>
+				</div>
+			</header>
 
 			<?php self::render_notice(); ?>
 
-			<div class="sp-redirects-metrics">
-				<div class="sp-redirects-metric">
+			<div class="sp-redirects-metrics sp-admin-metrics">
+				<div class="sp-redirects-metric sp-admin-metric">
 					<span class="sp-redirects-metric__label">Total rules</span>
 					<span class="sp-redirects-metric__value"><?= esc_html(number_format_i18n(count($rules))); ?></span>
 				</div>
-				<div class="sp-redirects-metric">
+				<div class="sp-redirects-metric sp-admin-metric">
 					<span class="sp-redirects-metric__label">Enabled</span>
 					<span class="sp-redirects-metric__value"><?= esc_html(number_format_i18n($enabled_count)); ?></span>
 				</div>
-				<div class="sp-redirects-metric">
+				<div class="sp-redirects-metric sp-admin-metric">
 					<span class="sp-redirects-metric__label">Default status</span>
 					<span class="sp-redirects-metric__value">301</span>
 				</div>
 			</div>
 
-			<form method="post" action="options.php">
+			<form id="sp-redirects-settings" method="post" action="options.php">
 				<?php settings_fields(self::OPT_KEY); ?>
 
-				<section class="sp-redirects__card">
-					<div class="sp-redirects__card-head">
+				<section class="sp-redirects__card sp-admin-card">
+					<div class="sp-redirects__card-head sp-admin-card__header">
 						<h2>Redirect Rules</h2>
 						<button type="button" class="button sp-redirects-add">+ Add row</button>
 					</div>
 
 					<div class="sp-redirects__table-wrap">
-						<table class="widefat fixed striped sp-redirects__table">
-							<thead>
-							<tr>
-								<th>OLD</th>
-								<th>NEW</th>
-								<th class="sp-redirects__status-col">Code</th>
-								<th class="sp-redirects__enabled-col">On</th>
-								<th class="sp-redirects__remove-col"></th>
-							</tr>
-							</thead>
+						<table class="sp-redirects__table">
 							<tbody id="sp-redirects-rows">
 							<?php foreach ($rules as $i => $rule) : ?>
 								<?php self::render_row($i, $rule); ?>
@@ -124,11 +125,10 @@ final class SP_Redirects
 					</template>
 				</section>
 
-				<?php submit_button('Save Redirects'); ?>
 			</form>
 
-			<section class="sp-redirects__card">
-				<div class="sp-redirects__card-head">
+			<section class="sp-redirects__card sp-admin-card">
+				<div class="sp-redirects__card-head sp-admin-card__header">
 					<h2>Import From File</h2>
 				</div>
 				<p class="description">Upload a <code>.csv</code>, <code>.tsv</code> or <code>.txt</code> file. The first columns should be <code>OLD</code>, <code>NEW</code>, <code>STATUS</code>. Header row is optional.</p>
@@ -156,17 +156,38 @@ final class SP_Redirects
 		$key     = esc_attr(self::OPT_KEY);
 		?>
 		<tr>
-			<td><input type="text" class="large-text" name="<?= $key; ?>[rules][<?= esc_attr((string) $index); ?>][old]" value="<?= $old; ?>" placeholder="/old-url/" /></td>
-			<td><input type="text" class="large-text" name="<?= $key; ?>[rules][<?= esc_attr((string) $index); ?>][new]" value="<?= $new; ?>" placeholder="/new-url/" /></td>
-			<td>
-				<select name="<?= $key; ?>[rules][<?= esc_attr((string) $index); ?>][status]">
-					<?php foreach ([301, 302, 307, 308] as $code) : ?>
-						<option value="<?= esc_attr((string) $code); ?>" <?php selected($status, $code); ?>><?= esc_html((string) $code); ?></option>
-					<?php endforeach; ?>
-				</select>
+			<td class="sp-redirects__source">
+				<label>
+					<span class="sp-redirects__field-label">Source URL</span>
+					<input type="text" class="large-text" name="<?= $key; ?>[rules][<?= esc_attr((string) $index); ?>][old]" value="<?= $old; ?>" placeholder="/old-url/" />
+				</label>
 			</td>
-			<td><input type="checkbox" name="<?= $key; ?>[rules][<?= esc_attr((string) $index); ?>][enabled]" value="1" <?php checked($enabled); ?> /></td>
-			<td><button type="button" class="button-link-delete sp-redirects-remove">Remove</button></td>
+			<td class="sp-redirects__arrow" aria-hidden="true"><span class="dashicons dashicons-arrow-right-alt"></span></td>
+			<td class="sp-redirects__destination">
+				<label>
+					<span class="sp-redirects__field-label">Destination URL</span>
+					<input type="text" class="large-text" name="<?= $key; ?>[rules][<?= esc_attr((string) $index); ?>][new]" value="<?= $new; ?>" placeholder="/new-url/" />
+				</label>
+			</td>
+			<td class="sp-redirects__status">
+				<label>
+					<span class="sp-redirects__field-label">Redirect type</span>
+					<select name="<?= $key; ?>[rules][<?= esc_attr((string) $index); ?>][status]">
+					<?php foreach ([301 => 'Permanent', 302 => 'Temporary', 307 => 'Temporary', 308 => 'Permanent'] as $code => $label) : ?>
+						<option value="<?= esc_attr((string) $code); ?>" <?php selected($status, $code); ?>><?= esc_html($code . ' · ' . $label); ?></option>
+					<?php endforeach; ?>
+					</select>
+				</label>
+			</td>
+			<td class="sp-redirects__enabled">
+				<span class="sp-redirects__field-label">Active</span>
+				<label class="sp-redirects-toggle">
+					<input type="checkbox" name="<?= $key; ?>[rules][<?= esc_attr((string) $index); ?>][enabled]" value="1" <?php checked($enabled); ?> />
+					<span class="sp-redirects-toggle__track" aria-hidden="true"><span></span></span>
+					<span class="screen-reader-text">Enable redirect</span>
+				</label>
+			</td>
+			<td class="sp-redirects__remove"><button type="button" class="button sp-redirects-remove" title="Remove redirect"><span class="dashicons dashicons-trash" aria-hidden="true"></span><span class="screen-reader-text">Remove redirect</span></button></td>
 		</tr>
 		<?php
 	}
@@ -415,29 +436,54 @@ final class SP_Redirects
 	private static function css(): string
 	{
 		return <<<'CSS'
-.sp-redirects .description { color: #667085; }
+.sp-redirects { color: var(--sp-admin-text, #1a1f24); }
+.sp-redirects .description { color: var(--sp-admin-muted, #525b66); }
 .sp-redirects-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 14px 0; }
-.sp-redirects-metric { background: #fff; border: 1px solid #dcdcde; border-radius: 10px; padding: 12px 14px; }
-.sp-redirects-metric__label { display: block; font-size: 12px; color: #667085; margin-bottom: 4px; }
-.sp-redirects-metric__value { display: block; font-size: 16px; font-weight: 600; color: #1d2939; }
-.sp-redirects__card { background: #fff; border: 1px solid #dcdcde; border-radius: 12px; padding: 16px 20px; margin-bottom: 14px; box-shadow: 0 1px 0 rgba(16,24,40,.03); }
+.sp-redirects-metric { background: var(--sp-admin-surface, #fff); border: 1px solid var(--sp-admin-border, #e7eaee); border-radius: var(--sp-admin-radius-sm, 9px); padding: 12px 14px; box-shadow: var(--sp-admin-shadow-xs, 0 1px 2px rgb(26 31 36 / 4%)); }
+.sp-redirects-metric__label { display: block; margin-bottom: 4px; color: var(--sp-admin-muted, #525b66); font-size: 12px; }
+.sp-redirects-metric__value { display: block; color: var(--sp-admin-text, #1a1f24); font-size: 16px; font-weight: 600; }
+.sp-redirects__card { background: var(--sp-admin-surface, #fff); border: 1px solid var(--sp-admin-border, #e7eaee); border-radius: var(--sp-admin-radius, 14px); padding: 16px 20px; margin-bottom: 14px; box-shadow: var(--sp-admin-shadow-xs, 0 1px 2px rgb(26 31 36 / 4%)); }
 .sp-redirects__card-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .sp-redirects__card-head h2, .sp-redirects__card h2 { margin: 0; font-size: 16px; line-height: 1.35; }
-.sp-redirects__table-wrap { overflow: auto; }
-.sp-redirects__table { margin-top: 0 !important; }
-.sp-redirects__table th { color: #344054; }
-.sp-redirects__table td { vertical-align: middle; }
-.sp-redirects__table input[type=text] { width: 100%; max-width: 100%; }
-.sp-redirects__table input[type=text], .sp-redirects__table select { height: 34px;width:100%; min-height: 34px; padding: 0 10px; border: 1px solid #d0d5dd; border-radius: 6px; font-size: 13px; }
-.sp-redirects__status-col { width: 90px; }
-.sp-redirects__enabled-col { width: 60px; }
-.sp-redirects__remove-col { width: 90px; }
-.sp-redirects-remove { color: #b42318; }
-.sp-redirects-upload { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; padding: 12px; background: #f9fafb; border: 1px solid #eaecf0; border-radius: 8px; }
+.sp-redirects__table-wrap { overflow: visible; }
+.sp-redirects__table { display: block; width: 100%; margin: 0; border: 0; border-collapse: collapse; background: transparent; }
+.sp-redirects__table tbody { display: grid; gap: 10px; }
+.sp-redirects__table tr { display: grid; grid-template-columns: minmax(260px,1fr) 26px minmax(260px,1fr) 156px 64px 42px; align-items: end; gap: 10px; padding: 14px; border: 1px solid var(--sp-admin-border, #e7eaee); border-radius: var(--sp-admin-radius-sm, 9px); background: var(--sp-admin-surface-alt, #f8fafc); box-shadow: var(--sp-admin-shadow-xs, 0 1px 2px rgb(26 31 36 / 4%)); transition: border-color var(--sp-admin-transition, 160ms ease), box-shadow var(--sp-admin-transition, 160ms ease); }
+.sp-redirects__table tr:hover { border-color: var(--sp-admin-border-strong, #d6dbe1); }
+.sp-redirects__table td { display: block; padding: 0; border: 0; }
+.sp-redirects__table label { display: grid; gap: 6px; }
+.sp-redirects__field-label { display: block; color: var(--sp-admin-text-2, #525b66); font-size: 12px; font-weight: 600; line-height: 1.2; }
+.sp-redirects__table input[type=text], .sp-redirects__table select { width: 100%; max-width: 100%; background: var(--sp-admin-input-bg, #fdfefe); }
+.sp-redirects__arrow { align-self: end; padding-bottom: 7px !important; color: var(--sp-admin-subtle, #8a919b); text-align: center; }
+.sp-redirects__arrow .dashicons { width: 20px; height: 20px; color: var(--sp-admin-text-2, #525b66); font-size: 18px; line-height: 20px; }
+.sp-redirects__enabled { display: grid !important; align-content: end; justify-items: start; gap: 8px; padding-bottom: 8px !important; }
+.sp-redirects__remove { display: flex !important; align-items: flex-end; padding-bottom: 1px !important; }
+.sp-redirects-toggle { position: relative; display: inline-flex; cursor: pointer; }
+.sp-redirects-toggle input { position: absolute; opacity: 0; pointer-events: none; }
+.sp-redirects-toggle__track { position: relative; display: block; width: 38px; height: 22px; border-radius: 999px; background: var(--sp-admin-surface-alt, #f8fafc); box-shadow: inset 0 0 0 1px var(--sp-admin-border-strong, #d6dbe1); transition: background-color var(--sp-admin-transition, 160ms ease), box-shadow var(--sp-admin-transition, 160ms ease); }
+.sp-redirects-toggle__track span { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: var(--sp-admin-surface, #fff); box-shadow: 0 1px 3px rgb(26 31 36 / 20%); transition: transform var(--sp-admin-transition, 160ms ease); }
+.sp-redirects-toggle input:checked + .sp-redirects-toggle__track { background: var(--sp-admin-accent, #3858e9); box-shadow: inset 0 0 0 1px var(--sp-admin-accent, #3858e9); }
+.sp-redirects-toggle input:checked + .sp-redirects-toggle__track span { transform: translateX(16px); }
+.sp-redirects-toggle input:focus-visible + .sp-redirects-toggle__track { box-shadow: inset 0 0 0 1px var(--sp-admin-accent, #3858e9), var(--sp-admin-focus, 0 0 0 3px rgb(56 88 233 / 18%)); }
+.sp-redirects-remove.button { width: 36px; min-width: 36px; padding: 0; border-color: color-mix(in srgb, var(--sp-admin-danger, #e74c3c) 32%, var(--sp-admin-border, #e7eaee)); background: color-mix(in srgb, var(--sp-admin-danger, #e74c3c) 6%, var(--sp-admin-surface, #fff)); color: var(--sp-admin-danger, #e74c3c); transition: border-color var(--sp-admin-transition, 160ms ease), background-color var(--sp-admin-transition, 160ms ease), box-shadow var(--sp-admin-transition, 160ms ease); }
+.sp-redirects-remove.button:hover, .sp-redirects-remove.button:focus { border-color: var(--sp-admin-danger, #e74c3c); background: color-mix(in srgb, var(--sp-admin-danger, #e74c3c) 11%, var(--sp-admin-surface, #fff)); color: var(--sp-admin-danger, #e74c3c); }
+.sp-redirects-remove.button:focus-visible { box-shadow: var(--sp-admin-focus, 0 0 0 3px rgb(56 88 233 / 18%)); outline: none; }
+.sp-redirects-remove .dashicons { width: 18px; height: 18px; font-size: 18px; line-height: 18px; pointer-events: none; }
+.sp-redirects-upload { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 14px; margin-top: 12px; padding: 12px; background: var(--sp-admin-surface-alt, #f8fafc); border: 1px solid var(--sp-admin-border, #e7eaee); border-radius: var(--sp-admin-radius-sm, 9px); }
 .sp-redirects-upload input[type=file] { min-width: 280px; }
-.sp-redirects-upload label { color: #344054; }
+.sp-redirects-upload label { color: var(--sp-admin-text-2, #525b66); }
 .sp-redirects .button { min-height: 30px; line-height: 2.15384615; }
-@media (max-width: 782px) { .sp-redirects-metrics { grid-template-columns: 1fr; } }
+@media (max-width: 1100px) { .sp-redirects__table tr { grid-template-columns: minmax(180px,1fr) 24px minmax(180px,1fr) 142px 60px 42px; gap: 8px; } }
+@media (max-width: 782px) {
+	.sp-redirects-metrics { grid-template-columns: 1fr; }
+	.sp-redirects__table tr { grid-template-columns: 1fr 1fr auto; grid-template-areas: "source source source" "arrow arrow arrow" "destination destination destination" "status enabled remove"; align-items: end; }
+	.sp-redirects__source { grid-area: source; }
+	.sp-redirects__arrow { grid-area: arrow; padding: 0 !important; text-align: left; transform: rotate(90deg); transform-origin: 10px 10px; }
+	.sp-redirects__destination { grid-area: destination; }
+	.sp-redirects__status { grid-area: status; }
+	.sp-redirects__enabled { grid-area: enabled; }
+	.sp-redirects__remove { grid-area: remove; }
+}
 CSS;
 	}
 

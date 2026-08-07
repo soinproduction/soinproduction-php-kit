@@ -2,7 +2,7 @@
 	/**
 	 * Plugin Name: SP Favorite Posts
 	 * Description: Adds a "Favorite" star column in post lists and helpers for frontend output.
-	 * Version: 1.3.0
+	 * Version: 1.4.0
 	 */
 
 	if ( ! defined( 'ABSPATH' ) ) {
@@ -20,7 +20,7 @@
 			private const ROW_NONCE       = 'sp_favorite_post_row_action';
 			private const OPT_KEY         = 'sp_favorite_posts_cfg';
 			private const PAGE_SLUG       = 'sp-favorite-posts';
-			private const VERSION         = '1.3.0';
+			private const VERSION         = '1.4.0';
 
 			private const BULK_MARK_ACTION   = 'sp_favorite_mark';
 			private const BULK_UNMARK_ACTION = 'sp_favorite_unmark';
@@ -88,6 +88,7 @@
 			private function defaults(): array {
 				return [
 					'enabled_post_types' => $this->get_supported_post_types(),
+					'single_favorite_post_types' => [],
 					'enable_admin_filter' => 1,
 					'enable_bulk_actions' => 1,
 					'enable_quick_edit'   => 1,
@@ -101,6 +102,7 @@
 			private function sanitize_cfg( array $raw ): array {
 				$supported = $this->get_supported_post_types();
 				$selected  = isset( $raw['enabled_post_types'] ) ? (array) $raw['enabled_post_types'] : [];
+				$single_selected = isset( $raw['single_favorite_post_types'] ) ? (array) $raw['single_favorite_post_types'] : [];
 
 				$selected = array_map(
 					static function ( $item ): string {
@@ -110,6 +112,14 @@
 				);
 				$selected = array_values( array_unique( array_filter( $selected ) ) );
 
+				$single_selected = array_map(
+					static function ( $item ): string {
+						return sanitize_key( (string) $item );
+					},
+					$single_selected
+				);
+				$single_selected = array_values( array_unique( array_filter( $single_selected ) ) );
+
 				$enabled = [];
 				foreach ( $selected as $post_type ) {
 					if ( in_array( $post_type, $supported, true ) ) {
@@ -117,8 +127,16 @@
 					}
 				}
 
+				$single_enabled = [];
+				foreach ( $single_selected as $post_type ) {
+					if ( in_array( $post_type, $supported, true ) ) {
+						$single_enabled[] = $post_type;
+					}
+				}
+
 				return [
 					'enabled_post_types' => $enabled,
+					'single_favorite_post_types' => $single_enabled,
 					'enable_admin_filter' => ! empty( $raw['enable_admin_filter'] ) ? 1 : 0,
 					'enable_bulk_actions' => ! empty( $raw['enable_bulk_actions'] ) ? 1 : 0,
 					'enable_quick_edit'   => ! empty( $raw['enable_quick_edit'] ) ? 1 : 0,
@@ -143,6 +161,10 @@
 				return (array) ( $this->cfg()['enabled_post_types'] ?? [] );
 			}
 
+			private function single_favorite_post_types(): array {
+				return (array) ( $this->cfg()['single_favorite_post_types'] ?? [] );
+			}
+
 			private function is_enabled_post_type( string $post_type ): bool {
 				$post_type = sanitize_key( $post_type );
 				if ( $post_type === '' ) {
@@ -150,6 +172,28 @@
 				}
 
 				return in_array( $post_type, $this->enabled_post_types(), true );
+			}
+
+			private function is_single_mode_post_type( string $post_type ): bool {
+				$post_type = sanitize_key( $post_type );
+				if ( $post_type === '' ) {
+					return false;
+				}
+
+				return in_array( $post_type, $this->single_favorite_post_types(), true );
+			}
+
+			private function clear_other_favorites( int $post_id, string $post_type = '' ): void {
+				if ( $post_id <= 0 ) {
+					return;
+				}
+
+				$post_type = $post_type !== '' ? sanitize_key( $post_type ) : sanitize_key( (string) get_post_type( $post_id ) );
+				if ( $post_type === '' ) {
+					return;
+				}
+
+				sp_favorite_posts_clear_other_favorites( $post_id, $post_type );
 			}
 
 			private function is_feature_enabled( string $key ): bool {
@@ -192,16 +236,26 @@
 				$cfg       = $this->cfg();
 				$posttypes = $this->get_supported_post_type_labels();
 				?>
-				<div class="wrap">
-					<h1>Favorite Posts</h1>
-					<p class="description">Configure where Favorite functionality should be enabled.</p>
+				<div class="wrap sp-favorite-admin sp-admin-page">
+					<header class="sp-admin-header">
+						<div class="sp-admin-header__identity">
+							<span class="sp-admin-header__icon dashicons dashicons-star-filled" aria-hidden="true"></span>
+							<div class="sp-admin-header__copy">
+								<h1>Favorite Posts</h1>
+								<p>Configure where Favorite functionality should be enabled.</p>
+							</div>
+						</div>
+						<div class="sp-admin-header__actions">
+							<button type="submit" class="button button-primary" form="sp-favorite-settings">Save settings</button>
+						</div>
+					</header>
 
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="sp-favorite-settings-form">
+					<form id="sp-favorite-settings" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="sp-favorite-settings-form">
 						<input type="hidden" name="action" value="sp_favorite_posts_save_settings">
 						<?php wp_nonce_field( self::SETTINGS_NONCE, 'sp_favorite_posts_nonce' ); ?>
 
-						<div class="sp-favorite-settings-box">
-							<h2>Features</h2>
+						<div class="sp-favorite-settings-box sp-admin-card">
+							<div class="sp-admin-card__header"><h2>Features</h2></div>
 							<label class="sp-favorite-settings-row">
 								<input type="checkbox" name="enable_admin_filter" value="1" <?php checked( ! empty( $cfg['enable_admin_filter'] ) ); ?>>
 								<span>Show dropdown filter in admin list (All/Favorites/Not favorites)</span>
@@ -232,11 +286,13 @@
 							</label>
 						</div>
 
-						<div class="sp-favorite-settings-box">
-							<h2>Enabled Post Types</h2>
-							<div class="sp-favorite-settings-actions">
-								<button type="button" class="button" id="sp-favorite-select-all">Select all</button>
-								<button type="button" class="button" id="sp-favorite-clear-all">Clear all</button>
+						<div class="sp-favorite-settings-box sp-admin-card">
+							<div class="sp-admin-card__header">
+								<h2>Enabled Post Types</h2>
+								<div class="sp-favorite-settings-actions sp-admin-card__actions">
+									<button type="button" class="button" id="sp-favorite-select-all">Select all</button>
+									<button type="button" class="button" id="sp-favorite-clear-all">Clear all</button>
+								</div>
 							</div>
 							<?php foreach ( $posttypes as $slug => $label ) : ?>
 								<label class="sp-favorite-settings-row">
@@ -252,22 +308,39 @@
 							<?php endforeach; ?>
 						</div>
 
-						<div class="sp-favorite-settings-box">
-							<h2>Shortcode</h2>
+						<div class="sp-favorite-settings-box sp-admin-card">
+							<div class="sp-admin-card__header">
+								<div class="sp-admin-card__copy">
+									<h2>Single Favorite Mode</h2>
+									<p>For selected post types, marking a post as favorite automatically removes favorite from all other posts of the same type.</p>
+								</div>
+							</div>
+							<?php foreach ( $posttypes as $slug => $label ) : ?>
+								<label class="sp-favorite-settings-row">
+									<input
+										type="checkbox"
+										name="single_favorite_post_types[]"
+										value="<?php echo esc_attr( $slug ); ?>"
+										<?php checked( in_array( $slug, (array) $cfg['single_favorite_post_types'], true ) ); ?>
+									>
+									<span><?php echo esc_html( $label ); ?> <code><?php echo esc_html( $slug ); ?></code></span>
+								</label>
+							<?php endforeach; ?>
+						</div>
+
+						<div class="sp-favorite-settings-box sp-admin-card">
+							<div class="sp-admin-card__header"><h2>Shortcode</h2></div>
 							<p><code>[sp_favorite_posts post_type="post" card="card-favorite.php" posts_per_page="6"]</code></p>
 							<p><small>Template file: <code>wp-content/themes/<?= THEME_SLUG;?>/templates/card-favorite.php</code></small></p>
 							<p><small>In template you can use <code>$post_id</code> (current favorite post ID).</small></p>
 						</div>
 
-						<div class="sp-favorite-settings-box">
-							<h2>REST API</h2>
+						<div class="sp-favorite-settings-box sp-admin-card">
+							<div class="sp-admin-card__header"><h2>REST API</h2></div>
 							<p><code>GET /wp-json/wp/v2/{post_type}?sp_favorite=1</code> or <code>?sp_favorite=0</code></p>
 							<p>Response field: <code>is_favorite</code></p>
 						</div>
 
-						<p>
-							<button type="submit" class="button button-primary">Save settings</button>
-						</p>
 					</form>
 				</div>
 				<?php
@@ -282,6 +355,7 @@
 
 				$raw = [
 					'enabled_post_types' => isset( $_POST['enabled_post_types'] ) ? (array) wp_unslash( $_POST['enabled_post_types'] ) : [],
+					'single_favorite_post_types' => isset( $_POST['single_favorite_post_types'] ) ? (array) wp_unslash( $_POST['single_favorite_post_types'] ) : [],
 					'enable_admin_filter' => ! empty( $_POST['enable_admin_filter'] ) ? 1 : 0,
 					'enable_bulk_actions' => ! empty( $_POST['enable_bulk_actions'] ) ? 1 : 0,
 					'enable_quick_edit'   => ! empty( $_POST['enable_quick_edit'] ) ? 1 : 0,
@@ -361,6 +435,10 @@
 
 			private function set_favorite_flag( int $post_id, bool $is_favorite ): void {
 				if ( $is_favorite ) {
+					$post_type = sanitize_key( (string) get_post_type( $post_id ) );
+					if ( $this->is_single_mode_post_type( $post_type ) ) {
+						$this->clear_other_favorites( $post_id, $post_type );
+					}
 					update_post_meta( $post_id, self::META_KEY, '1' );
 					return;
 				}
@@ -435,6 +513,9 @@
 						continue;
 					}
 					if ( ! current_user_can( 'edit_post', $post_id ) ) {
+						continue;
+					}
+					if ( $doaction === self::BULK_MARK_ACTION && $this->is_single_mode_post_type( $post_type ) && $count > 0 ) {
 						continue;
 					}
 
@@ -790,7 +871,7 @@
 						justify-content: space-between;
 						padding: 4px 0;
 						font-size: 13px;
-						color: #1d2327;
+						color: var(--sp-admin-text, #1a1f24);
 					}
 
 					.sp-favorite-ios-toggle {
@@ -810,7 +891,7 @@
 						display: block;
 						width: 40px;
 						height: 22px;
-						background: #c3c4c7;
+						background: var(--sp-admin-border-strong, #d6dbe1);
 						border-radius: 22px;
 						transition: background .25s;
 						position: relative;
@@ -822,21 +903,21 @@
 						left: 2px;
 						width: 18px;
 						height: 18px;
-						background: #fff;
+						background: var(--sp-admin-surface, #fff);
 						border-radius: 50%;
 						transition: left .25s;
 						box-shadow: 0 1px 3px rgba(0, 0, 0, .25);
 					}
 
 					.sp-favorite-ios-toggle input:checked ~ .sp-favorite-ios-track {
-						background: #2271b1;
+						background: var(--sp-admin-accent, #3858e9);
 					}
 
 					.sp-favorite-ios-toggle input:checked ~ .sp-favorite-ios-track .sp-favorite-ios-thumb {
 						left: 20px;
 					}
 				</style>
-				<div class="sp-favorite-meta-row">
+				<div class="sp-favorite-meta-row sp-admin-component">
 					<span><?php echo esc_html__( 'Mark as favorite', 'frontre' ); ?></span>
 					<label class="sp-favorite-ios-toggle" for="<?php echo esc_attr( $uid ); ?>">
 						<input type="checkbox" id="<?php echo esc_attr( $uid ); ?>" name="sp_favorite_editor" value="1" <?php checked( $is_favorite ); ?>>
@@ -1000,6 +1081,7 @@
 					'window.SPFavoritePostsCfg=' . wp_json_encode(
 						[
 							'quickEditEnabled' => $this->is_feature_enabled( 'enable_quick_edit' ) ? 1 : 0,
+							'singleMode'       => $this->is_single_mode_post_type( $post_type ) ? 1 : 0,
 						]
 					) . ';',
 					'before'
@@ -1017,10 +1099,10 @@
                     }
                     .sp-favorite-settings-box {
                         max-width: 100%;
-                        background: #fff;
-                        border: 1px solid #dcdcde;
-                        border-radius: 8px;
-                        padding: 14px;
+                        background: var(--sp-admin-surface);
+                        border: 1px solid var(--sp-admin-border);
+                        border-radius: var(--sp-admin-radius);
+                        padding: 20px;
                         
                         input {
                             margin: 0;
@@ -1070,13 +1152,13 @@
                         height: 30px;
                         background: transparent;
                         border: 0;
-                        border-radius: 4px;
+                        border-radius: 0;
                         padding: 0;
                         cursor: pointer;
                     }
                     .column-sp_favorite_post .sp-fav-post-toggle:focus {
                         outline: none;
-                        box-shadow: 0 0 0 3px rgba(34, 113, 177, .18);
+                        box-shadow: 0 0 0 3px rgba(56, 88, 233, .18);
                     }
                     .column-sp_favorite_post .sp-fav-post-toggle .dashicons {
                         width: 20px;
@@ -1085,10 +1167,10 @@
                         line-height: 20px;
                     }
                     .column-sp_favorite_post .sp-fav-post-toggle.is-on .dashicons {
-                        color: #f6b300;
+                        color: #3858e9;
                     }
                     .column-sp_favorite_post .sp-fav-post-toggle.is-off .dashicons {
-                        color: #f6b300;
+                        color: #8a919b;
                         opacity: .35;
                     }
                     .column-sp_favorite_post .sp-fav-post-toggle.is-saving {
@@ -1114,6 +1196,17 @@
                     
                         function updateRowData(postId, isOn) {
                             $('#post-' + postId).find('.sp-fav-row-data').attr('data-fav', isOn ? '1' : '0');
+                        }
+
+                        function clearOtherRows(postId) {
+                            $('.sp-fav-post-toggle').not('[data-post-id="' + postId + '"]').each(function () {
+                                const $other = $(this);
+                                const otherId = parseInt($other.data('post-id'), 10);
+                                render($other, false);
+                                if (otherId) {
+                                    updateRowData(otherId, false);
+                                }
+                            });
                         }
                     
                         $(document).on('click', '.sp-fav-post-toggle', function (e) {
@@ -1144,6 +1237,9 @@
                             }).done(function (resp) {
                                 if (resp && resp.success && resp.data) {
                                     const on = !!resp.data.is_favorite;
+                                    if (on && (parseInt(cfg.singleMode || 0, 10) === 1 || !!resp.data.single_favorite)) {
+                                        clearOtherRows(postId);
+                                    }
                                     render($btn, on);
                                     updateRowData(postId, on);
                                 } else {
@@ -1216,6 +1312,7 @@
 					[
 						'post_id'     => $post_id,
 						'is_favorite' => $is_favorite ? 1 : 0,
+						'single_favorite' => $this->is_single_mode_post_type( $post_type ) ? 1 : 0,
 					]
 				);
 			}
@@ -1315,6 +1412,69 @@
 		}
 	}
 
+	if ( ! function_exists( 'sp_favorite_posts_single_post_types' ) ) {
+		function sp_favorite_posts_single_post_types(): array {
+			$cfg = get_option( 'sp_favorite_posts_cfg', [] );
+			if ( ! is_array( $cfg ) ) {
+				return [];
+			}
+
+			$post_types = isset( $cfg['single_favorite_post_types'] ) ? (array) $cfg['single_favorite_post_types'] : [];
+			$post_types = array_map(
+				static function ( $post_type ): string {
+					return sanitize_key( (string) $post_type );
+				},
+				$post_types
+			);
+
+			return array_values( array_unique( array_filter( $post_types ) ) );
+		}
+	}
+
+	if ( ! function_exists( 'sp_favorite_posts_is_single_mode' ) ) {
+		function sp_favorite_posts_is_single_mode( string $post_type ): bool {
+			$post_type = sanitize_key( $post_type );
+			if ( $post_type === '' ) {
+				return false;
+			}
+
+			return in_array( $post_type, sp_favorite_posts_single_post_types(), true );
+		}
+	}
+
+	if ( ! function_exists( 'sp_favorite_posts_clear_other_favorites' ) ) {
+		function sp_favorite_posts_clear_other_favorites( int $post_id, string $post_type = '' ): void {
+			$post_id = (int) $post_id;
+			if ( $post_id <= 0 ) {
+				return;
+			}
+
+			$post_type = $post_type !== '' ? sanitize_key( $post_type ) : sanitize_key( (string) get_post_type( $post_id ) );
+			if ( $post_type === '' ) {
+				return;
+			}
+
+			$query = new WP_Query(
+				[
+					'post_type'      => $post_type,
+					'post_status'    => 'any',
+					'fields'         => 'ids',
+					'posts_per_page' => -1,
+					'no_found_rows'  => true,
+					'post__not_in'   => [ $post_id ],
+					'meta_key'       => '_sp_favorite_post',
+					'meta_value'     => '1',
+				]
+			);
+
+			foreach ( $query->posts as $other_post_id ) {
+				delete_post_meta( (int) $other_post_id, '_sp_favorite_post' );
+			}
+
+			wp_reset_postdata();
+		}
+	}
+
 	if ( ! function_exists( 'sp_set_favorite_post' ) ) {
 		/**
 		 * Sets favorite status for a post.
@@ -1329,6 +1489,11 @@
 			}
 
 			if ( $is_favorite ) {
+				$post_type = sanitize_key( (string) get_post_type( $post_id ) );
+				if ( sp_favorite_posts_is_single_mode( $post_type ) ) {
+					sp_favorite_posts_clear_other_favorites( $post_id, $post_type );
+				}
+
 				update_post_meta( $post_id, '_sp_favorite_post', '1' );
 				return true;
 			}

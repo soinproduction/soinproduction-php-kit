@@ -72,6 +72,7 @@
 		remove_menu_page('edit.php');
 		remove_submenu_page('edit.php', 'edit-tags.php?taxonomy=category');
 		remove_submenu_page('edit.php', 'edit-tags.php?taxonomy=post_tag');
+		remove_submenu_page('themes.php', 'widgets.php');
 	}, 999);
 
 	add_action('admin_bar_menu', function ($bar) {

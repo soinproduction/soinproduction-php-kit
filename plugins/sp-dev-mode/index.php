@@ -207,6 +207,9 @@
 			?>
             <style>
                 #wp-dbg-launcher {
+					--color-accent: #3858e9;
+					--color-accent-bright: #487de4;
+					--color-accent-hover: #2145e6;
                     display: flex;
                     align-items: center;
                     justify-content: center;
@@ -217,9 +220,9 @@
                     height: 40px;
                     padding: 0 14px;
                     border-radius: 10px;
-                    border: 1px solid rgba(124,58,237,0.34);
+                    border: 1px solid rgba(56,88,233,0.38);
                     background: rgba(15,18,32,0.96);
-                    color: #ddd6fe;
+                    color: var(--color-accent-bright);
                     font-size: 12px;
                     font-weight: 900;
                     letter-spacing: 0.4px;
@@ -228,7 +231,12 @@
                 }
                 #wp-dbg-launcher:hover {
                     background: rgba(23,27,46,0.98);
-                    border-color: rgba(124,58,237,0.5);
+                    border-color: rgba(56,88,233,0.58);
+					color: var(--color-accent-bright);
+				}
+				#wp-dbg-launcher:focus-visible {
+					outline: none;
+					box-shadow: 0 10px 32px rgba(0,0,0,0.55), 0 0 0 3px rgba(56,88,233,0.26);
                 }
                 @media (max-width: 520px) {
                     #wp-dbg-launcher {
@@ -923,6 +931,13 @@
 			?>
             <style>
                 #wp-dbg-panel {
+					--color-accent: #3858e9;
+					--color-accent-bright: #487de4;
+					--color-accent-hover: #2145e6;
+					--color-success: #27ae60;
+					--color-warning: #f2994a;
+					--color-error: #e74c3c;
+					--color-info: #2d9cdb;
                     position: fixed;
                     z-index: 2147483647;
                     left: 20px;
@@ -932,11 +947,11 @@
                     max-height: 78vh;
 
                     background: linear-gradient(180deg, #0f1220 0%, #0b0d16 100%);
-                    border: 1px solid rgba(124, 58, 237, 0.22);
+                    border: 1px solid rgba(56, 88, 233, 0.24);
                     border-radius: 14px;
 
                     box-shadow:
-                            0 0 0 1px rgba(124, 58, 237, 0.12),
+                            0 0 0 1px rgba(56, 88, 233, 0.12),
                             0 24px 80px rgba(0,0,0,0.70),
                             inset 0 1px 0 rgba(255,255,255,0.06);
 
@@ -973,7 +988,7 @@
                     letter-spacing: 2.6px;
                     text-transform: uppercase;
 
-                    color: #a78bfa;
+                    color: var(--color-accent-bright);
                 }
 
                 #wp-dbg-title .dbg-title-template {
@@ -994,8 +1009,8 @@
                     width: 8px;
                     height: 8px;
                     border-radius: 50%;
-                    background: #a78bfa;
-                    box-shadow: 0 0 12px rgba(167,139,250,0.9);
+                    background: var(--color-accent);
+                    box-shadow: 0 0 12px rgba(56,88,233,0.82);
                     animation: dbg-blink 2.4s ease-in-out infinite;
                     flex-shrink: 0;
                 }
@@ -1034,41 +1049,48 @@
                 }
 
                 #wp-dbg-controls .dbg-btn-min {
-                    background: rgba(245,158,11,0.14);
-                    border-color: rgba(245,158,11,0.22);
-                    color: #fbbf24;
+                    background: rgba(242,153,74,0.14);
+                    border-color: rgba(242,153,74,0.24);
+                    color: var(--color-warning);
                 }
 
                 #wp-dbg-controls .dbg-btn-min:hover {
-                    background: rgba(245,158,11,0.26);
-                    border-color: rgba(245,158,11,0.34);
+                    background: rgba(242,153,74,0.24);
+                    border-color: rgba(242,153,74,0.4);
                 }
 
                 #wp-dbg-controls .dbg-btn-close {
-                    background: rgba(239,68,68,0.14);
-                    border-color: rgba(239,68,68,0.22);
-                    color: #f87171;
+                    background: rgba(231,76,60,0.14);
+                    border-color: rgba(231,76,60,0.24);
+                    color: var(--color-error);
                 }
 
                 #wp-dbg-controls .dbg-btn-close:hover {
-                    background: rgba(239,68,68,0.26);
-                    border-color: rgba(239,68,68,0.34);
+                    background: rgba(231,76,60,0.24);
+                    border-color: rgba(231,76,60,0.4);
                 }
 
                 #wp-dbg-controls .dbg-btn-json {
                     width: auto;
                     min-width: 44px;
                     padding: 0 10px;
-                    background: rgba(99,102,241,0.14);
-                    border-color: rgba(99,102,241,0.24);
-                    color: #c7d2fe;
+                    background: rgba(56,88,233,0.14);
+                    border-color: rgba(56,88,233,0.28);
+                    color: var(--color-accent-bright);
                     font-size: 11px;
                     letter-spacing: 0.3px;
                 }
 
                 #wp-dbg-controls .dbg-btn-json:hover {
-                    background: rgba(99,102,241,0.28);
-                    border-color: rgba(99,102,241,0.36);
+                    background: rgba(56,88,233,0.25);
+                    border-color: rgba(56,88,233,0.46);
+				}
+
+				#wp-dbg-controls button:focus-visible,
+				.wp-dbg-tab:focus-visible,
+				#wp-dbg-open:focus-visible {
+					outline: none;
+					box-shadow: 0 0 0 3px rgba(56,88,233,0.26);
                 }
 
                 #wp-dbg-tabs {
@@ -1115,8 +1137,8 @@
 
                 .wp-dbg-tab.active {
                     color: #e5e7eb;
-                    background: rgba(124,58,237,0.16);
-                    border-color: rgba(124,58,237,0.28);
+                    background: rgba(56,88,233,0.16);
+                    border-color: rgba(56,88,233,0.3);
                     box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
                 }
 
@@ -1127,11 +1149,11 @@
                     flex: 1;
 
                     scrollbar-width: thin;
-                    scrollbar-color: rgba(124,58,237,0.35) transparent;
+                    scrollbar-color: rgba(56,88,233,0.38) transparent;
                 }
                 #wp-dbg-body::-webkit-scrollbar { width: 8px; }
                 #wp-dbg-body::-webkit-scrollbar-thumb {
-                    background: rgba(124,58,237,0.28);
+                    background: rgba(56,88,233,0.3);
                     border-radius: 10px;
                     border: 2px solid transparent;
                     background-clip: content-box;
@@ -1193,10 +1215,10 @@
                     color: #e5e7eb;
                 }
 
-                .dbg-bg { background: rgba(124,58,237,0.16); border-color: rgba(124,58,237,0.28); color: #c4b5fd; }
-                .dbg-gg { background: rgba(34,197,94,0.14);  border-color: rgba(34,197,94,0.24);  color: #86efac; }
-                .dbg-rr { background: rgba(239,68,68,0.14);   border-color: rgba(239,68,68,0.24);   color: #fca5a5; }
-                .dbg-yy { background: rgba(245,158,11,0.14);  border-color: rgba(245,158,11,0.24);  color: #fcd34d; }
+                .dbg-bg { background: rgba(56,88,233,0.16); border-color: rgba(56,88,233,0.3); color: var(--color-accent-bright); }
+                .dbg-gg { background: rgba(39,174,96,0.14); border-color: rgba(39,174,96,0.28); color: var(--color-success); }
+                .dbg-rr { background: rgba(231,76,60,0.14); border-color: rgba(231,76,60,0.28); color: var(--color-error); }
+                .dbg-yy { background: rgba(242,153,74,0.14); border-color: rgba(242,153,74,0.28); color: var(--color-warning); }
 
                 .dbg-tags {
                     display: flex;
@@ -1214,9 +1236,9 @@
                     font-size: 11px;
                     font-weight: 900;
 
-                    background: rgba(124,58,237,0.12);
-                    color: #c4b5fd;
-                    border: 1px solid rgba(124,58,237,0.22);
+                    background: rgba(56,88,233,0.12);
+                    color: var(--color-accent-bright);
+                    border: 1px solid rgba(56,88,233,0.24);
                 }
                 .dbg-tag-gray {
                     background: rgba(107,114,128,0.12);
@@ -1328,11 +1350,11 @@
                     color: rgba(229,231,235,0.86);
                 }
 
-                .dbg-pill-ext { background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.22); color: #fcd34d; }
-                .dbg-pill-big { background: rgba(239,68,68,0.12); border-color: rgba(239,68,68,0.22); color: #fca5a5; }
-                .dbg-pill-ok  { background: rgba(34,197,94,0.12); border-color: rgba(34,197,94,0.22); color: #86efac; }
-                .dbg-pill-head{ background: rgba(124,58,237,0.12); border-color: rgba(124,58,237,0.22); color: #c4b5fd; }
-                .dbg-pill-warn{ background: rgba(245,158,11,0.12); border-color: rgba(245,158,11,0.22); color: #fcd34d; }
+                .dbg-pill-ext { background: rgba(242,153,74,0.12); border-color: rgba(242,153,74,0.24); color: var(--color-warning); }
+                .dbg-pill-big { background: rgba(231,76,60,0.12); border-color: rgba(231,76,60,0.24); color: var(--color-error); }
+                .dbg-pill-ok  { background: rgba(39,174,96,0.12); border-color: rgba(39,174,96,0.24); color: var(--color-success); }
+                .dbg-pill-head{ background: rgba(56,88,233,0.12); border-color: rgba(56,88,233,0.24); color: var(--color-accent-bright); }
+                .dbg-pill-warn{ background: rgba(242,153,74,0.12); border-color: rgba(242,153,74,0.24); color: var(--color-warning); }
 
                 .dbg-hint {
                     padding: 18px 12px;
@@ -1372,6 +1394,9 @@
                 }
 
                 #wp-dbg-open {
+					--color-accent: #3858e9;
+					--color-accent-bright: #487de4;
+					--color-accent-hover: #2145e6;
                     position: fixed;
                     z-index: 2147483646;
                     left: 20px;
@@ -1386,9 +1411,9 @@
                     padding: 0 14px;
 
                     border-radius: 10px;
-                    border: 1px solid rgba(124,58,237,0.32);
+                    border: 1px solid rgba(56,88,233,0.36);
                     background: rgba(15,18,32,0.96);
-                    color: #ddd6fe;
+                    color: var(--color-accent-bright);
 
                     font-size: 12px;
                     font-weight: 900;
@@ -1400,7 +1425,8 @@
 
                 #wp-dbg-open:hover {
                     background: rgba(23,27,46,0.98);
-                    border-color: rgba(124,58,237,0.50);
+                    border-color: rgba(56,88,233,0.58);
+					color: var(--color-accent-bright);
                 }
 
                 @media (max-width: 520px) {
@@ -1491,7 +1517,7 @@
                             <div class="dbg-row">
                                 <div class="dbg-k">Permalink</div>
                                 <div class="dbg-v">
-                                    <a href="<?php echo esc_url( $permalink ); ?>" target="_blank" rel="noopener" style="color:#c4b5fd;font-weight:900;text-decoration:none;">
+                                    <a href="<?php echo esc_url( $permalink ); ?>" target="_blank" rel="noopener" style="color:var(--color-accent-bright);font-weight:900;text-decoration:none;">
 										<?php echo esc_html( $home ? str_replace( $home, '', $permalink ) : $permalink ); ?>
                                     </a>
                                 </div>
@@ -1502,7 +1528,7 @@
                             <div class="dbg-row">
                                 <div class="dbg-k">Edit URL</div>
                                 <div class="dbg-v">
-                                    <a href="<?php echo esc_url( get_edit_post_link( $post->ID ) ); ?>" target="_blank" rel="noopener" style="color:#c4b5fd;font-weight:900;text-decoration:none;">
+                                    <a href="<?php echo esc_url( get_edit_post_link( $post->ID ) ); ?>" target="_blank" rel="noopener" style="color:var(--color-accent-bright);font-weight:900;text-decoration:none;">
                                         wp-admin
                                     </a>
                                 </div>
@@ -1516,15 +1542,15 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">JS files</div>
-                                <div class="dbg-stat-v" style="color:#c4b5fd"><?php echo (int) count( $assets_js ); ?></div>
+                                <div class="dbg-stat-v" style="color:var(--color-accent-bright)"><?php echo (int) count( $assets_js ); ?></div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">CSS files</div>
-                                <div class="dbg-stat-v" style="color:#ddd6fe"><?php echo (int) count( $assets_css ); ?></div>
+                                <div class="dbg-stat-v" style="color:#d6dbe1"><?php echo (int) count( $assets_css ); ?></div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Head JS</div>
-                                <div class="dbg-stat-v" style="color:<?php echo $head_js_count ? '#fcd34d' : '#86efac'; ?>">
+                                <div class="dbg-stat-v" style="color:<?php echo $head_js_count ? 'var(--color-warning)' : 'var(--color-success)'; ?>">
 									<?php echo (int) $head_js_count; ?>
                                 </div>
                             </div>
@@ -1636,19 +1662,19 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">JS local</div>
-                                <div class="dbg-stat-v" style="color:#c4b5fd;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:var(--color-accent-bright);font-size:18px;line-height:18px;">
 									<?php echo esc_html( wp_dbg_human_bytes( $total_js_bytes ) ); ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">CSS local</div>
-                                <div class="dbg-stat-v" style="color:#ddd6fe;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:#d6dbe1;font-size:18px;line-height:18px;">
 									<?php echo esc_html( wp_dbg_human_bytes( $total_css_bytes ) ); ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Images*</div>
-                                <div class="dbg-stat-v" style="color:#86efac;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:var(--color-success);font-size:18px;line-height:18px;">
 									<?php echo esc_html( wp_dbg_human_bytes( $total_img_bytes ) ); ?>
                                 </div>
                             </div>
@@ -1716,19 +1742,19 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Inline JS</div>
-                                <div class="dbg-stat-v" style="color:<?php echo ( $total_inline_js_bytes > 40 * 1024 ) ? '#fca5a5' : '#fcd34d'; ?>;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:<?php echo ( $total_inline_js_bytes > 40 * 1024 ) ? 'var(--color-error)' : 'var(--color-warning)'; ?>;font-size:18px;line-height:18px;">
 									<?php echo esc_html( wp_dbg_human_bytes( $total_inline_js_bytes ) ); ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Inline CSS</div>
-                                <div class="dbg-stat-v" style="color:<?php echo ( $total_inline_css_bytes > 25 * 1024 ) ? '#fca5a5' : '#fcd34d'; ?>;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:<?php echo ( $total_inline_css_bytes > 25 * 1024 ) ? 'var(--color-error)' : 'var(--color-warning)'; ?>;font-size:18px;line-height:18px;">
 									<?php echo esc_html( wp_dbg_human_bytes( $total_inline_css_bytes ) ); ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Duplicates src</div>
-                                <div class="dbg-stat-v" style="color:<?php echo ! empty( $dup_src ) ? '#fcd34d' : '#86efac'; ?>;">
+                                <div class="dbg-stat-v" style="color:<?php echo ! empty( $dup_src ) ? 'var(--color-warning)' : 'var(--color-success)'; ?>;">
 									<?php echo (int) count( $dup_src ); ?>
                                 </div>
                             </div>
@@ -1781,10 +1807,10 @@
 
                         <div class="dbg-section">Duplicate src</div>
 						<?php if ( empty( $dup_src ) ) : ?>
-                            <div class="dbg-hint" style="border-color:rgba(34,197,94,0.22);color:#86efac;">✓ Дубликатов по src не найдено</div>
+                            <div class="dbg-hint" style="border-color:rgba(39,174,96,0.28);color:var(--color-success);">✓ Дубликатов по src не найдено</div>
 						<?php else : ?>
 							<?php foreach ( $dup_src as $src => $handles ) : ?>
-                                <div class="dbg-hint" style="border-color:rgba(245,158,11,0.22);">
+                                <div class="dbg-hint" style="border-color:rgba(242,153,74,0.28);">
                                     <div style="font-weight:1000;margin-bottom:6px;">src: <span style="opacity:.9"><?php echo esc_html( str_replace( $home, '', (string) $src ) ); ?></span></div>
                                     <div style="opacity:.85;font-weight:800;line-height:18px;">
 										<?php echo esc_html( implode( ', ', (array) $handles ) ); ?>
@@ -1801,19 +1827,19 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Fonts found*</div>
-                                <div class="dbg-stat-v" style="color:#c4b5fd">
+                                <div class="dbg-stat-v" style="color:var(--color-accent-bright)">
 									<?php echo (int) count( $font_refs ); ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Fonts local bytes*</div>
-                                <div class="dbg-stat-v" style="color:<?php echo ( $font_total_bytes > 250 * 1024 ) ? '#fcd34d' : '#86efac'; ?>;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:<?php echo ( $font_total_bytes > 250 * 1024 ) ? 'var(--color-warning)' : 'var(--color-success)'; ?>;font-size:18px;line-height:18px;">
 									<?php echo esc_html( wp_dbg_human_bytes( $font_total_bytes ) ); ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">BG images found*</div>
-                                <div class="dbg-stat-v" style="color:#ddd6fe">
+                                <div class="dbg-stat-v" style="color:#d6dbe1">
 									<?php echo (int) count( $css_bg_imgs ); ?>
                                 </div>
                             </div>
@@ -1897,22 +1923,22 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">3rd-party domains</div>
-                                <div class="dbg-stat-v" style="color:<?php echo count( $third_party_domains_sorted ) ? '#fcd34d' : '#86efac'; ?>">
+                                <div class="dbg-stat-v" style="color:<?php echo count( $third_party_domains_sorted ) ? 'var(--color-warning)' : 'var(--color-success)'; ?>">
 									<?php echo (int) count( $third_party_domains_sorted ); ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">3rd-party JS</div>
-                                <div class="dbg-stat-v" style="color:#fcd34d"><?php echo (int) $total_ext_js; ?></div>
+                                <div class="dbg-stat-v" style="color:var(--color-warning)"><?php echo (int) $total_ext_js; ?></div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">3rd-party CSS</div>
-                                <div class="dbg-stat-v" style="color:#fcd34d"><?php echo (int) $total_ext_css; ?></div>
+                                <div class="dbg-stat-v" style="color:var(--color-warning)"><?php echo (int) $total_ext_css; ?></div>
                             </div>
                         </div>
 
 						<?php if ( empty( $third_party_domains_sorted ) ) : ?>
-                            <div class="dbg-hint" style="border-color:rgba(34,197,94,0.22);color:#86efac;">✓ Внешних доменов не найдено (по текущим ассетам)</div>
+                            <div class="dbg-hint" style="border-color:rgba(39,174,96,0.28);color:var(--color-success);">✓ Внешних доменов не найдено (по текущим ассетам)</div>
 						<?php else : ?>
                             <div class="dbg-section">Domains</div>
 							<?php foreach ( array_slice( $third_party_domains_sorted, 0, 18 ) as $d ) : ?>
@@ -1946,19 +1972,19 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Requests (est.)</div>
-                                <div class="dbg-stat-v" style="color:<?php echo ( $total_requests_est > 70 ) ? '#fca5a5' : ( ( $total_requests_est > 50 ) ? '#fcd34d' : '#86efac' ); ?>">
+                                <div class="dbg-stat-v" style="color:<?php echo ( $total_requests_est > 70 ) ? 'var(--color-error)' : ( ( $total_requests_est > 50 ) ? 'var(--color-warning)' : 'var(--color-success)' ); ?>">
 									<?php echo (int) $total_requests_est; ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">JS total*</div>
-                                <div class="dbg-stat-v" style="color:<?php echo ( $total_js_all > 1100 * 1024 ) ? '#fca5a5' : ( ( $total_js_all > 800 * 1024 ) ? '#fcd34d' : '#c4b5fd' ); ?>;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:<?php echo ( $total_js_all > 1100 * 1024 ) ? 'var(--color-error)' : ( ( $total_js_all > 800 * 1024 ) ? 'var(--color-warning)' : 'var(--color-accent-bright)' ); ?>;font-size:18px;line-height:18px;">
 									<?php echo esc_html( wp_dbg_human_bytes( $total_js_all ) ); ?>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">CLS risk</div>
-                                <div class="dbg-stat-v" style="color:<?php echo $img_missing_dims ? '#fcd34d' : '#86efac'; ?>;">
+                                <div class="dbg-stat-v" style="color:<?php echo $img_missing_dims ? 'var(--color-warning)' : 'var(--color-success)'; ?>;">
 									<?php echo $img_missing_dims ? 'check' : 'ok'; ?>
                                 </div>
                             </div>
@@ -1972,8 +1998,8 @@
                         </div>
 
 						<?php if ( empty( $psi_warnings ) ) : ?>
-                            <div class="dbg-hint" style="border-color:rgba(34,197,94,0.22);">
-                                <div style="font-weight:1000;margin-bottom:6px;color:#86efac;">✓ По эвристикам — без явных красных флагов</div>
+                            <div class="dbg-hint" style="border-color:rgba(39,174,96,0.28);">
+                                <div style="font-weight:1000;margin-bottom:6px;color:var(--color-success);">✓ По эвристикам — без явных красных флагов</div>
                             </div>
 						<?php else : ?>
 							<?php foreach ( $psi_warnings as $w ) :
@@ -2014,17 +2040,17 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Queries</div>
-                                <div class="dbg-stat-v" style="color:#c4b5fd"><?php echo (int) $num_queries; ?></div>
+                                <div class="dbg-stat-v" style="color:var(--color-accent-bright)"><?php echo (int) $num_queries; ?></div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Time</div>
-                                <div class="dbg-stat-v" style="color:#ddd6fe;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:#d6dbe1;font-size:18px;line-height:18px;">
 									<?php echo esc_html( $query_time ); ?>s
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Slow &gt;50ms</div>
-                                <div class="dbg-stat-v" style="color:<?php echo count( $slow_queries ) ? '#fca5a5' : '#86efac'; ?>">
+                                <div class="dbg-stat-v" style="color:<?php echo count( $slow_queries ) ? 'var(--color-error)' : 'var(--color-success)'; ?>">
 									<?php echo (int) count( $slow_queries ); ?>
                                 </div>
                             </div>
@@ -2036,11 +2062,11 @@
                                 <span class="dbg-badge dbg-yy" style="text-transform:none;letter-spacing:0;">define('SAVEQUERIES', true);</span>
                             </div>
 						<?php elseif ( empty( $slow_queries ) ) : ?>
-                            <div class="dbg-hint" style="border-color:rgba(34,197,94,0.22);color:#86efac;">✓ Медленных запросов нет</div>
+                            <div class="dbg-hint" style="border-color:rgba(39,174,96,0.28);color:var(--color-success);">✓ Медленных запросов нет</div>
 						<?php else : ?>
                             <div class="dbg-section"><?php echo (int) count( $slow_queries ); ?> slow queries</div>
 							<?php foreach ( $slow_queries as $q ) : ?>
-                                <div class="dbg-hint" style="border-color:rgba(239,68,68,0.22);">
+                                <div class="dbg-hint" style="border-color:rgba(231,76,60,0.28);">
                                     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
                                         <span class="dbg-badge dbg-rr"><?php echo esc_html( $q['time'] ); ?></span>
                                         <span style="opacity:.7;font-weight:900;">caller</span>
@@ -2063,13 +2089,13 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Peak RAM</div>
-                                <div class="dbg-stat-v" style="color:#c4b5fd;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:var(--color-accent-bright);font-size:18px;line-height:18px;">
 									<?php echo esc_html( (string) $memory_peak ); ?><span style="font-size:12px;opacity:.55;"> MB</span>
                                 </div>
                             </div>
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Limit</div>
-                                <div class="dbg-stat-v" style="color:#ddd6fe;font-size:18px;line-height:18px;">
+                                <div class="dbg-stat-v" style="color:#d6dbe1;font-size:18px;line-height:18px;">
 									<?php echo esc_html( (string) $memory_limit ); ?>
                                 </div>
                             </div>
@@ -2128,7 +2154,7 @@
                         <div class="dbg-stats">
                             <div class="dbg-stat">
                                 <div class="dbg-stat-l">Active plugins</div>
-                                <div class="dbg-stat-v" style="color:#c4b5fd"><?php echo (int) count( $active_plugins ); ?></div>
+                                <div class="dbg-stat-v" style="color:var(--color-accent-bright)"><?php echo (int) count( $active_plugins ); ?></div>
                             </div>
                         </div>
 

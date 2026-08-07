@@ -625,20 +625,26 @@
 					}
 				}
 					?>
-				<div class="wrap sp-cm-wrap">
-					<h1>Content Manager</h1>
-					<p class="description">Duplicate content and manage drag-and-drop ordering for content lists, taxonomies, and the admin sidebar menu.</p>
+				<div class="wrap sp-cm-wrap sp-admin-page">
+					<header class="sp-admin-header">
+						<div class="sp-admin-header__identity">
+							<span class="sp-admin-header__icon dashicons dashicons-admin-users" aria-hidden="true"></span>
+							<div class="sp-admin-header__copy">
+								<h1>Content Manager</h1>
+								<p>Duplicate content and manage drag-and-drop ordering for content lists, taxonomies, and the admin sidebar menu.</p>
+							</div>
+						</div>
+						<div class="sp-admin-header__actions">
+							<button type="button" class="button button-primary" id="sp-cm-save-settings">Save settings</button>
+						</div>
+					</header>
 
 					<div id="sp-cm-settings-status" class="notice inline" style="display:none;"><p></p></div>
 
-					<div class="sp-cm-toolbar">
-						<button type="button" class="button button-primary" id="sp-cm-save-settings">Save settings</button>
-					</div>
-
 					<div class="sp-cm-grid">
                         <div class="sp-cm-grid__coll">
-                            <section class="sp-cm-card sp-cm-card-wide">
-                                <div class="sp-cm-card-box">
+                            <section class="sp-cm-card sp-cm-card-wide sp-admin-card">
+                                <div class="sp-cm-card-box sp-admin-card__header">
                                     <div class="sp-cm-card-box-inner">
                                         <h2>Admin Sidebar Menu Order</h2>
                                         <p class="description">Drag items to define your custom order for the left admin menu.</p>
@@ -665,8 +671,8 @@
 	                                </ul>
                             </section>
 
-							<section class="sp-cm-card sp-cm-card-wide">
-								<div class="sp-cm-card-box">
+							<section class="sp-cm-card sp-cm-card-wide sp-admin-card">
+								<div class="sp-cm-card-box sp-admin-card__header">
 									<div class="sp-cm-card-box-inner">
 										<h2>Admin Submenu Order</h2>
 										<p class="description">Set custom order for submenu items inside each parent menu.</p>
@@ -705,8 +711,8 @@
 							</section>
                         </div>
                         <div class="sp-cm-grid__coll">
-                            <section class="sp-cm-card">
-                                <div class="sp-cm-card-box">
+                            <section class="sp-cm-card sp-admin-card">
+                                <div class="sp-cm-card-box sp-admin-card__header">
                                     <h2>Features</h2>
                                 </div>
 
@@ -733,8 +739,8 @@
 									</label>
                                 </div>
                             </section>
-                            <section class="sp-cm-card">
-                                <div class="sp-cm-card-box">
+                            <section class="sp-cm-card sp-admin-card">
+                                <div class="sp-cm-card-box sp-admin-card__header">
                                     <h2>Sortable Post Types</h2>
                                     <div class="sp-cm-actions">
                                         <button type="button" class="button" id="sp-cm-post-types-all">Select all</button>
@@ -750,8 +756,8 @@
                                     <?php endforeach; ?>
                                 </div>
                             </section>
-                            <section class="sp-cm-card">
-                                <div class="sp-cm-card-box">
+                            <section class="sp-cm-card sp-admin-card">
+                                <div class="sp-cm-card-box sp-admin-card__header">
                                     <h2>Sortable Taxonomies</h2>
                                     <div class="sp-cm-actions">
                                         <button type="button" class="button" id="sp-cm-taxonomies-all">Select all</button>
@@ -1526,19 +1532,20 @@
 			private function list_css(): string {
 				return <<<'CSS'
 #the-list tr.sp-cm-placeholder td {
-	background: #f0f6fc !important;
-	border-top: 2px dashed #2271b1;
-	border-bottom: 2px dashed #2271b1;
+	background: #edf0ff !important;
+	border-top: 2px dashed #3858e9;
+	border-bottom: 2px dashed #3858e9;
 }
 .sp-cm-handle {
 	display: inline-flex;
+	flex-shrink: 0;
 	align-items: center;
 	justify-content: center;
 	width: 16px;
 	height: 16px;
 	margin-right: 8px;
 	cursor: move;
-	color: #8c8f94;
+	color: #8a919b;
 	font-weight: 700;
 	user-select: none;
 }
@@ -1555,7 +1562,7 @@ strong:has(.sp-cm-handle) {
     align-items: center;
 }
 .sp-cm-handle:hover {
-	color: #2271b1;
+	color: #3858e9;
 }
 #sp-cm-order-status {
 	position: absolute;
@@ -1598,9 +1605,9 @@ CSS;
 	}
 }
 .sp-cm-card {
-	background: #fff;
-	border: 1px solid #dcdcde;
-	border-radius: 8px;
+	background: var(--sp-admin-surface);
+	border: 1px solid var(--sp-admin-border);
+	border-radius: var(--sp-admin-radius);
 	padding: 16px;
 	display: flex;
 	flex-direction: column;
@@ -1662,9 +1669,9 @@ CSS;
 	margin: 0;
 	padding: 0;
 	list-style: none;
-	border: 1px solid #dcdcde;
-	border-radius: 8px;
-	background: #f9f9f9;
+	border: 1px solid var(--sp-admin-border);
+	border-radius: var(--sp-admin-radius-sm);
+	background: var(--sp-admin-surface-subtle);
 	overflow: hidden;
 }
 .sp-cm-menu-item {
@@ -1672,8 +1679,8 @@ CSS;
 	align-items: center;
 	gap: 10px;
 	padding: 10px 12px;
-	border-top: 1px solid #e7e7e7;
-	background: #fff;
+	border-top: 1px solid var(--sp-admin-border);
+	background: var(--sp-admin-surface);
 	cursor: move;
 }
 .sp-cm-menu-item:first-child {
@@ -1684,7 +1691,7 @@ CSS;
 	align-items: center;
 	justify-content: center;
 	width: 16px;
-	color: #8c8f94;
+	color: var(--sp-admin-subtle);
 	font-weight: 700;
 }
 .sp-cm-menu-title {
@@ -1705,34 +1712,34 @@ CSS;
 	min-width: 52px;
 	height: 24px;
 	padding: 0 8px;
-	border: 1px solid #bfc3c9;
+	border: 1px solid var(--sp-admin-border-strong);
 	border-radius: 999px;
-	background: #fff;
-	color: #2c3338;
+	background: var(--sp-admin-surface);
+	color: var(--sp-admin-text-2);
 	font-size: 11px;
 	line-height: 1;
 	font-weight: 600;
 	cursor: pointer;
 }
 .sp-cm-visibility-toggle.is-on {
-	background: #eaf7f0;
-	border-color: #7ebf95;
-	color: #0d5f31;
+	background: #eefaf3;
+	border-color: #a9dfbf;
+	color: #176b3a;
 }
 .sp-cm-visibility-toggle.is-off {
-	background: #fff1f1;
-	border-color: #dba3a3;
-	color: #922323;
+	background: #fff3f2;
+	border-color: #f4bbb5;
+	color: #a92e24;
 }
 .sp-cm-visibility-toggle:focus {
 	outline: none;
-	box-shadow: 0 0 0 2px rgba(34, 113, 177, .22);
+	box-shadow: var(--sp-admin-focus);
 }
 .sp-cm-menu-list .sp-cm-placeholder {
 	height: 42px;
-	background: #f0f6fc;
-	border-top: 2px dashed #2271b1;
-	border-bottom: 2px dashed #2271b1;
+	background: var(--sp-admin-accent-soft);
+	border-top: 2px dashed var(--sp-admin-accent);
+	border-bottom: 2px dashed var(--sp-admin-accent);
 }
 .sp-cm-submenu-groups {
 	display: grid;
@@ -1740,9 +1747,9 @@ CSS;
 	gap: 12px;
 }
 .sp-cm-submenu-group {
-	border: 1px solid #dcdcde;
-	border-radius: 8px;
-	background: #fff;
+	border: 1px solid var(--sp-admin-border);
+	border-radius: var(--sp-admin-radius-sm);
+	background: var(--sp-admin-surface);
 	overflow: hidden;
 }
 .sp-cm-submenu-group-head {
@@ -1750,8 +1757,8 @@ CSS;
 	align-items: center;
 	gap: 8px;
 	padding: 10px 12px;
-	background: #f8f9fb;
-	border-bottom: 1px solid #e7e7e7;
+	background: var(--sp-admin-surface-subtle);
+	border-bottom: 1px solid var(--sp-admin-border);
 }
 .sp-cm-submenu-group-head strong {
 	flex: 1;
@@ -1772,8 +1779,8 @@ CSS;
 	align-items: center;
 	gap: 10px;
 	padding: 9px 12px;
-	border-top: 1px solid #f0f0f1;
-	background: #fff;
+	border-top: 1px solid var(--sp-admin-border);
+	background: var(--sp-admin-surface);
 	cursor: move;
 }
 .sp-cm-submenu-item:first-child {
@@ -1781,9 +1788,9 @@ CSS;
 }
 .sp-cm-submenu-list .sp-cm-placeholder {
 	height: 40px;
-	background: #f0f6fc;
-	border-top: 2px dashed #2271b1;
-	border-bottom: 2px dashed #2271b1;
+	background: var(--sp-admin-accent-soft);
+	border-top: 2px dashed var(--sp-admin-accent);
+	border-bottom: 2px dashed var(--sp-admin-accent);
 }
 @media (max-width: 960px) {
 	.sp-cm-grid {

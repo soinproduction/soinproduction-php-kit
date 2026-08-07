@@ -8,7 +8,7 @@
 			private const OPT_KEY      = 'sp_tag_manager_cfg';
 			private const NONCE_ACTION = 'sp_tag_manager_admin';
 			private const PAGE_SLUG    = 'sp-tag-manager';
-			private const VERSION      = '1.0.1';
+			private const VERSION      = '1.0.2';
 
 			private static ?self $instance = null;
 
@@ -47,6 +47,12 @@
 					'consent_cookie_key'   => 'sp_cookie_consent',
 					'consent_cookie_grant' => 'granted',
 					'consent_cookie_deny'  => 'denied',
+					'cookie_modal_enabled' => 1,
+					'cookie_modal_text'    => 'By clicking "Accept", you agree to the storing of cookies on your device to enhance site navigation, analyze site usage, and assist in our marketing efforts. View our Privacy Policy for more information.',
+					'cookie_modal_accept'  => 'Accept',
+					'cookie_modal_reject'  => 'Reject',
+					'cookie_modal_accept_class' => '',
+					'cookie_modal_reject_class' => '',
 					'custom_head'          => '',
 					'custom_body_open'     => '',
 					'custom_footer'        => '',
@@ -218,6 +224,29 @@
 				return trim( wp_kses( $value, $this->snippet_allowed_html() ) );
 			}
 
+			private function sanitize_cookie_modal_text( string $value ): string {
+				$value = trim( (string) $value );
+				if ( $value === '' ) {
+					return '';
+				}
+
+				return trim( wp_kses_post( $value ) );
+			}
+
+			private function sanitize_class_list( string $value ): string {
+				$classes = preg_split( '/\s+/', trim( $value ) );
+				if ( ! is_array( $classes ) ) {
+					return '';
+				}
+
+				$classes = array_filter(
+					array_map( 'sanitize_html_class', $classes ),
+					static fn( $class ) => $class !== ''
+				);
+
+				return implode( ' ', array_unique( $classes ) );
+			}
+
 			private function sanitize_cfg( array $raw ): array {
 				$d = $this->defaults();
 
@@ -237,6 +266,12 @@
 					'consent_cookie_key'   => $this->sanitize_cookie_key( (string) ( $raw['consent_cookie_key'] ?? $d['consent_cookie_key'] ) ),
 					'consent_cookie_grant' => $this->sanitize_cookie_value( (string) ( $raw['consent_cookie_grant'] ?? $d['consent_cookie_grant'] ), 'granted' ),
 					'consent_cookie_deny'  => $this->sanitize_cookie_value( (string) ( $raw['consent_cookie_deny'] ?? $d['consent_cookie_deny'] ), 'denied' ),
+					'cookie_modal_enabled' => ! empty( $raw['cookie_modal_enabled'] ) ? 1 : 0,
+					'cookie_modal_text'    => $this->sanitize_cookie_modal_text( (string) ( $raw['cookie_modal_text'] ?? $d['cookie_modal_text'] ) ),
+					'cookie_modal_accept'  => sanitize_text_field( (string) ( $raw['cookie_modal_accept'] ?? $d['cookie_modal_accept'] ) ),
+					'cookie_modal_reject'  => sanitize_text_field( (string) ( $raw['cookie_modal_reject'] ?? $d['cookie_modal_reject'] ) ),
+					'cookie_modal_accept_class' => $this->sanitize_class_list( (string) ( $raw['cookie_modal_accept_class'] ?? $d['cookie_modal_accept_class'] ) ),
+					'cookie_modal_reject_class' => $this->sanitize_class_list( (string) ( $raw['cookie_modal_reject_class'] ?? $d['cookie_modal_reject_class'] ) ),
 					'custom_head'        => $this->sanitize_snippet( (string) ( $raw['custom_head'] ?? '' ) ),
 					'custom_body_open'   => $this->sanitize_snippet( (string) ( $raw['custom_body_open'] ?? '' ) ),
 					'custom_footer'      => $this->sanitize_snippet( (string) ( $raw['custom_footer'] ?? '' ) ),
@@ -469,12 +504,74 @@
 				}
 			}
 
+			private function output_cookie_modal( array $cfg ): void {
+				if ( empty( $cfg['cookie_modal_enabled'] ) || empty( $cfg['cookie_modal_text'] ) ) {
+					return;
+				}
+
+				$cookie_key   = (string) ( $cfg['consent_cookie_key'] ?? 'sp_cookie_consent' );
+				$cookie_grant = (string) ( $cfg['consent_cookie_grant'] ?? 'granted' );
+				$cookie_deny  = (string) ( $cfg['consent_cookie_deny'] ?? 'denied' );
+				$accept_label = (string) ( $cfg['cookie_modal_accept'] ?? 'Accept' );
+				$reject_label = (string) ( $cfg['cookie_modal_reject'] ?? 'Reject' );
+				$accept_class = trim( 'sp-cookie-consent__button sp-cookie-consent__button--accept ' . (string) ( $cfg['cookie_modal_accept_class'] ?? '' ) );
+				$reject_class = trim( 'sp-cookie-consent__button sp-cookie-consent__button--reject ' . (string) ( $cfg['cookie_modal_reject_class'] ?? '' ) );
+				?>
+				<div class="sp-cookie-consent" data-sp-cookie-consent role="dialog" aria-live="polite" aria-label="Cookie consent" hidden>
+					<p class="sp-cookie-consent__text">
+						<?php echo wp_kses_post( (string) $cfg['cookie_modal_text'] ); ?>
+					</p>
+					<div class="sp-cookie-consent__actions">
+						<button type="button" class="secondary-button <?php echo esc_attr( $accept_class ); ?>" data-sp-cookie-consent-button="accept" data-sp-cookie-consent-choice="granted">
+							<?php echo esc_html( $accept_label !== '' ? $accept_label : 'Accept' ); ?>
+						</button>
+						<button type="button" class="secondary-button gray <?php echo esc_attr( $reject_class ); ?>" data-sp-cookie-consent-button="reject" data-sp-cookie-consent-choice="denied">
+							<?php echo esc_html( $reject_label !== '' ? $reject_label : 'Reject' ); ?>
+						</button>
+					</div>
+				</div>
+				<script id="sp-cookie-consent-script">
+					(function(w,d){
+						var modal=d.querySelector('[data-sp-cookie-consent]');
+						if(!modal){return;}
+						var cookieKey=<?php echo wp_json_encode( $cookie_key ); ?>;
+						var grantValue=<?php echo wp_json_encode( $cookie_grant ); ?>;
+						var denyValue=<?php echo wp_json_encode( $cookie_deny ); ?>;
+						var maxAge=60*60*24*365;
+						function readCookie(name){var parts=('; '+d.cookie).split('; '+name+'=');if(parts.length<2){return '';}return decodeURIComponent(parts.pop().split(';').shift()||'');}
+						function writeCookie(name,value){d.cookie=name+'='+encodeURIComponent(value)+'; path=/; max-age='+maxAge+'; SameSite=Lax';}
+						function applyChoice(state){
+							var value=state==='granted'?grantValue:denyValue;
+							writeCookie(cookieKey,value);
+							if(state==='granted'&&typeof w.spTagConsentGrantAll==='function'){w.spTagConsentGrantAll();}
+							if(state==='denied'&&typeof w.spTagConsentDenyAll==='function'){w.spTagConsentDenyAll();}
+							d.dispatchEvent(new CustomEvent('sp:consent:update',{detail:{state:state}}));
+							modal.classList.remove('is-active');
+							modal.classList.add('is-leaving');
+							setTimeout(function(){modal.hidden=true;modal.classList.remove('is-leaving');},350);
+						}
+						if(readCookie(cookieKey)){modal.hidden=true;return;}
+						modal.hidden=false;
+						w.requestAnimationFrame(function(){modal.classList.add('is-active');});
+						modal.addEventListener('click',function(ev){
+							if(!ev.target||!ev.target.closest){return;}
+							var btn=ev.target.closest('[data-sp-cookie-consent-choice]');
+							if(!btn){return;}
+							applyChoice(btn.getAttribute('data-sp-cookie-consent-choice')==='granted'?'granted':'denied');
+						});
+					})(window,document);
+				</script>
+				<?php
+			}
+
 			public function output_footer(): void {
 				if ( ! $this->should_output_front() ) {
 					return;
 				}
 
 				$cfg = $this->cfg();
+				$this->output_cookie_modal( $cfg );
+
 				if ( ! empty( $cfg['custom_footer'] ) ) {
 					echo "\n<!-- SP Tag Manager: custom footer -->\n";
 					echo (string) $cfg['custom_footer'] . "\n";
@@ -485,23 +582,23 @@
 				$cfg   = $this->cfg();
 				$nonce = wp_create_nonce( self::NONCE_ACTION );
 				?>
-				<div class="sp-tag-admin">
-					<div class="sp-tag-admin__header">
-						<div class="sp-tag-admin__title-wrap">
-							<div class="sp-tag-admin__icon">TM</div>
-							<div>
+				<div class="sp-tag-admin sp-admin-page">
+					<header class="sp-tag-admin__header sp-admin-header">
+						<div class="sp-tag-admin__title-wrap sp-admin-header__identity">
+							<div class="sp-tag-admin__icon sp-admin-header__icon">TM</div>
+							<div class="sp-admin-header__copy">
 								<h1>Tag Manager</h1>
 								<p>Configure GTM and custom tag snippets with predictable loading behavior.</p>
 							</div>
 						</div>
-						<div>
+						<div class="sp-admin-header__actions">
 							<button type="button" class="button button-primary" id="sp-tag-save">Save settings</button>
 						</div>
-					</div>
+					</header>
 
 					<div class="sp-tag-grid">
-						<section class="sp-tag-card">
-							<h2>Global</h2>
+						<section class="sp-tag-card sp-admin-card">
+							<div class="sp-admin-card__header"><h2>Global</h2></div>
 							<label class="sp-tag-row">
 								<span>Enable output</span>
 								<input type="checkbox" id="sp-tag-enabled" <?php checked( ! empty( $cfg['enabled'] ) ); ?>>
@@ -517,8 +614,8 @@
 							<p class="sp-tag-help">Recommended: keep output disabled for logged-in users to avoid analytics noise.</p>
 						</section>
 
-						<section class="sp-tag-card">
-							<h2>Google Tag Manager</h2>
+						<section class="sp-tag-card sp-admin-card">
+							<div class="sp-admin-card__header"><h2>Google Tag Manager</h2></div>
 							<label class="sp-tag-row">
 								<span>Enable GTM</span>
 								<input type="checkbox" id="sp-tag-gtm-enabled" <?php checked( ! empty( $cfg['gtm_enabled'] ) ); ?>>
@@ -546,8 +643,8 @@
 							<p class="sp-tag-help">For Core Web Vitals, use <b>After interaction</b> or <b>After delay</b> in most cases.</p>
 						</section>
 
-						<section class="sp-tag-card">
-							<h2>Consent Mode v2</h2>
+						<section class="sp-tag-card sp-admin-card">
+							<div class="sp-admin-card__header"><h2>Consent Mode v2</h2></div>
 							<label class="sp-tag-row">
 								<span>Enable Consent Mode</span>
 								<input type="checkbox" id="sp-tag-consent-enabled" <?php checked( ! empty( $cfg['consent_mode_enabled'] ) ); ?>>
@@ -592,9 +689,44 @@
 							<p class="sp-tag-help">When default is denied, the GTM <code>noscript</code> iframe is intentionally skipped.</p>
 						</section>
 
-						<section class="sp-tag-card sp-tag-card--full">
-							<h2>Custom snippets</h2>
-							<p class="sp-tag-help">Paste trusted snippets only. HTML is sanitized on save.</p>
+						<section class="sp-tag-card sp-admin-card">
+							<div class="sp-admin-card__header"><h2>Cookie Modal</h2></div>
+							<label class="sp-tag-row">
+								<span>Enable cookie modal</span>
+								<input type="checkbox" id="sp-tag-cookie-modal-enabled" <?php checked( ! empty( $cfg['cookie_modal_enabled'] ) ); ?>>
+							</label>
+							<div id="sp-tag-cookie-modal-fields">
+								<label class="sp-tag-field">
+									<span>Message</span>
+									<textarea id="sp-tag-cookie-modal-text" rows="6" placeholder="Cookie consent message"><?php echo esc_textarea( (string) $cfg['cookie_modal_text'] ); ?></textarea>
+								</label>
+								<label class="sp-tag-field">
+									<span>Accept button</span>
+									<input type="text" id="sp-tag-cookie-modal-accept" value="<?php echo esc_attr( (string) $cfg['cookie_modal_accept'] ); ?>" placeholder="Accept">
+								</label>
+								<label class="sp-tag-field">
+									<span>Accept button classes</span>
+									<input type="text" id="sp-tag-cookie-modal-accept-class" value="<?php echo esc_attr( (string) $cfg['cookie_modal_accept_class'] ); ?>" placeholder="main-button">
+								</label>
+								<label class="sp-tag-field">
+									<span>Reject button</span>
+									<input type="text" id="sp-tag-cookie-modal-reject" value="<?php echo esc_attr( (string) $cfg['cookie_modal_reject'] ); ?>" placeholder="Reject">
+								</label>
+								<label class="sp-tag-field">
+									<span>Reject button classes</span>
+									<input type="text" id="sp-tag-cookie-modal-reject-class" value="<?php echo esc_attr( (string) $cfg['cookie_modal_reject_class'] ); ?>" placeholder="main-button main-button--secondary">
+								</label>
+								<p class="sp-tag-help">Shown in the bottom-right corner without using the site modal overlay.</p>
+							</div>
+						</section>
+
+						<section class="sp-tag-card sp-tag-card--full sp-admin-card">
+							<div class="sp-admin-card__header">
+								<div class="sp-admin-card__copy">
+									<h2>Custom snippets</h2>
+									<p>Paste trusted snippets only. HTML is sanitized on save.</p>
+								</div>
+							</div>
 							<label class="sp-tag-field">
 								<span>Head snippet (`wp_head`)</span>
 								<textarea id="sp-tag-custom-head" rows="7" placeholder="&lt;script&gt;/* ... */&lt;/script&gt;"><?php echo esc_textarea( (string) $cfg['custom_head'] ); ?></textarea>
@@ -620,29 +752,32 @@
 				</div>
 
 				<style>
-					.sp-tag-admin { margin: 24px 20px 0 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif; color: #1f2937; }
-					.sp-tag-admin__header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 20px; background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; }
+					.sp-tag-admin { margin: 24px 20px 0 0; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Inter,Arial,sans-serif; color: var(--sp-admin-text); }
+					.sp-tag-admin__header { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 18px 20px; background: var(--sp-admin-surface); border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius); box-shadow: var(--sp-admin-shadow); }
 					.sp-tag-admin__title-wrap { display: flex; align-items: center; gap: 12px; }
 					.sp-tag-admin__title-wrap h1 { margin: 0 0 2px; font-size: 22px; line-height: 1.25; }
-					.sp-tag-admin__title-wrap p { margin: 0; color: #6b7280; }
-					.sp-tag-admin__icon { width: 40px; height: 40px; border-radius: 10px; background: linear-gradient(135deg, #1d4ed8, #3b82f6); color: #fff; display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
+					.sp-tag-admin__title-wrap p { margin: 0; color: var(--sp-admin-text-2); }
+					.sp-tag-admin__icon { width: 40px; height: 40px; border-radius: var(--sp-admin-radius-sm); background: linear-gradient(135deg, var(--sp-admin-accent), var(--sp-admin-accent-bright)); color: var(--color-on-accent); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; }
 					.sp-tag-grid { margin-top: 16px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
-					.sp-tag-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 14px; padding: 16px; box-shadow: 0 8px 24px rgba(0,0,0,.03); }
+					.sp-tag-card { background: var(--sp-admin-surface); border: 1px solid var(--sp-admin-border); border-radius: var(--sp-admin-radius); padding: 16px; box-shadow: var(--sp-admin-shadow); }
 					.sp-tag-card--full { grid-column: 1 / -1; }
-					.sp-tag-card h2 { margin: 0 0 12px; font-size: 16px; letter-spacing: .03em; text-transform: uppercase; color: #374151; }
-					.sp-tag-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid #f3f4f6; }
+					.sp-tag-card h2 { margin: 0 0 12px; font-size: 15px; letter-spacing: 0; text-transform: none; color: var(--sp-admin-text); }
+					.sp-tag-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid var(--sp-admin-border); }
 					.sp-tag-row:first-of-type { border-top: 0; }
 					.sp-tag-field { display: grid; gap: 6px; margin-top: 12px; }
-					.sp-tag-field > span { font-weight: 600; color: #374151; }
+					.sp-tag-field > span { font-weight: 600; color: var(--sp-admin-text-2); }
 					.sp-tag-field input,
 					.sp-tag-field select,
-					.sp-tag-field textarea { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 9px 10px; font-size: 14px; }
+					.sp-tag-field textarea { width: 100%; border: 1px solid var(--sp-admin-border-strong); border-radius: var(--sp-admin-radius-sm); padding: 9px 10px; background: var(--sp-admin-input-bg); color: var(--sp-admin-text); font-size: 14px; }
+					.sp-tag-field input:focus,
+					.sp-tag-field select:focus,
+					.sp-tag-field textarea:focus { border-color: var(--sp-admin-accent); box-shadow: var(--sp-admin-focus); outline: 0; }
 					.sp-tag-field textarea { font-family: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono",monospace; resize: vertical; }
-					.sp-tag-help { margin: 10px 0 0; color: #6b7280; }
-					.sp-tag-note { margin-top: 12px; padding: 10px; background: #f8fafc; border: 1px dashed #cbd5e1; border-radius: 10px; display: grid; gap: 6px; }
-					.sp-tag-note code { display: block; white-space: pre-wrap; word-break: break-word; padding: 6px 8px; border-radius: 6px; background: #0f172a; color: #e2e8f0; font-size: 12px; }
-					.sp-tag-status { margin-top: 14px; min-height: 22px; color: #1d4ed8; font-weight: 600; }
-					.sp-tag-status.is-error { color: #b91c1c; }
+					.sp-tag-help { margin: 10px 0 0; color: var(--sp-admin-muted); }
+					.sp-tag-note { margin-top: 12px; padding: 10px; background: var(--sp-admin-surface-subtle); border: 1px dashed var(--sp-admin-border-strong); border-radius: var(--sp-admin-radius-sm); display: grid; gap: 6px; }
+					.sp-tag-note code { display: block; white-space: pre-wrap; word-break: break-word; padding: 6px 8px; border-radius: var(--sp-admin-radius-sm); background: var(--sp-admin-text); color: var(--sp-admin-surface); font-size: 12px; }
+					.sp-tag-status { margin-top: 14px; min-height: 22px; color: var(--sp-admin-accent); font-weight: 600; }
+					.sp-tag-status.is-error { color: var(--sp-admin-danger); }
 					@media (max-width: 1100px) {
 						.sp-tag-grid { grid-template-columns: 1fr; }
 					}
@@ -659,6 +794,8 @@
 						const $consentFields = $('#sp-tag-consent-fields');
 						const $cookieSync = $('#sp-tag-consent-cookie-sync');
 						const $cookieFields = $('#sp-tag-consent-cookie-fields');
+						const $cookieModalEnabled = $('#sp-tag-cookie-modal-enabled');
+						const $cookieModalFields = $('#sp-tag-cookie-modal-fields');
 
 						function setStatus(text, isError) {
 							$status.text(text || '');
@@ -678,6 +815,10 @@
 							$cookieFields.toggle($cookieSync.is(':checked'));
 						}
 
+						function toggleCookieModalFields() {
+							$cookieModalFields.toggle($cookieModalEnabled.is(':checked'));
+						}
+
 						function payload() {
 							return {
 								enabled: $('#sp-tag-enabled').is(':checked') ? 1 : 0,
@@ -695,6 +836,12 @@
 								consent_cookie_key: $('#sp-tag-consent-cookie-key').val() || '',
 								consent_cookie_grant: $('#sp-tag-consent-cookie-grant').val() || '',
 								consent_cookie_deny: $('#sp-tag-consent-cookie-deny').val() || '',
+								cookie_modal_enabled: $('#sp-tag-cookie-modal-enabled').is(':checked') ? 1 : 0,
+								cookie_modal_text: $('#sp-tag-cookie-modal-text').val() || '',
+								cookie_modal_accept: $('#sp-tag-cookie-modal-accept').val() || '',
+								cookie_modal_reject: $('#sp-tag-cookie-modal-reject').val() || '',
+								cookie_modal_accept_class: $('#sp-tag-cookie-modal-accept-class').val() || '',
+								cookie_modal_reject_class: $('#sp-tag-cookie-modal-reject-class').val() || '',
 								custom_head: $('#sp-tag-custom-head').val() || '',
 								custom_body_open: $('#sp-tag-custom-body').val() || '',
 								custom_footer: $('#sp-tag-custom-footer').val() || ''
@@ -722,10 +869,12 @@
 						$strategy.on('change', toggleDelay);
 						$consentEnabled.on('change', toggleConsentFields);
 						$cookieSync.on('change', toggleCookieFields);
+						$cookieModalEnabled.on('change', toggleCookieModalFields);
 						$('#sp-tag-save').on('click', save);
 						toggleDelay();
 						toggleConsentFields();
 						toggleCookieFields();
+						toggleCookieModalFields();
 					})(jQuery);
 				</script>
 				<?php
