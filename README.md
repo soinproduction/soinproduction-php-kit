@@ -57,7 +57,11 @@ declare(strict_types=1);
 
 $platform = [
 	'_author-meta',
+	'branding',
 	'dev-user',
+	'duplicator-key',
+	'page-loader-settings',
+	'post-type-converter',
 	'reading-time',
 	'remove-post-slug',
 	'reset'
@@ -69,16 +73,19 @@ $acf = [
 ];
 
 $plugins = [
+	'sp-accelerator',
 	'sp-allow-svg-upload',
 	'sp-content-manager',
 	'sp-cpt-archives',
 	'sp-dev-mode',
 	'sp-favorite-posts',
+	'sp-google-reviews',
 	'sp-redirects',
 	'_sp-share',
 	'sp-tag-manager',
 	'sp-uploads-webp-convert',
-	'sp-video-preview'
+	'sp-video-preview',
+	'sp-wiki',
 ];
 
 // 1. Загружаем платформу и ACF-типы из кита ДО регистрации групп полей темы.

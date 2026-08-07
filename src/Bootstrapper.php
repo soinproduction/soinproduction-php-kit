@@ -14,7 +14,27 @@ class Bootstrapper {
 	private const DEFAULT_FRONTEND_SKIP_PATHS = [
 		'plugins/sp-content-manager/',
 		'plugins/sp-video-preview/',
+		'plugins/sp-google-reviews/stars-column.php',
 	];
+
+	private const DEFAULT_AUTOLOAD_SKIP_PATHS = [
+		'plugins/sp-accelerator/includes/',
+	];
+
+	public static function pathToUrl(string $path): string {
+		if (!defined('THEME_DIR') || !defined('THEME_URI')) {
+			return '';
+		}
+
+		$path      = str_replace('\\', '/', $path);
+		$theme_dir = rtrim(str_replace('\\', '/', (string) THEME_DIR), '/') . '/';
+
+		if (!str_starts_with($path, $theme_dir)) {
+			return '';
+		}
+
+		return rtrim((string) THEME_URI, '/') . '/' . ltrim(substr($path, strlen($theme_dir)), '/');
+	}
 
 	public static function run(array $config = []): void {
 		$root = dirname(__DIR__);
@@ -28,6 +48,9 @@ class Bootstrapper {
 		$plugins_modules  = self::normalize_modules($config['plugins'] ?? []);
 		$frontend_skip_paths = self::normalize_skip_paths(
 			$config['frontend_skip_paths'] ?? self::DEFAULT_FRONTEND_SKIP_PATHS
+		);
+		$autoload_skip_paths = self::normalize_skip_paths(
+			$config['autoload_skip_paths'] ?? self::DEFAULT_AUTOLOAD_SKIP_PATHS
 		);
 
 		$normalize_relative = static function (string $path) use ($root): string {
@@ -69,8 +92,21 @@ class Bootstrapper {
 			return false;
 		};
 
-		$autoload = static function (string $dir) use (&$autoload, $should_skip_on_frontend): void {
-			if (!is_dir($dir) || !is_readable($dir) || $should_skip_on_frontend($dir)) {
+		$should_skip_autoload = static function (string $path) use ($normalize_relative, $autoload_skip_paths): bool {
+			$relative = $normalize_relative($path);
+
+			foreach ($autoload_skip_paths as $skip_path) {
+				$skip = trim(str_replace('\\', '/', (string) $skip_path), '/');
+				if ($skip !== '' && str_starts_with($relative . '/', $skip . '/')) {
+					return true;
+				}
+			}
+
+			return false;
+		};
+
+		$autoload = static function (string $dir) use (&$autoload, $should_skip_on_frontend, $should_skip_autoload): void {
+			if (!is_dir($dir) || !is_readable($dir) || $should_skip_on_frontend($dir) || $should_skip_autoload($dir)) {
 				return;
 			}
 
@@ -94,7 +130,7 @@ class Bootstrapper {
 
 				$path = $dir . DIRECTORY_SEPARATOR . $item;
 
-				if ($should_skip_on_frontend($path)) {
+				if ($should_skip_on_frontend($path) || $should_skip_autoload($path)) {
 					continue;
 				}
 

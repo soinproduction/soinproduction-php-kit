@@ -181,32 +181,42 @@
                 'ru' => 'Russian',
             ];
             ?>
-            <div class="wrap sp-gr-admin-wrap">
-                <h1>Google Reviews</h1>
-                <p class="description">Manage Google reviews synchronization via SerpAPI.</p>
+            <div class="wrap sp-gr-admin-wrap sp-admin-page">
+                <header class="sp-admin-header">
+                    <div class="sp-admin-header__identity">
+                        <span class="sp-admin-header__icon dashicons dashicons-star-filled" aria-hidden="true"></span>
+                        <div class="sp-admin-header__copy">
+                            <h1>Google Reviews</h1>
+                            <p>Manage Google reviews synchronization via SerpAPI.</p>
+                        </div>
+                    </div>
+                    <div class="sp-admin-header__actions">
+                        <button type="submit" class="button button-primary" form="sp-gr-settings">Save settings</button>
+                    </div>
+                </header>
 
-                <section class="sp-gr-card">
-                    <div class="sp-gr-card-head"><h2>Sync Status</h2></div>
-                    <div class="sp-gr-metrics">
-                        <div class="sp-gr-metric">
+                <section class="sp-gr-card sp-admin-card">
+                    <div class="sp-gr-card-head sp-admin-card__header"><h2>Sync Status</h2></div>
+                    <div class="sp-gr-metrics sp-admin-metrics">
+                        <div class="sp-gr-metric sp-admin-metric">
                             <span class="sp-gr-metric__label">Provider</span>
                             <span class="sp-gr-metric__value">SerpAPI</span>
                         </div>
-                        <div class="sp-gr-metric">
+                        <div class="sp-gr-metric sp-admin-metric">
                             <span class="sp-gr-metric__label">Ready to sync</span>
                             <span id="sp-gr-ready-badge" class="sp-gr-badge <?php echo $ready ? 'is-ok' : 'is-warn'; ?>">
 							<?php echo $ready ? 'Yes' : 'No'; ?>
 						</span>
                         </div>
-                        <div class="sp-gr-metric">
+                        <div class="sp-gr-metric sp-admin-metric">
                             <span class="sp-gr-metric__label">Average rating</span>
                             <span class="sp-gr-metric__value"><?php echo esc_html( number_format( $stats_rating, 1, '.', '' ) ); ?></span>
                         </div>
-                        <div class="sp-gr-metric">
+                        <div class="sp-gr-metric sp-admin-metric">
                             <span class="sp-gr-metric__label">Reviews in DB</span>
                             <span class="sp-gr-metric__value"><?php echo esc_html( number_format_i18n( $stats_count ) ); ?></span>
                         </div>
-                        <div class="sp-gr-metric">
+                        <div class="sp-gr-metric sp-admin-metric">
                             <span class="sp-gr-metric__label">Last sync</span>
                             <span class="sp-gr-metric__value"><?php echo esc_html( $last_label ); ?></span>
                         </div>
@@ -242,11 +252,11 @@
                     <p id="sp-gr-copy-status" class="sp-gr-copy-status" aria-live="polite"></p>
                 </section>
 
-                <form method="post" action="options.php" class="sp-gr-settings-form">
+                <form id="sp-gr-settings" method="post" action="options.php" class="sp-gr-settings-form">
                     <?php settings_fields( 'sp_google_reviews' ); ?>
 
-                    <section class="sp-gr-card">
-                        <div class="sp-gr-card-head"><h2>Provider Settings</h2></div>
+                    <section class="sp-gr-card sp-admin-card">
+                        <div class="sp-gr-card-head sp-admin-card__header"><h2>Provider Settings</h2></div>
                         <table class="form-table sp-gr-form-table">
 
                             <tr class="sp-gr-row">
@@ -325,8 +335,8 @@
                         </table>
                     </section>
 
-                    <section class="sp-gr-card">
-                        <div class="sp-gr-card-head"><h2>Widget Overrides</h2></div>
+                    <section class="sp-gr-card sp-admin-card">
+                        <div class="sp-gr-card-head sp-admin-card__header"><h2>Widget Overrides</h2></div>
                         <table class="form-table sp-gr-form-table">
                             <tr class="sp-gr-row">
                                 <th scope="row"><label for="sp-fallback-rating">Average Rating Override</label></th>
@@ -352,7 +362,6 @@
                     </section>
 
                     <div class="sp-gr-submit-row">
-                        <?php submit_button( 'Save Settings', 'primary', 'submit', false ); ?>
                         <div class="sp-gr-readiness">
  						<span id="sp-gr-place-badge" class="sp-gr-inline-badge <?php echo $place_id_set ? 'is-ok' : 'is-warn'; ?>">
 							Place ID: <?php echo $place_id_set ? 'set' : 'missing'; ?>
@@ -373,54 +382,55 @@
 
         private static function admin_css(): string {
             return <<<'CSS'
-.sp-gr-admin-wrap { max-width: 1180px; }
-.sp-gr-admin-wrap .description { color: #667085; }
-.sp-gr-card { background:#fff; border:1px solid #dcdcde; border-radius:12px; padding:16px; margin-bottom:14px; box-shadow:0 1px 0 rgba(16,24,40,.03); }
+.sp-gr-admin-wrap { max-width: 1180px; color: var(--sp-admin-text, #1a1f24); }
+.sp-gr-admin-wrap .description { color: var(--sp-admin-muted, #525b66); }
+.sp-gr-card { background:var(--sp-admin-surface, #fff); border:1px solid var(--sp-admin-border, #e7eaee); border-radius:var(--sp-admin-radius, 14px); padding:16px; margin-bottom:14px; box-shadow:var(--sp-admin-shadow-xs, 0 1px 2px rgb(26 31 36 / 4%)); }
 .sp-gr-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:12px; }
-.sp-gr-card-head h2 { margin:0; font-size:17px; line-height:1.35; }
+.sp-gr-card-head h2 { margin:0; color:var(--sp-admin-text, #1a1f24); font-size:17px; line-height:1.35; }
 .sp-gr-metrics { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-bottom:14px; }
-.sp-gr-metric { border:1px solid #eaecf0; border-radius:10px; background:#f9fafb; padding:10px; }
-.sp-gr-metric__label { display:block; font-size:12px; color:#667085; margin-bottom:4px; }
-.sp-gr-metric__value { display:block; font-size:16px; font-weight:600; color:#1d2939; }
+.sp-gr-metric { border:1px solid var(--sp-admin-border, #e7eaee); border-radius:var(--sp-admin-radius-sm, 9px); background:var(--sp-admin-surface-alt, #f8fafc); padding:10px; }
+.sp-gr-metric__label { display:block; margin-bottom:4px; color:var(--sp-admin-muted, #525b66); font-size:12px; }
+.sp-gr-metric__value { display:block; color:var(--sp-admin-text, #1a1f24); font-size:16px; font-weight:600; }
 .sp-gr-badge { display:inline-flex; align-items:center; justify-content:center; min-width:62px; height:28px; padding:0 10px; border-radius:999px; font-weight:600; font-size:12px; border:1px solid transparent; }
-.sp-gr-badge.is-ok  { color:#0f5132; background:#d1e7dd; border-color:#badbcc; }
-.sp-gr-badge.is-warn { color:#7a2e0f; background:#fff4e5; border-color:#ffd8a8; }
+.sp-gr-badge.is-ok  { color:color-mix(in srgb, var(--sp-admin-success, #27ae60) 68%, var(--sp-admin-text, #1a1f24)); background:color-mix(in srgb, var(--sp-admin-success, #27ae60) 10%, var(--sp-admin-surface, #fff)); border-color:color-mix(in srgb, var(--sp-admin-success, #27ae60) 30%, var(--sp-admin-border, #e7eaee)); }
+.sp-gr-badge.is-warn { color:color-mix(in srgb, var(--sp-admin-warning, #f2994a) 64%, var(--sp-admin-text, #1a1f24)); background:color-mix(in srgb, var(--sp-admin-warning, #f2994a) 11%, var(--sp-admin-surface, #fff)); border-color:color-mix(in srgb, var(--sp-admin-warning, #f2994a) 32%, var(--sp-admin-border, #e7eaee)); }
 .sp-gr-actions { display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px; }
 .sp-gr-actions .button.is-disabled { opacity:.55; pointer-events:none; }
 .sp-gr-copy-status { min-height:20px; margin:4px 0 0; font-size:12px; }
-.sp-gr-copy-status.is-ok  { color:#039855; }
-.sp-gr-copy-status.is-err { color:#b42318; }
+.sp-gr-copy-status.is-ok  { color:color-mix(in srgb, var(--sp-admin-success, #27ae60) 72%, var(--sp-admin-text, #1a1f24)); }
+.sp-gr-copy-status.is-err { color:color-mix(in srgb, var(--sp-admin-danger, #e74c3c) 72%, var(--sp-admin-text, #1a1f24)); }
 .sp-gr-settings-form .sp-gr-form-table { margin-top:0; }
-.sp-gr-settings-form .sp-gr-form-table th { width:260px; color:#344054; }
-.sp-gr-settings-form .sp-gr-form-table td { color:#1d2939; }
+.sp-gr-settings-form .sp-gr-form-table th { width:260px; color:var(--sp-admin-text-2, #525b66); }
+.sp-gr-settings-form .sp-gr-form-table td { color:var(--sp-admin-text, #1a1f24); }
 .sp-gr-settings-form .regular-text { max-width:560px; width:100%; }
 .sp-gr-settings-form .small-text { min-width:110px; }
 .sp-gr-submit-row { display:flex; flex-wrap:wrap; align-items:center; gap:10px 12px; }
 .sp-gr-readiness { display:flex; flex-wrap:wrap; gap:8px; }
 .sp-gr-inline-badge { display:inline-flex; align-items:center; justify-content:center; height:26px; padding:0 10px; border-radius:999px; font-size:12px; font-weight:600; border:1px solid transparent; }
-.sp-gr-inline-badge.is-ok  { color:#0f5132; background:#d1e7dd; border-color:#badbcc; }
-.sp-gr-inline-badge.is-warn { color:#7a2e0f; background:#fff4e5; border-color:#ffd8a8; }
+.sp-gr-inline-badge.is-ok  { color:color-mix(in srgb, var(--sp-admin-success, #27ae60) 68%, var(--sp-admin-text, #1a1f24)); background:color-mix(in srgb, var(--sp-admin-success, #27ae60) 10%, var(--sp-admin-surface, #fff)); border-color:color-mix(in srgb, var(--sp-admin-success, #27ae60) 30%, var(--sp-admin-border, #e7eaee)); }
+.sp-gr-inline-badge.is-warn { color:color-mix(in srgb, var(--sp-admin-warning, #f2994a) 64%, var(--sp-admin-text, #1a1f24)); background:color-mix(in srgb, var(--sp-admin-warning, #f2994a) 11%, var(--sp-admin-surface, #fff)); border-color:color-mix(in srgb, var(--sp-admin-warning, #f2994a) 32%, var(--sp-admin-border, #e7eaee)); }
 
 .sp-gr-progress-card {
-  background: #fff;
-  border: 1px solid #eaecf0;
-  border-radius: 12px;
+  background: var(--sp-admin-surface, #fff);
+  border: 1px solid var(--sp-admin-border, #e7eaee);
+  border-radius: var(--sp-admin-radius, 14px);
   padding: 16px;
   margin-bottom: 14px;
-  box-shadow: 0 4px 10px rgba(16, 24, 40, 0.05);
+  box-shadow: var(--sp-admin-shadow-xs, 0 1px 2px rgb(26 31 36 / 4%));
 }
 .sp-gr-progress-header {
   display: flex;
   justify-content: space-between;
   font-weight: 600;
   font-size: 14px;
-  color: #1d2939;
+  color: var(--sp-admin-text, #1a1f24);
   margin-bottom: 8px;
 }
 .sp-gr-progress-bar-bg {
   width: 100%;
   height: 8px;
-  background: #f2f4f7;
+  background: var(--sp-admin-surface-alt, #f8fafc);
+  box-shadow: inset 0 0 0 1px var(--sp-admin-border, #e7eaee);
   border-radius: 999px;
   overflow: hidden;
   margin-bottom: 10px;
@@ -428,9 +438,9 @@
 .sp-gr-progress-bar-fill {
   width: 0%;
   height: 100%;
-  background: linear-gradient(90deg, #ff5a1f 0%, #ff8c00 100%);
+  background: linear-gradient(90deg, var(--sp-admin-accent, #3858e9) 0%, var(--sp-admin-accent-bright, #487de4) 100%);
   border-radius: 999px;
-  transition: width 0.4s ease;
+  transition: width var(--sp-admin-transition, 160ms cubic-bezier(.2, .8, .2, 1));
 }
 
 @media (max-width:1200px) { .sp-gr-metrics { grid-template-columns:repeat(3,minmax(0,1fr)); } }
