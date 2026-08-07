@@ -1838,7 +1838,16 @@
 		}
 
 		private function frontend_styles_url(): string {
-			return trailingslashit( THEME_URI ) . 'core/plugins/sp-share/assets/sp-share-frontend.min.css';
+			$css_file  = wp_normalize_path( __DIR__ . '/assets/sp-share-frontend.min.css' );
+			$theme_dir = trailingslashit( wp_normalize_path( THEME_DIR ) );
+
+			if ( str_starts_with( $css_file, $theme_dir ) ) {
+				$relative_path = ltrim( substr( $css_file, strlen( $theme_dir ) ), '/' );
+
+				return trailingslashit( THEME_URI ) . $relative_path;
+			}
+
+			return '';
 		}
 
 		private function frontend_script_handle(): string {
