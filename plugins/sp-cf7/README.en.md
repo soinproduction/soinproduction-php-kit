@@ -14,4 +14,20 @@ Each submodule follows the same structure: `modules/<name>/index.php`, `README.e
 | `ui-select` | Custom Select shortcode, form tag and mail tags. |
 | `icon-generator` | UI Icon generator in the CF7 editor. |
 
-All submodules load by default. Projects can filter the `sp_cf7_modules` array before initialization when a smaller set is required.
+All submodules load by default. Configure them directly in the PHP Kit `plugins` array; prefix a name with `_` to keep it listed but disabled:
+
+```php
+'plugins' => [
+	'sp-cf7' => [
+		'base',
+		'mail-viewer',
+		'_flowchimp',
+		'_webhook',
+		'redirects',
+		'ui-select',
+		'icon-generator',
+	],
+],
+```
+
+An empty `sp-cf7` array loads no submodules. The `sp_cf7_modules` filter remains available for runtime customization.
