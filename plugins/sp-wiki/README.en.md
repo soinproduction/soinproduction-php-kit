@@ -52,7 +52,7 @@ Relative Markdown links to another `.md` file are rewritten to `options-general.
 
 ## Module Discovery in Detail
 
-For each direct child of `core/plugins` the Wiki requires:
+The default discovery roots are `vendor/soinproduction/php-kit/plugins` and the legacy theme path `core/plugins`. Each discovered module requires:
 
 - a folder name that does not begin with `_`;
 - a real `index.php` file;
@@ -60,7 +60,7 @@ For each direct child of `core/plugins` the Wiki requires:
 
 The last condition is what makes the catalog dynamic: mere presence in Git is insufficient. It also supports modules whose `index.php` loads additional files in `includes/`.
 
-Document fallback order is `README.<current-language>.md`, `README.en.md`, then legacy `README.md`. If none exists, the module still appears with an instructional placeholder so missing coverage is visible.
+The canonical files are `README.en.md` and `README.ru.md`; legacy `README.md` remains a read-only fallback for older theme modules. If none exists, the module still appears with an instructional placeholder so missing coverage is visible.
 
 Module document IDs use `plugin:<folder-slug>`. A known-slug icon registry supplies semantic Dashicons; unknown future modules receive the generic plugin icon automatically.
 

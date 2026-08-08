@@ -2,7 +2,7 @@
 if (! defined('ABSPATH')) exit;
 
 /*
- * Universal Author Meta Box — core/platform/author-meta.php
+ * Universal Author Meta Box — platform/author-meta/index.php
  *
  * Usage — add one line to any CPT index.php:
  *   sp_register_author_metabox( 'blog' );

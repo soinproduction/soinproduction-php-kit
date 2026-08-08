@@ -2,7 +2,7 @@
 
 /**
  * Dependency-free regression checks for the SQLite object-cache drop-in.
- * Run directly with: php _tests/object-cache.php
+ * Run directly with: php tests/object-cache.php
  */
 
 if ( PHP_SAPI !== 'cli' ) {
@@ -10,7 +10,7 @@ if ( PHP_SAPI !== 'cli' ) {
 }
 
 $sp_oc_test_script = __FILE__;
-$sp_oc_test_dropin = dirname( __DIR__ ) . '/dropin/object-cache.php.txt';
+$sp_oc_test_dropin = dirname( __DIR__ ) . '/templates/object-cache.php';
 
 function sp_oc_test_is_fixture( string $directory ): bool {
 	$temporary = realpath( sys_get_temp_dir() );

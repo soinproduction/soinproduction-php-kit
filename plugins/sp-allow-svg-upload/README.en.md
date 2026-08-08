@@ -32,7 +32,7 @@ SVG is executable XML. Do not bypass the sanitizer or allow arbitrary remote SVG
 | `admin_head` | `fix_svg_display()` | Adds Media Library thumbnail sizing rules. |
 | `template_redirect` | `start_output_buffering()` | Starts the frontend transformation buffer. |
 
-The module is loaded by `core/bootstrap.php`; there is no settings record and no admin page. Disabling it means prefixing the module folder with `_` or changing the bootstrap rules. Existing SVG attachments remain in the library, but new uploads and frontend transformations stop.
+The module is loaded by PHP Kit; there is no settings record and no admin page. Prefix `sp-allow-svg-upload` with `_` in the PHP Kit `plugins` configuration to disable it. Existing SVG attachments remain in the library, but new uploads and frontend transformations stop.
 
 ## Sanitizer Pipeline
 

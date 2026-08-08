@@ -303,5 +303,5 @@ SP Accelerator refuses destructive operations on drop-ins it does not own.
 If PHP Kit is outside a WordPress installation, pass its root explicitly:
 
 ```bash
-SP_ACCELERATOR_WP_ROOT=/path/to/wordpress php _tests/run.php
+SP_ACCELERATOR_WP_ROOT=/path/to/wordpress php tests/run.php
 ```

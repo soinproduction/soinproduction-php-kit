@@ -55,7 +55,7 @@ final class SP_Accelerator_Object_Cache {
 
 		if ( $this->owns_dropin() ) {
 			$loaded = defined( 'SP_ACCELERATOR_OBJECT_CACHE' );
-			$source = $this->plugin_dir . '/dropin/object-cache.php.txt';
+			$source = $this->plugin_dir . '/templates/object-cache.php';
 			$current_hash = is_readable( $source ) ? hash_file( 'sha256', $source ) : false;
 			$installed_hash = hash_file( 'sha256', $this->path() );
 			if ( is_string( $current_hash ) && is_string( $installed_hash ) && ! hash_equals( $current_hash, $installed_hash ) ) {
@@ -116,7 +116,7 @@ final class SP_Accelerator_Object_Cache {
 			return new WP_Error( 'sqlite_missing', 'PHP extension sqlite3 недоступен.' );
 		}
 
-		$source = $this->plugin_dir . '/dropin/object-cache.php.txt';
+		$source = $this->plugin_dir . '/templates/object-cache.php';
 		if ( ! is_readable( $source ) ) {
 			return new WP_Error( 'missing_source', 'Не найден шаблон object-cache.php.' );
 		}

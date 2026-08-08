@@ -39,7 +39,7 @@ final class SP_Accelerator_Dropin {
 
 		$contents = file_get_contents( $path, false, null, 0, 1024 );
 		if ( is_string( $contents ) && strpos( $contents, self::SIGNATURE ) !== false ) {
-			$source = $this->plugin_dir . '/dropin/advanced-cache.php.txt';
+			$source = $this->plugin_dir . '/templates/advanced-cache.php';
 			if ( is_readable( $source ) && hash_file( 'sha256', $source ) !== hash_file( 'sha256', $path ) ) {
 				return [
 					'code'   => 'outdated',
@@ -101,7 +101,7 @@ final class SP_Accelerator_Dropin {
 			return new WP_Error( 'foreign_dropin', $status['detail'] );
 		}
 
-		$source = $this->plugin_dir . '/dropin/advanced-cache.php.txt';
+		$source = $this->plugin_dir . '/templates/advanced-cache.php';
 		if ( ! is_readable( $source ) ) {
 			return new WP_Error( 'missing_source', 'Не найден шаблон advanced-cache.php.' );
 		}

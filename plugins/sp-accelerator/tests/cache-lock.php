@@ -2,7 +2,7 @@
 
 /**
  * Focused regression checks for runtime cache-lock invalidation.
- * Run directly with: php _tests/cache-lock.php
+ * Run directly with: php tests/cache-lock.php
  */
 
 if ( PHP_SAPI !== 'cli' ) {

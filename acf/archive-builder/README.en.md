@@ -8,7 +8,7 @@ The active field implementation lives in:
 acf/archive-builder/index.php
 ```
 
-The theme autoloader loads this file automatically because it scans `core/` recursively.
+PHP Kit loads this entrypoint when `archive-builder` is enabled in the `acf` configuration.
 
 ## Field Config
 

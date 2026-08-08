@@ -8,7 +8,7 @@
 // posts-per-page, confirm/reset, pagination, empty state и AJAX endpoint.
 //
 // Подробная документация и примеры лежат рядом:
-// core/acf/archive-builder/README.md
+// See README.en.md and README.ru.md.
 //
 // =============================================================================
 // 1. РЕГИСТРАЦИЯ ACF ПОЛЯ (fields.php)

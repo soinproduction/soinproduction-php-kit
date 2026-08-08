@@ -2,7 +2,7 @@
 
 /**
  * Dependency-free regression checks for storage migration and warmer control.
- * Run directly with: php _tests/control-plane.php
+ * Run directly with: php tests/control-plane.php
  */
 
 if ( PHP_SAPI !== 'cli' ) {

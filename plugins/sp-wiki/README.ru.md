@@ -52,7 +52,7 @@ Relative links на `.md` переписываются в `options-general.php?p
 
 ## Discovery Модулей
 
-Для каждого direct child в `core/plugins` требуются:
+Default roots discovery — `vendor/soinproduction/php-kit/plugins` и legacy-путь темы `core/plugins`. Для каждого найденного модуля требуются:
 
 - folder name без начального `_`;
 - реальный `index.php`;
@@ -60,7 +60,7 @@ Relative links на `.md` переписываются в `options-general.php?p
 
 Последнее условие делает каталог динамическим: присутствия папки в Git недостаточно. Поддерживаются и modules, где `index.php` подключает дополнительные files из `includes/`.
 
-Fallback документов: `README.<current-language>.md`, затем `README.en.md`, затем legacy `README.md`. Если файлов нет, модуль всё равно показывается с placeholder — отсутствие coverage заметно сразу.
+Канонические файлы — `README.en.md` и `README.ru.md`; legacy `README.md` остаётся read-only fallback для старых theme modules. Если файлов нет, модуль всё равно показывается с placeholder — отсутствие coverage заметно сразу.
 
 ID модуля: `plugin:<folder-slug>`. Для известных slugs используется semantic Dashicon; будущие неизвестные modules автоматически получают generic plugin icon.
 

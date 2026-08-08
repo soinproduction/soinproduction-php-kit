@@ -2,7 +2,7 @@
 
 /**
  * Focused regression checks for owned .htaccess marker handling.
- * Run directly with: php _tests/server.php
+ * Run directly with: php tests/server.php
  */
 
 if ( PHP_SAPI !== 'cli' ) {

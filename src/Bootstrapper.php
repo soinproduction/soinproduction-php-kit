@@ -15,13 +15,14 @@ class Bootstrapper {
 	private const DEFAULT_FRONTEND_SKIP_PATHS = [
 		'plugins/sp-content-manager/',
 		'plugins/sp-video-preview/',
-		'plugins/sp-google-reviews/stars-column.php',
+		'plugins/sp-google-reviews/includes/stars-column.php',
 	];
 
 	private const DEFAULT_AUTOLOAD_SKIP_PATHS = [
 		'plugins/sp-accelerator/includes/',
+		'plugins/sp-accelerator/tests/',
 		'plugins/sp-admin-ui/modules/',
-		'plugins/sp-admin-ui/support/',
+		'plugins/sp-admin-ui/includes/',
 		'plugins/sp-cf7/modules/',
 	];
 
@@ -169,13 +170,8 @@ class Bootstrapper {
 			}
 		};
 
-		// Platform modules are individual files and must load before theme runtime.
-		foreach ($platform_modules as $module) {
-			$path = $root . '/platform/' . $module . '.php';
-			if (is_file($path) && !$should_skip_on_frontend($path)) {
-				require_once $path;
-			}
-		}
+		// Platform modules load before theme runtime.
+		$load_directories('platform', $platform_modules);
 
 		// ACF field types/helpers should load before the theme registers field groups.
 		$load_directories('acf', $acf_modules);

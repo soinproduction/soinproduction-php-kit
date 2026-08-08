@@ -31,4 +31,4 @@ add_filter( 'sp_admin_ui_modules', static fn(): array => [
 ] );
 ```
 
-An empty `sp-admin-ui` array loads no submodules. The taxonomy modules share guarded helpers from `support/taxonomy.php`. The package provides behavior and semantic class names; project-specific admin CSS may style those classes.
+An empty `sp-admin-ui` array loads no submodules. The taxonomy modules share guarded helpers from `includes/taxonomy.php`. The package provides behavior and semantic class names; project-specific admin CSS may style those classes.

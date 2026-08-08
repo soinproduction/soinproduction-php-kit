@@ -2,7 +2,7 @@
 
 /**
  * Focused regression checks for conservative LCP image selection.
- * Run directly with: php _tests/markup.php
+ * Run directly with: php tests/markup.php
  */
 
 if ( PHP_SAPI !== 'cli' ) {

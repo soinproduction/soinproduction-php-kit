@@ -312,5 +312,5 @@ SP Accelerator отказывается от destructive operations над drop-
 Если PHP Kit находится вне установки WordPress, передайте её корень явно:
 
 ```bash
-SP_ACCELERATOR_WP_ROOT=/path/to/wordpress php _tests/run.php
+SP_ACCELERATOR_WP_ROOT=/path/to/wordpress php tests/run.php
 ```

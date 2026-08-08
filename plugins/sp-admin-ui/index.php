@@ -3,7 +3,7 @@
 		exit;
 	}
 
-	require_once __DIR__ . '/support/taxonomy.php';
+	require_once __DIR__ . '/includes/taxonomy.php';
 
 	$sp_admin_ui_modules = [
 		'menu-title-item',

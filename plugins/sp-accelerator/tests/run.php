@@ -2,7 +2,7 @@
 
 /**
  * Dependency-free regression checks for the request policy and standalone
- * advanced-cache.php. Run with: php _tests/run.php
+ * advanced-cache.php. Run with: php tests/run.php
  */
 
 if ( PHP_SAPI !== 'cli' ) {
@@ -173,7 +173,7 @@ if ( isset( $argv[1] ) && $argv[1] === 'dropin-case' ) {
 	}
 	register_shutdown_function( 'sp_test_remove_tree', $base );
 
-	include $root . '/dropin/advanced-cache.php.txt';
+	include $root . '/templates/advanced-cache.php';
 	if ( $case === 'lock-ownership' ) {
 		$owned_lock = $GLOBALS['sp_accelerator_revalidation_lock'] ?? null;
 		$preserved  = false;

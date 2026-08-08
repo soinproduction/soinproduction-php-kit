@@ -32,7 +32,7 @@ SVG — исполняемый XML. Не обходите sanitizer и не ра
 | `admin_head` | `fix_svg_display()` | Добавляет правила размеров thumbnails в Media Library. |
 | `template_redirect` | `start_output_buffering()` | Запускает frontend transformation buffer. |
 
-Модуль загружается через `core/bootstrap.php`; собственной admin page и option у него нет. Для отключения папку переименовывают с префиксом `_` либо меняют bootstrap rules. Существующие SVG останутся в Media Library, но новые uploads и frontend transformations прекратятся.
+Модуль загружается через PHP Kit; собственной admin page и option у него нет. Для отключения добавьте `_` к имени `sp-allow-svg-upload` в секции `plugins` конфигурации PHP Kit. Существующие SVG останутся в Media Library, но новые uploads и frontend transformations прекратятся.
 
 ## Pipeline Sanitizer
 
