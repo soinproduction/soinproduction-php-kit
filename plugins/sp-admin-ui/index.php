@@ -11,12 +11,16 @@
 		'taxonomy-checkbox',
 		'taxonomy-radio',
 	];
+	$sp_admin_ui_config = \SoinProduction\Kit\Bootstrapper::moduleConfig( 'plugins', 'sp-admin-ui' );
+	if ( $sp_admin_ui_config !== null ) {
+		$sp_admin_ui_modules = $sp_admin_ui_config;
+	}
 
 	$sp_admin_ui_modules = apply_filters( 'sp_admin_ui_modules', $sp_admin_ui_modules );
 	$sp_admin_ui_modules = is_array( $sp_admin_ui_modules ) ? $sp_admin_ui_modules : [];
 
 	foreach ( $sp_admin_ui_modules as $sp_admin_ui_module ) {
-		if ( ! is_string( $sp_admin_ui_module ) ) {
+		if ( ! is_string( $sp_admin_ui_module ) || str_starts_with( $sp_admin_ui_module, '_' ) ) {
 			continue;
 		}
 
@@ -31,4 +35,4 @@
 		}
 	}
 
-	unset( $sp_admin_ui_modules, $sp_admin_ui_module, $sp_admin_ui_module_file );
+	unset( $sp_admin_ui_modules, $sp_admin_ui_config, $sp_admin_ui_module, $sp_admin_ui_module_file );

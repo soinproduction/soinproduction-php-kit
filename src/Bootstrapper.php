@@ -10,6 +10,7 @@ if (!defined('ABSPATH')) {
 class Bootstrapper {
 
 	private const DISABLED_MODULE_PREFIX = '_';
+	private static array $moduleConfigs = [];
 
 	private const DEFAULT_FRONTEND_SKIP_PATHS = [
 		'plugins/sp-content-manager/',
@@ -46,9 +47,9 @@ class Bootstrapper {
 		$is_admin_like  = is_admin() || wp_doing_ajax() || wp_doing_cron() || $is_cli_request;
 		$is_frontend    = !$is_admin_like;
 
-		$platform_modules = self::normalize_modules($config['platform'] ?? []);
-		$acf_modules      = self::normalize_modules($config['acf'] ?? []);
-		$plugins_modules  = self::normalize_modules($config['plugins'] ?? []);
+		$platform_modules = self::normalize_modules($config['platform'] ?? [], 'platform');
+		$acf_modules      = self::normalize_modules($config['acf'] ?? [], 'acf');
+		$plugins_modules  = self::normalize_modules($config['plugins'] ?? [], 'plugins');
 		$frontend_skip_paths = self::normalize_skip_paths(
 			$config['frontend_skip_paths'] ?? self::DEFAULT_FRONTEND_SKIP_PATHS
 		);
@@ -183,14 +184,22 @@ class Bootstrapper {
 		$load_directories('plugins', $plugins_modules);
 	}
 
-	private static function normalize_modules($modules): array {
+	public static function moduleConfig(string $category, string $module): ?array {
+		return self::$moduleConfigs[$category][$module] ?? null;
+	}
+
+	private static function normalize_modules($modules, string $category): array {
 		if (!is_array($modules)) {
 			return [];
 		}
 
+		self::$moduleConfigs[$category] = [];
 		$enabled = [];
 
-		foreach ($modules as $module) {
+		foreach ($modules as $key => $value) {
+			$module        = is_string($key) ? $key : $value;
+			$module_config = is_string($key) && is_array($value) ? array_values($value) : null;
+
 			if (!is_string($module)) {
 				continue;
 			}
@@ -206,6 +215,10 @@ class Bootstrapper {
 			}
 
 			$enabled[$module] = true;
+
+			if ($module_config !== null) {
+				self::$moduleConfigs[$category][$module] = $module_config;
+			}
 		}
 
 		return array_keys($enabled);

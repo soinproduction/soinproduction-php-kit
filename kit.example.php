@@ -31,7 +31,12 @@ $acf = [
 $plugins = [
 	'sp-accelerator',
 	'sp-allow-svg-upload',
-	'sp-admin-ui',
+	'sp-admin-ui' => [
+		'menu-title-item',
+		'preview-thumbnail',
+		'taxonomy-checkbox',
+		'taxonomy-radio',
+	],
 	'sp-cf7',
 	'sp-content-manager',
 	'sp-cpt-archives',
