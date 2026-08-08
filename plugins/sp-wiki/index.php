@@ -13,6 +13,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 			'sp-accelerator'          => 'performance',
 			'sp-allow-svg-upload'     => 'format-image',
 			'sp-cf7'                  => 'email-alt',
+			'sp-admin-ui'             => 'admin-customizer',
 			'sp-content-manager'      => 'admin-users',
 			'sp-cpt-archives'         => 'archive',
 			'sp-dev-mode'             => 'editor-code',

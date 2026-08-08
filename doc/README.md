@@ -54,3 +54,4 @@ ACF-типы и общие ACF-хелперы загружаются до рег
 - **[sp-uploads-webp-convert](../plugins/sp-uploads-webp-convert/index.php)** — автоматическая конвертация загружаемых изображений в формат WebP для оптимизации скорости.
 - **[sp-video-preview](../plugins/sp-video-preview/index.php)** — генерация превью-изображений для загружаемых видеофайлов.
 - **[sp-wiki](../plugins/sp-wiki/index.php)** — встроенная Wiki для документации темы и подключённых модулей кита.
+- **[sp-admin-ui](../plugins/sp-admin-ui/README.ru.md)** — структурированный набор admin UI: menu title, preview thumbnail и taxonomy metaboxes.

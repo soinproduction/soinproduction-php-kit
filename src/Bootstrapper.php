@@ -19,6 +19,8 @@ class Bootstrapper {
 
 	private const DEFAULT_AUTOLOAD_SKIP_PATHS = [
 		'plugins/sp-accelerator/includes/',
+		'plugins/sp-admin-ui/modules/',
+		'plugins/sp-admin-ui/support/',
 		'plugins/sp-cf7/modules/',
 	];
 
