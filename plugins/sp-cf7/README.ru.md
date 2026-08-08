@@ -6,26 +6,26 @@
 
 | Модуль | Назначение |
 | --- | --- |
-| `base` | Общее поведение CF7 и ACF-список форм. |
-| `mail-viewer` | Приватный журнал подготовленных писем CF7. |
-| `flowchimp` | Синхронизация с Mailchimp audience. |
-| `webhook` | Исходящий HTTP webhook отдельной формы. |
-| `redirects` | Redirect/modal metadata в разметке форм. |
-| `ui-select` | Custom Select shortcode, form tag и mail tags. |
-| `icon-generator` | Генератор UI Icon в редакторе CF7. |
+| `sp-cf7-core` | Общее поведение CF7 и ACF-список форм. |
+| `sp-cf7-mail-viewer` | Приватный журнал подготовленных писем CF7. |
+| `sp-cf7-mailchimp-sync` | Синхронизация с Mailchimp audience. |
+| `sp-cf7-webhook` | Исходящий HTTP webhook отдельной формы. |
+| `sp-cf7-redirects` | Redirect/modal metadata в разметке форм. |
+| `sp-cf7-select-field` | Custom Select shortcode, form tag и mail tags. |
+| `sp-cf7-icon-generator` | Генератор UI Icon в редакторе CF7. |
 
 По умолчанию загружаются все подмодули. Управлять ими можно прямо в массиве `plugins`; префикс `_` оставляет подмодуль в списке, но отключает его:
 
 ```php
 'plugins' => [
 	'sp-cf7' => [
-		'base',
-		'mail-viewer',
-		'_flowchimp',
-		'_webhook',
-		'redirects',
-		'ui-select',
-		'icon-generator',
+		'sp-cf7-core',
+		'sp-cf7-mail-viewer',
+		'_sp-cf7-mailchimp-sync',
+		'_sp-cf7-webhook',
+		'sp-cf7-redirects',
+		'sp-cf7-select-field',
+		'sp-cf7-icon-generator',
 	],
 ],
 ```

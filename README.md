@@ -7,9 +7,11 @@
 
 ## Стандарт структуры
 
-Модули в `platform/`, `acf/` и `plugins/` используют один формат: `<module-id>/index.php`, `README.en.md` и `README.ru.md`. Module IDs и имена каталогов записываются в `kebab-case`. Вложенные составные модули находятся в `modules/<module-id>/index.php`, внутренние PHP-компоненты — в `includes/`, тесты — в `tests/`.
+Модули в `platform/`, `acf/` и `plugins/` используют один формат: `<module-id>/index.php`, `README.en.md` и `README.ru.md`. Все публичные module IDs и каталоги используют namespace `sp-` и записываются в `kebab-case`. Вложенные модули используют полный namespace родителя, например `sp-cf7-mail-viewer`. Внутренние PHP-компоненты находятся в `includes/`, тесты — в `tests/`.
 
 Классы в `src/` следуют PSR-4 и поэтому сохраняют имена файлов в `PascalCase`.
+
+Старые module IDs поддерживаются Bootstrapper как compatibility aliases. Новые проекты должны использовать только канонические `sp-*` имена из `kit.example.php`.
 
 ## Установка
 
@@ -62,51 +64,51 @@ require_once THEME_DIR . '/kit.php';
 declare(strict_types=1);
 
 $platform = [
-	'_author-meta',
-	'branding',
-	'dev-user',
-	'duplicator-key',
-	'page-loader-settings',
-	'post-type-converter',
-	'reading-time',
-	'remove-post-slug',
-	'reset'
+	'_sp-author-meta',
+	'sp-login-branding',
+	'sp-content-admin',
+	'sp-duplicator-license',
+	'sp-motion-settings',
+	'sp-content-type-converter',
+	'sp-reading-time',
+	'sp-permalink-manager',
+	'sp-wordpress-baseline'
 ];
 
 $acf = [
-	'smart-relationship',
-	'_smart-taxonomy',
+	'sp-post-selector',
+	'_sp-term-selector',
 ];
 
 $plugins = [
 	'sp-accelerator',
-	'sp-allow-svg-upload',
+	'sp-svg-support',
 	'sp-admin-ui' => [
-		'menu-title-item',
-		'preview-thumbnail',
-		'taxonomy-checkbox',
-		'taxonomy-radio',
+		'sp-admin-ui-menu-heading',
+		'sp-admin-ui-thumbnail-column',
+		'sp-admin-ui-taxonomy-checklist',
+		'sp-admin-ui-taxonomy-radio',
 	],
 	'sp-cf7' => [
-		'base',
-		'mail-viewer',
-		'flowchimp',
-		'webhook',
-		'redirects',
-		'ui-select',
-		'icon-generator',
+		'sp-cf7-core',
+		'sp-cf7-mail-viewer',
+		'sp-cf7-mailchimp-sync',
+		'sp-cf7-webhook',
+		'sp-cf7-redirects',
+		'sp-cf7-select-field',
+		'sp-cf7-icon-generator',
 	],
 	'sp-content-manager',
-	'sp-cpt-archives',
-	'sp-dev-mode',
-	'sp-favorite-posts',
+	'sp-archive-pages',
+	'sp-debug-toolbar',
+	'sp-content-favorites',
 	'sp-google-reviews',
-	'sp-redirects',
+	'sp-redirect-manager',
 	'_sp-share',
 	'sp-tag-manager',
-	'sp-uploads-webp-convert',
-	'sp-video-preview',
-	'sp-wiki',
+	'sp-webp-uploads',
+	'sp-video-posters',
+	'sp-documentation',
 ];
 
 // 1. Загружаем платформу и ACF-типы из кита ДО регистрации групп полей темы.

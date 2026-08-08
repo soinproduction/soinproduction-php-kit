@@ -4,20 +4,20 @@
 
 | Модуль | Назначение |
 | --- | --- |
-| `menu-title-item` | Добавляет перетаскиваемые некликабельные заголовки в «Внешний вид → Меню». |
-| `preview-thumbnail` | Добавляет редактируемые колонки изображений в списки записей и терминов. |
-| `taxonomy-checkbox` | Выводит и сохраняет metabox таксономии с множественным выбором. |
-| `taxonomy-radio` | Выводит и сохраняет metabox таксономии с одиночным выбором. |
+| `sp-admin-ui-menu-heading` | Добавляет перетаскиваемые некликабельные заголовки в «Внешний вид → Меню». |
+| `sp-admin-ui-thumbnail-column` | Добавляет редактируемые колонки изображений в списки записей и терминов. |
+| `sp-admin-ui-taxonomy-checklist` | Выводит и сохраняет metabox таксономии с множественным выбором. |
+| `sp-admin-ui-taxonomy-radio` | Выводит и сохраняет metabox таксономии с одиночным выбором. |
 
 По умолчанию загружаются все подмодули. Управлять ими можно прямо в массиве `plugins`; префикс `_` оставляет модуль в списке, но отключает его:
 
 ```php
 'plugins' => [
 	'sp-admin-ui' => [
-		'menu-title-item',
-		'_preview-thumbnail',
-		'taxonomy-checkbox',
-		'_taxonomy-radio',
+		'sp-admin-ui-menu-heading',
+		'_sp-admin-ui-thumbnail-column',
+		'sp-admin-ui-taxonomy-checklist',
+		'_sp-admin-ui-taxonomy-radio',
 	],
 ],
 ```
@@ -26,8 +26,8 @@
 
 ```php
 add_filter( 'sp_admin_ui_modules', static fn(): array => [
-	'menu-title-item',
-	'taxonomy-radio',
+	'sp-admin-ui-menu-heading',
+	'sp-admin-ui-taxonomy-radio',
 ] );
 ```
 

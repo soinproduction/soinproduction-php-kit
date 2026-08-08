@@ -6,10 +6,16 @@
 	require_once __DIR__ . '/includes/taxonomy.php';
 
 	$sp_admin_ui_modules = [
-		'menu-title-item',
-		'preview-thumbnail',
-		'taxonomy-checkbox',
-		'taxonomy-radio',
+		'sp-admin-ui-menu-heading',
+		'sp-admin-ui-thumbnail-column',
+		'sp-admin-ui-taxonomy-checklist',
+		'sp-admin-ui-taxonomy-radio',
+	];
+	$sp_admin_ui_aliases = [
+		'menu-title-item'   => 'sp-admin-ui-menu-heading',
+		'preview-thumbnail' => 'sp-admin-ui-thumbnail-column',
+		'taxonomy-checkbox' => 'sp-admin-ui-taxonomy-checklist',
+		'taxonomy-radio'    => 'sp-admin-ui-taxonomy-radio',
 	];
 	$sp_admin_ui_config = \SoinProduction\Kit\Bootstrapper::moduleConfig( 'plugins', 'sp-admin-ui' );
 	if ( $sp_admin_ui_config !== null ) {
@@ -25,6 +31,7 @@
 		}
 
 		$sp_admin_ui_module = sanitize_key( $sp_admin_ui_module );
+		$sp_admin_ui_module = $sp_admin_ui_aliases[ $sp_admin_ui_module ] ?? $sp_admin_ui_module;
 		if ( $sp_admin_ui_module === '' ) {
 			continue;
 		}
@@ -35,4 +42,4 @@
 		}
 	}
 
-	unset( $sp_admin_ui_modules, $sp_admin_ui_config, $sp_admin_ui_module, $sp_admin_ui_module_file );
+	unset( $sp_admin_ui_modules, $sp_admin_ui_aliases, $sp_admin_ui_config, $sp_admin_ui_module, $sp_admin_ui_module_file );

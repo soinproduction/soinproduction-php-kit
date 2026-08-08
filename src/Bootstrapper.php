@@ -12,9 +12,43 @@ class Bootstrapper {
 	private const DISABLED_MODULE_PREFIX = '_';
 	private static array $moduleConfigs = [];
 
+	private const MODULE_ALIASES = [
+		'platform' => [
+			'author-meta'          => 'sp-author-meta',
+			'branding'             => 'sp-login-branding',
+			'dev-user'             => 'sp-content-admin',
+			'duplicator-key'       => 'sp-duplicator-license',
+			'page-loader-settings' => 'sp-motion-settings',
+			'post-type-converter' => 'sp-content-type-converter',
+			'reading-time'         => 'sp-reading-time',
+			'remove-post-slug'     => 'sp-permalink-manager',
+			'reset'                => 'sp-wordpress-baseline',
+		],
+		'acf' => [
+			'archive-builder'    => 'sp-archive-builder',
+			'icon-link-list'     => 'sp-icon-links',
+			'related-posts'      => 'sp-related-content',
+			'smart-relationship' => 'sp-post-selector',
+			'smart-taxonomy'     => 'sp-term-selector',
+			'table'              => 'sp-table',
+			'taxonomy-urls'      => 'sp-term-links',
+			'universal-media'    => 'sp-media',
+		],
+		'plugins' => [
+			'sp-allow-svg-upload'     => 'sp-svg-support',
+			'sp-cpt-archives'         => 'sp-archive-pages',
+			'sp-dev-mode'             => 'sp-debug-toolbar',
+			'sp-favorite-posts'       => 'sp-content-favorites',
+			'sp-redirects'            => 'sp-redirect-manager',
+			'sp-uploads-webp-convert' => 'sp-webp-uploads',
+			'sp-video-preview'        => 'sp-video-posters',
+			'sp-wiki'                 => 'sp-documentation',
+		],
+	];
+
 	private const DEFAULT_FRONTEND_SKIP_PATHS = [
 		'plugins/sp-content-manager/',
-		'plugins/sp-video-preview/',
+		'plugins/sp-video-posters/',
 		'plugins/sp-google-reviews/includes/stars-column.php',
 	];
 
@@ -209,6 +243,8 @@ class Bootstrapper {
 			if (preg_match('/^[a-z0-9][a-z0-9_-]*$/i', $module) !== 1) {
 				continue;
 			}
+
+			$module = self::MODULE_ALIASES[$category][$module] ?? $module;
 
 			$enabled[$module] = true;
 

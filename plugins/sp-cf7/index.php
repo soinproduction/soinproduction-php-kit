@@ -4,13 +4,22 @@
 	}
 
 	$sp_cf7_modules = [
-		'base',
-		'mail-viewer',
-		'flowchimp',
-		'webhook',
-		'redirects',
-		'ui-select',
-		'icon-generator',
+		'sp-cf7-core',
+		'sp-cf7-mail-viewer',
+		'sp-cf7-mailchimp-sync',
+		'sp-cf7-webhook',
+		'sp-cf7-redirects',
+		'sp-cf7-select-field',
+		'sp-cf7-icon-generator',
+	];
+	$sp_cf7_aliases = [
+		'base'           => 'sp-cf7-core',
+		'mail-viewer'    => 'sp-cf7-mail-viewer',
+		'flowchimp'      => 'sp-cf7-mailchimp-sync',
+		'webhook'        => 'sp-cf7-webhook',
+		'redirects'      => 'sp-cf7-redirects',
+		'ui-select'      => 'sp-cf7-select-field',
+		'icon-generator' => 'sp-cf7-icon-generator',
 	];
 	$sp_cf7_config = \SoinProduction\Kit\Bootstrapper::moduleConfig( 'plugins', 'sp-cf7' );
 	if ( $sp_cf7_config !== null ) {
@@ -26,6 +35,7 @@
 		}
 
 		$sp_cf7_module = sanitize_key( $sp_cf7_module );
+		$sp_cf7_module = $sp_cf7_aliases[ $sp_cf7_module ] ?? $sp_cf7_module;
 		if ( $sp_cf7_module === '' ) {
 			continue;
 		}
@@ -36,4 +46,4 @@
 		}
 	}
 
-	unset( $sp_cf7_modules, $sp_cf7_config, $sp_cf7_module, $sp_cf7_module_file );
+	unset( $sp_cf7_modules, $sp_cf7_aliases, $sp_cf7_config, $sp_cf7_module, $sp_cf7_module_file );
