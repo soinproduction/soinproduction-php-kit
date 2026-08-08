@@ -1,4 +1,24 @@
 <?php
+/**
+ * Determine whether the current request renders the Contact Form 7 editor.
+ *
+ * Contact Form 7 registers the same `wpcf7` slug as both a top-level menu and
+ * a submenu. Depending on the WordPress/CF7 version, the resulting screen ID
+ * can therefore use either the `toplevel_page_` or `contact_page_` prefix.
+ */
+function sp_cf7_redirects_is_editor_screen(): bool
+{
+    $screen = get_current_screen();
+    $screen_id = $screen ? (string) $screen->id : '';
+    $page = isset($_GET['page']) ? sanitize_key(wp_unslash($_GET['page'])) : '';
+
+    return in_array($screen_id, array(
+        'toplevel_page_wpcf7',
+        'contact_page_wpcf7',
+        'contact_page_wpcf7-new',
+    ), true) || in_array($page, array('wpcf7', 'wpcf7-new'), true);
+}
+
 // ============================================
 // ADMIN STYLES
 // ============================================
@@ -6,8 +26,7 @@ add_action('admin_head', 'cf7_custom_metabox_styles');
 
 function cf7_custom_metabox_styles()
 {
-    $screen = get_current_screen();
-    if (! $screen || $screen->id !== 'toplevel_page_wpcf7') {
+    if (! sp_cf7_redirects_is_editor_screen()) {
         return;
     }
 ?>
@@ -223,8 +242,7 @@ add_action('admin_footer', 'cf7_custom_metabox_scripts');
 
 function cf7_custom_metabox_scripts()
 {
-    $screen = get_current_screen();
-    if (! $screen || $screen->id !== 'toplevel_page_wpcf7') {
+    if (! sp_cf7_redirects_is_editor_screen()) {
         return;
     }
 ?>
