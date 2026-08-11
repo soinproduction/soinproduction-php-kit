@@ -836,8 +836,10 @@
             .cf7cs-copy-btn {
                 position: absolute;
                 right: 4px;
-                top: 50%;
-                transform: translateY(-50%);
+                top: 0;
+                bottom: 0;
+                margin: auto 0;
+                transform: none !important;
                 width: 36px;
                 height: 36px;
                 display: flex;
@@ -845,20 +847,20 @@
                 justify-content: center;
                 background: transparent;
                 border: none;
-                border-radius: var(--sp-admin-radius-xs);
+                border-radius: 0;
                 color: var(--sp-admin-muted);
                 cursor: pointer;
                 transition: all 0.2s ease;
             }
             .cf7cs-copy-btn:hover {
-                background: var(--sp-admin-accent-soft, #edf0ff) !important;
-                color: var(--sp-admin-accent-hover, #2145e6) !important;
-                transform: translateY(-50%) !important;
+                background: var(--sp-admin-accent, #3858e9) !important;
+                color: var(--color-on-accent, #fff) !important;
+                transform: none !important;
                 box-shadow: none !important;
             }
             .cf7cs-copy-btn:focus {
                 outline: none !important;
-                transform: translateY(-50%) !important;
+                transform: none !important;
                 box-shadow: none !important;
             }
             .cf7cs-copy-btn:focus-visible {
