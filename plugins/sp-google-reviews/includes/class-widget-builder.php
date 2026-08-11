@@ -37,13 +37,21 @@ final class SP_Google_Reviews_Widget_Builder {
 			'components'     => [ 'avatars', 'stars', 'rating', 'rating_label', 'count_label' ],
 			'avatar_count'    => 3,
 			'avatar_size'     => 52,
+			'avatar_size_mobile' => 42,
 			'avatar_overlap'  => 16,
+			'avatar_overlap_mobile' => 12,
 			'star_size'       => 22,
+			'star_size_mobile' => 18,
 			'font_size'       => 18,
+			'font_size_mobile' => 16,
 			'padding_y'       => 18,
+			'padding_y_mobile' => 14,
 			'padding_x'       => 24,
+			'padding_x_mobile' => 16,
 			'gap'             => 22,
+			'gap_mobile'      => 14,
 			'radius'          => 0,
+			'radius_mobile'   => 0,
 			'text_color'      => '#ffffff',
 			'muted_color'     => '#f2f2f5',
 			'star_color'      => '#ff5a1f',
@@ -63,12 +71,19 @@ final class SP_Google_Reviews_Widget_Builder {
 				'preset'          => 'compact',
 				'components'      => [ 'stars', 'rating', 'rating_label', 'count_label' ],
 				'avatar_count'     => 0,
+				'avatar_size_mobile'=> 28,
 				'star_size'        => 17,
+				'star_size_mobile' => 15,
 				'font_size'        => 14,
+				'font_size_mobile' => 13,
 				'padding_y'        => 12,
+				'padding_y_mobile' => 10,
 				'padding_x'        => 16,
+				'padding_x_mobile' => 12,
 				'gap'              => 10,
+				'gap_mobile'       => 8,
 				'radius'           => 8,
+				'radius_mobile'    => 6,
 				'background_color' => '#171717',
 				'overlay_opacity'  => 0,
 			] ),
@@ -76,12 +91,19 @@ final class SP_Google_Reviews_Widget_Builder {
 				'preset'          => 'minimal',
 				'components'      => [ 'stars', 'count_label' ],
 				'avatar_count'     => 0,
+				'avatar_size_mobile'=> 28,
 				'star_size'        => 15,
+				'star_size_mobile' => 13,
 				'font_size'        => 12,
+				'font_size_mobile' => 11,
 				'padding_y'        => 8,
+				'padding_y_mobile' => 6,
 				'padding_x'        => 10,
+				'padding_x_mobile' => 8,
 				'gap'              => 6,
+				'gap_mobile'       => 5,
 				'radius'           => 4,
+				'radius_mobile'    => 4,
 				'background_color' => '#171717',
 				'overlay_opacity'  => 0,
 			] ),
@@ -172,13 +194,21 @@ final class SP_Google_Reviews_Widget_Builder {
 				'components'       => $components,
 				'avatar_count'      => self::clamp_int( $raw['avatar_count'] ?? 3, 0, 6 ),
 				'avatar_size'       => self::clamp_int( $raw['avatar_size'] ?? 52, 28, 96 ),
+				'avatar_size_mobile'=> self::clamp_int( $raw['avatar_size_mobile'] ?? 42, 20, 96 ),
 				'avatar_overlap'    => self::clamp_int( $raw['avatar_overlap'] ?? 16, 0, 40 ),
+				'avatar_overlap_mobile' => self::clamp_int( $raw['avatar_overlap_mobile'] ?? 12, 0, 40 ),
 				'star_size'         => self::clamp_int( $raw['star_size'] ?? 22, 10, 48 ),
+				'star_size_mobile'  => self::clamp_int( $raw['star_size_mobile'] ?? 18, 8, 48 ),
 				'font_size'         => self::clamp_int( $raw['font_size'] ?? 18, 10, 36 ),
+				'font_size_mobile'  => self::clamp_int( $raw['font_size_mobile'] ?? 16, 8, 36 ),
 				'padding_y'         => self::clamp_int( $raw['padding_y'] ?? 18, 0, 80 ),
+				'padding_y_mobile'  => self::clamp_int( $raw['padding_y_mobile'] ?? 14, 0, 80 ),
 				'padding_x'         => self::clamp_int( $raw['padding_x'] ?? 24, 0, 100 ),
+				'padding_x_mobile'  => self::clamp_int( $raw['padding_x_mobile'] ?? 16, 0, 100 ),
 				'gap'               => self::clamp_int( $raw['gap'] ?? 22, 0, 64 ),
+				'gap_mobile'        => self::clamp_int( $raw['gap_mobile'] ?? 14, 0, 64 ),
 				'radius'            => self::clamp_int( $raw['radius'] ?? 0, 0, 80 ),
+				'radius_mobile'     => self::clamp_int( $raw['radius_mobile'] ?? 0, 0, 80 ),
 				'text_color'        => self::sanitize_color( $raw['text_color'] ?? '#ffffff', '#ffffff' ),
 				'muted_color'       => self::sanitize_color( $raw['muted_color'] ?? '#f2f2f5', '#f2f2f5' ),
 				'star_color'        => self::sanitize_color( $raw['star_color'] ?? '#ff5a1f', '#ff5a1f' ),
@@ -200,6 +230,21 @@ final class SP_Google_Reviews_Widget_Builder {
 	private static function sanitize_color( $value, string $fallback ): string {
 		$color = sanitize_hex_color( (string) $value );
 		return is_string( $color ) ? $color : $fallback;
+	}
+
+	private static function brand_palette(): array {
+		$palette = function_exists( 'color_palette_config' ) ? color_palette_config() : [];
+		if ( ! is_array( $palette ) ) {
+			return [];
+		}
+		$result = [];
+		foreach ( $palette as $color => $label ) {
+			$color = sanitize_hex_color( (string) $color );
+			if ( is_string( $color ) ) {
+				$result[ strtolower( $color ) ] = sanitize_text_field( (string) $label );
+			}
+		}
+		return $result;
 	}
 
 	public static function register_translation_strings(): void {
@@ -267,6 +312,7 @@ final class SP_Google_Reviews_Widget_Builder {
 				<?php self::render_editor( $presets['banner'], '__INDEX__', true ); ?>
 			</template>
 			<script type="application/json" id="sp-gr-widget-presets"><?php echo wp_json_encode( $presets ); ?></script>
+			<script type="application/json" id="sp-gr-brand-colors"><?php echo wp_json_encode( self::brand_palette() ); ?></script>
 		</div>
 		<?php
 	}
@@ -303,10 +349,10 @@ final class SP_Google_Reviews_Widget_Builder {
 				<div class="sp-gr-widget-editor__controls">
 					<section class="sp-gr-control-section">
 						<h3>Identity & preset</h3>
-						<div class="sp-gr-control-grid">
+						<div class="sp-gr-control-grid sp-gr-control-grid--identity">
 							<label><span>Name</span><input type="text" name="<?php echo esc_attr( $name ); ?>[name]" value="<?php echo esc_attr( (string) $widget['name'] ); ?>" data-sp-gr-name required></label>
 							<label><span>Widget ID</span><input type="text" name="<?php echo esc_attr( $name ); ?>[id]" value="<?php echo esc_attr( (string) $widget['id'] ); ?>" data-sp-gr-id pattern="[a-z0-9-]+" required><small>Lowercase letters, numbers and hyphens.</small></label>
-							<label class="sp-gr-control-grid__wide"><span>Preset</span><select name="<?php echo esc_attr( $name ); ?>[preset]" data-sp-gr-preset><option value="banner" <?php selected( $widget['preset'], 'banner' ); ?>>Banner</option><option value="compact" <?php selected( $widget['preset'], 'compact' ); ?>>Compact</option><option value="minimal" <?php selected( $widget['preset'], 'minimal' ); ?>>Minimal</option></select><small>Applying a preset replaces visual values in this editor.</small></label>
+							<label><span>Preset</span><select name="<?php echo esc_attr( $name ); ?>[preset]" data-sp-gr-preset><option value="banner" <?php selected( $widget['preset'], 'banner' ); ?>>Banner</option><option value="compact" <?php selected( $widget['preset'], 'compact' ); ?>>Compact</option><option value="minimal" <?php selected( $widget['preset'], 'minimal' ); ?>>Minimal</option></select><small>Applying a preset replaces visual values in this editor.</small></label>
 						</div>
 					</section>
 
@@ -339,14 +385,14 @@ final class SP_Google_Reviews_Widget_Builder {
 					<section class="sp-gr-control-section">
 						<h3>Appearance</h3>
 						<div class="sp-gr-control-grid sp-gr-control-grid--compact">
-							<?php self::number_control( $name, $widget, 'avatar_size', 'Avatar size', 28, 96, 'px' ); ?>
-							<?php self::number_control( $name, $widget, 'avatar_overlap', 'Avatar overlap', 0, 40, 'px' ); ?>
-							<?php self::number_control( $name, $widget, 'star_size', 'Star size', 10, 48, 'px' ); ?>
-							<?php self::number_control( $name, $widget, 'font_size', 'Font size', 10, 36, 'px' ); ?>
-							<?php self::number_control( $name, $widget, 'gap', 'Gap', 0, 64, 'px' ); ?>
-							<?php self::number_control( $name, $widget, 'radius', 'Radius', 0, 80, 'px' ); ?>
-							<?php self::number_control( $name, $widget, 'padding_y', 'Vertical padding', 0, 80, 'px' ); ?>
-							<?php self::number_control( $name, $widget, 'padding_x', 'Horizontal padding', 0, 100, 'px' ); ?>
+							<?php self::responsive_number_control( $name, $widget, 'avatar_size', 'Avatar size', 20, 96 ); ?>
+							<?php self::responsive_number_control( $name, $widget, 'avatar_overlap', 'Avatar overlap', 0, 40 ); ?>
+							<?php self::responsive_number_control( $name, $widget, 'star_size', 'Star size', 8, 48 ); ?>
+							<?php self::responsive_number_control( $name, $widget, 'font_size', 'Font size', 8, 36 ); ?>
+							<?php self::responsive_number_control( $name, $widget, 'gap', 'Gap', 0, 64 ); ?>
+							<?php self::responsive_number_control( $name, $widget, 'radius', 'Radius', 0, 80 ); ?>
+							<?php self::responsive_number_control( $name, $widget, 'padding_y', 'Vertical padding', 0, 80 ); ?>
+							<?php self::responsive_number_control( $name, $widget, 'padding_x', 'Horizontal padding', 0, 100 ); ?>
 							<?php self::color_control( $name, $widget, 'text_color', 'Text' ); ?>
 							<?php self::color_control( $name, $widget, 'muted_color', 'Muted text' ); ?>
 							<?php self::color_control( $name, $widget, 'star_color', 'Stars' ); ?>
@@ -358,7 +404,7 @@ final class SP_Google_Reviews_Widget_Builder {
 				</div>
 
 				<aside class="sp-gr-widget-editor__preview">
-					<div class="sp-gr-preview-toolbar"><strong>Live preview</strong><span>Responsive output</span></div>
+					<div class="sp-gr-preview-toolbar"><strong>Live preview</strong><span class="sp-gr-preview-modes"><button type="button" class="is-active" data-sp-gr-preview-mode="desktop">Desktop</button><button type="button" data-sp-gr-preview-mode="mobile">Mobile</button></span></div>
 					<div class="sp-gr-preview-stage" data-sp-gr-preview-stage>
 						<?php echo self::render_widget( $widget, self::preview_context(), true ); ?>
 					</div>
@@ -374,9 +420,23 @@ final class SP_Google_Reviews_Widget_Builder {
 		<?php
 	}
 
-	private static function color_control( string $name, array $widget, string $key, string $label ): void {
+	private static function responsive_number_control( string $name, array $widget, string $key, string $label, int $min, int $max ): void {
+		$mobile_key = $key . '_mobile';
 		?>
-		<label><span><?php echo esc_html( $label ); ?></span><span class="sp-gr-color-control"><input type="color" name="<?php echo esc_attr( $name ); ?>[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( (string) $widget[ $key ] ); ?>" data-setting="<?php echo esc_attr( $key ); ?>"><code><?php echo esc_html( (string) $widget[ $key ] ); ?></code></span></label>
+		<label class="sp-gr-responsive-control">
+			<span><?php echo esc_html( $label ); ?></span>
+			<span class="sp-gr-responsive-values">
+				<span><small>Desktop</small><span class="sp-gr-number-control"><input type="number" min="<?php echo esc_attr( (string) $min ); ?>" max="<?php echo esc_attr( (string) $max ); ?>" name="<?php echo esc_attr( $name ); ?>[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( (string) $widget[ $key ] ); ?>" data-setting="<?php echo esc_attr( $key ); ?>"><em>px</em></span></span>
+				<span><small>Mobile</small><span class="sp-gr-number-control"><input type="number" min="<?php echo esc_attr( (string) $min ); ?>" max="<?php echo esc_attr( (string) $max ); ?>" name="<?php echo esc_attr( $name ); ?>[<?php echo esc_attr( $mobile_key ); ?>]" value="<?php echo esc_attr( (string) $widget[ $mobile_key ] ); ?>" data-setting="<?php echo esc_attr( $mobile_key ); ?>"><em>px</em></span></span>
+			</span>
+		</label>
+		<?php
+	}
+
+	private static function color_control( string $name, array $widget, string $key, string $label ): void {
+		$palette = self::brand_palette();
+		?>
+		<label><span><?php echo esc_html( $label ); ?></span><span class="sp-gr-color-control"><input type="text" class="sp-gr-color-picker" name="<?php echo esc_attr( $name ); ?>[<?php echo esc_attr( $key ); ?>]" value="<?php echo esc_attr( (string) $widget[ $key ] ); ?>" data-setting="<?php echo esc_attr( $key ); ?>"></span><span class="sp-gr-brand-swatches" aria-label="Theme brand colors"><?php foreach ( $palette as $color => $color_label ) : ?><button type="button" data-sp-gr-color="<?php echo esc_attr( $color ); ?>" title="<?php echo esc_attr( $color_label . ' — ' . $color ); ?>" style="--swatch:<?php echo esc_attr( $color ); ?>"><span class="screen-reader-text"><?php echo esc_html( $color_label ); ?></span></button><?php endforeach; ?></span></label>
 		<?php
 	}
 
@@ -484,6 +544,17 @@ final class SP_Google_Reviews_Widget_Builder {
 		return $avatars;
 	}
 
+	private static function fluid_rem( int $mobile, int $desktop ): string {
+		if ( $mobile === $desktop ) {
+			return number_format( $mobile / 10, 3, '.', '' ) . 'rem';
+		}
+		$vw = ( $desktop - $mobile ) * 100 / ( 1440 - 375 );
+		$intercept_rem = ( $mobile - ( $vw * 3.75 ) ) / 10;
+		$minimum = min( $mobile, $desktop ) / 10;
+		$maximum = max( $mobile, $desktop ) / 10;
+		return sprintf( 'clamp(%.3frem, calc(%.3frem + %.3fvw), %.3frem)', $minimum, $intercept_rem, $vw, $maximum );
+	}
+
 	private static function render_widget( array $widget, array $context, bool $preview ): string {
 		$widget = wp_parse_args( $widget, self::defaults() );
 		$components = (array) $widget['components'];
@@ -495,9 +566,9 @@ final class SP_Google_Reviews_Widget_Builder {
 		$background = esc_url_raw( (string) $widget['background_image'] );
 		$background = str_replace( [ '\\', '"', "\r", "\n" ], [ '\\\\', '\\"', '', '' ], $background );
 		$style = sprintf(
-			'--sp-gr-text:%1$s;--sp-gr-muted:%2$s;--sp-gr-star:%3$s;--sp-gr-bg:%4$s;--sp-gr-avatar-size:%5$dpx;--sp-gr-avatar-overlap:%6$dpx;--sp-gr-star-size:%7$dpx;--sp-gr-font-size:%8$dpx;--sp-gr-pad-y:%9$dpx;--sp-gr-pad-x:%10$dpx;--sp-gr-gap:%11$dpx;--sp-gr-radius:%12$dpx;--sp-gr-overlay:%13$s;--sp-gr-image:%14$s;',
+			'--sp-gr-text:%1$s;--sp-gr-muted:%2$s;--sp-gr-star:%3$s;--sp-gr-bg:%4$s;--sp-gr-avatar-size:%5$s;--sp-gr-avatar-overlap:%6$s;--sp-gr-star-size:%7$s;--sp-gr-font-size:%8$s;--sp-gr-pad-y:%9$s;--sp-gr-pad-x:%10$s;--sp-gr-gap:%11$s;--sp-gr-radius:%12$s;--sp-gr-overlay:%13$s;--sp-gr-image:%14$s;',
 			esc_attr( (string) $widget['text_color'] ), esc_attr( (string) $widget['muted_color'] ), esc_attr( (string) $widget['star_color'] ), esc_attr( (string) $widget['background_color'] ),
-			(int) $widget['avatar_size'], (int) $widget['avatar_overlap'], (int) $widget['star_size'], (int) $widget['font_size'], (int) $widget['padding_y'], (int) $widget['padding_x'], (int) $widget['gap'], (int) $widget['radius'],
+			self::fluid_rem( (int) $widget['avatar_size_mobile'], (int) $widget['avatar_size'] ), self::fluid_rem( (int) $widget['avatar_overlap_mobile'], (int) $widget['avatar_overlap'] ), self::fluid_rem( (int) $widget['star_size_mobile'], (int) $widget['star_size'] ), self::fluid_rem( (int) $widget['font_size_mobile'], (int) $widget['font_size'] ), self::fluid_rem( (int) $widget['padding_y_mobile'], (int) $widget['padding_y'] ), self::fluid_rem( (int) $widget['padding_x_mobile'], (int) $widget['padding_x'] ), self::fluid_rem( (int) $widget['gap_mobile'], (int) $widget['gap'] ), self::fluid_rem( (int) $widget['radius_mobile'], (int) $widget['radius'] ),
 			$background !== '' ? number_format( (int) $widget['overlay_opacity'] / 100, 2, '.', '' ) : '0', $background !== '' ? 'url("' . $background . '")' : 'none'
 		);
 
@@ -563,9 +634,9 @@ CSS;
 .sp-gr-admin-wrap.sp-gr-builder-page{width:auto;max-width:none}.sp-gr-tabs{display:inline-flex;gap:4px;margin:0 0 20px;padding:4px;border:0;border-radius:10px;background:#e9edf3}.sp-gr-tabs .nav-tab{margin:0;padding:7px 14px;border:0;border-radius:7px;background:transparent;color:#4b5563;font-size:13px;font-weight:600;line-height:20px}.sp-gr-tabs .nav-tab:hover{background:rgb(255 255 255 / 60%);color:#1d2327}.sp-gr-tabs .nav-tab-active{background:#fff;color:#2746c7;box-shadow:0 1px 3px rgb(16 24 40 / 12%)}.sp-gr-builder-intro{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 20px}.sp-gr-builder-intro h2{margin:0 0 4px;font-size:18px}.sp-gr-builder-intro p{margin:0;color:#646970}.sp-gr-builder-count{padding:7px 11px;border-radius:999px;background:#eef2ff;color:#2746c7;white-space:nowrap}
 .sp-gr-widget-list{display:grid;gap:16px}.sp-gr-widget-editor{overflow:hidden;border:1px solid #dfe3e8;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgb(16 24 40 / 4%);transition:border-color .16s,box-shadow .16s}.sp-gr-widget-editor.is-expanded{border-color:#c9d1dc;box-shadow:0 8px 24px rgb(16 24 40 / 7%)}.sp-gr-widget-editor__header{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:58px;padding:10px 16px}.sp-gr-widget-editor__toggle{display:flex;flex:1;align-items:center;gap:10px;min-width:0;padding:0;border:0;background:none;text-align:left;cursor:pointer}.sp-gr-widget-editor__toggle>span:last-child{display:grid;gap:3px;min-width:0}.sp-gr-widget-editor__toggle strong{font-size:14px}.sp-gr-widget-editor__toggle small{overflow:hidden;color:#646970;font-weight:400;text-overflow:ellipsis;white-space:nowrap}.sp-gr-widget-editor__toggle code{padding:0;background:none}.sp-gr-widget-editor__toggle .dashicons{color:#667085;transition:transform .16s}.sp-gr-widget-editor.is-expanded .sp-gr-widget-editor__toggle .dashicons{transform:rotate(90deg)}.sp-gr-widget-editor__actions{display:flex;align-items:center;gap:8px}.sp-gr-widget-editor__body{display:none;grid-template-columns:minmax(520px,1fr) minmax(420px,.9fr);border-top:1px solid #e7eaee}.sp-gr-widget-editor.is-expanded .sp-gr-widget-editor__body{display:grid}.sp-gr-widget-list>.sp-gr-widget-editor:only-child [data-sp-gr-delete]{display:none}
 .sp-gr-delete-button{display:inline-flex!important;align-items:center;gap:4px!important;border-color:#f1b8b3!important;background:#fff7f6!important;color:#b42318!important}.sp-gr-delete-button .dashicons{width:15px;height:15px;font-size:15px;line-height:15px}.sp-gr-delete-button:hover,.sp-gr-delete-button:focus{border-color:#d92d20!important;background:#d92d20!important;color:#fff!important}.sp-gr-delete-button:focus{box-shadow:0 0 0 1px #fff,0 0 0 3px #d92d20!important}
-.sp-gr-widget-editor__controls{padding:18px}.sp-gr-control-section+ .sp-gr-control-section{margin-top:24px;padding-top:20px;border-top:1px solid #edf0f2}.sp-gr-control-section h3{margin:0 0 12px;font-size:15px}.sp-gr-control-section>.description{margin:-6px 0 12px}.sp-gr-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.sp-gr-control-grid--compact{grid-template-columns:repeat(3,minmax(0,1fr))}.sp-gr-control-grid label{display:grid;align-content:start;gap:6px}.sp-gr-control-grid label>span:first-child{color:#3c434a;font-size:12px;font-weight:600}.sp-gr-control-grid input:not([type=color]),.sp-gr-control-grid select{width:100%;min-height:38px}.sp-gr-control-grid small{color:#646970}.sp-gr-control-grid__wide{grid-column:1/-1}.sp-gr-number-control,.sp-gr-color-control,.sp-gr-media-control{display:flex;align-items:center}.sp-gr-number-control input{min-width:0}.sp-gr-number-control em{margin-left:-34px;color:#646970;font-style:normal;pointer-events:none}.sp-gr-color-control{gap:8px}.sp-gr-color-control input{width:44px;height:38px;padding:2px;border:1px solid #8c8f94;border-radius:4px;background:#fff}.sp-gr-media-control{gap:7px}.sp-gr-media-control input{flex:1}
+.sp-gr-widget-editor__controls{padding:18px}.sp-gr-control-section+ .sp-gr-control-section{margin-top:24px;padding-top:20px;border-top:1px solid #edf0f2}.sp-gr-control-section h3{margin:0 0 12px;font-size:15px}.sp-gr-control-section>.description{margin:-6px 0 12px}.sp-gr-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.sp-gr-control-grid--identity,.sp-gr-control-grid--compact{grid-template-columns:repeat(3,minmax(0,1fr))}.sp-gr-control-grid label{display:grid;align-content:start;gap:6px}.sp-gr-control-grid label>span:first-child{color:#3c434a;font-size:12px;font-weight:600}.sp-gr-control-grid input,.sp-gr-control-grid select{width:100%;min-height:38px}.sp-gr-control-grid small{color:#646970}.sp-gr-control-grid__wide{grid-column:1/-1}.sp-gr-number-control,.sp-gr-color-control,.sp-gr-media-control{display:flex;align-items:center}.sp-gr-number-control{position:relative}.sp-gr-number-control input{min-width:0;padding-right:32px!important;-moz-appearance:textfield}.sp-gr-number-control input::-webkit-inner-spin-button,.sp-gr-number-control input::-webkit-outer-spin-button{margin:0;-webkit-appearance:none}.sp-gr-number-control em{position:absolute;right:10px;color:#646970;font-style:normal;pointer-events:none}.sp-gr-responsive-values{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sp-gr-responsive-values>span{display:grid;gap:4px}.sp-gr-responsive-values small{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}.sp-gr-color-control{display:block}.sp-gr-color-control .wp-picker-container{display:block}.sp-gr-color-control .wp-color-result{margin:0}.sp-gr-brand-swatches{display:flex!important;flex-wrap:wrap;gap:5px}.sp-gr-brand-swatches button{width:22px;height:22px;padding:0;border:2px solid #fff;border-radius:50%;background:var(--swatch);box-shadow:0 0 0 1px #c7cdd4;cursor:pointer}.sp-gr-brand-swatches button:hover,.sp-gr-brand-swatches button:focus{box-shadow:0 0 0 2px #3858e9;outline:0}.sp-gr-media-control{gap:7px}.sp-gr-media-control input{flex:1}
 .sp-gr-component-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.sp-gr-component{min-width:0}.sp-gr-component label{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px;padding:8px 10px;border:1px solid #dfe3e8;border-radius:9px;background:#f8fafc;color:#475467;font-weight:600;cursor:pointer;transition:border-color .15s,background .15s,color .15s}.sp-gr-component input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.sp-gr-component i{position:relative;flex:0 0 34px;width:34px;height:20px;border-radius:999px;background:#c9d1dc;box-shadow:inset 0 0 0 1px rgb(0 0 0 / 5%);transition:background .15s}.sp-gr-component i::after{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 25%);content:"";transition:transform .15s}.sp-gr-component.is-enabled label{border-color:#a9b8f5;background:#f5f7ff;color:#2442b5}.sp-gr-component.is-enabled i{background:#3858e9}.sp-gr-component.is-enabled i::after{transform:translateX(14px)}.sp-gr-component input:focus-visible+i{outline:2px solid #3858e9;outline-offset:2px}
-.sp-gr-widget-editor__preview{position:relative;min-width:0;padding:18px;border-left:1px solid #e7eaee;background:#f6f7f7}.sp-gr-preview-toolbar{display:flex;justify-content:space-between;margin-bottom:12px;color:#646970;font-size:12px}.sp-gr-preview-toolbar strong{color:#1d2327;font-size:13px}.sp-gr-preview-stage{position:sticky;top:46px;display:grid;min-height:300px;place-items:center;padding:28px;overflow:hidden;border:1px solid #dcdcde;border-radius:12px;background-color:#dfe3e8;background-image:linear-gradient(45deg,#eef0f2 25%,transparent 25%),linear-gradient(-45deg,#eef0f2 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#eef0f2 75%),linear-gradient(-45deg,transparent 75%,#eef0f2 75%);background-position:0 0,0 10px,10px -10px,-10px 0;background-size:20px 20px}.sp-gr-preview-stage .sp-gr-widget{max-width:100%}
+.sp-gr-widget-editor__preview{position:relative;min-width:0;padding:18px;border-left:1px solid #e7eaee;background:#f6f7f7}.sp-gr-preview-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;color:#646970;font-size:12px}.sp-gr-preview-toolbar strong{color:#1d2327;font-size:13px}.sp-gr-preview-modes{display:inline-flex;padding:2px;border-radius:7px;background:#e4e8ee}.sp-gr-preview-modes button{padding:4px 8px;border:0;border-radius:5px;background:transparent;color:#667085;font-size:11px;cursor:pointer}.sp-gr-preview-modes button.is-active{background:#fff;color:#2746c7;box-shadow:0 1px 2px rgb(16 24 40 / 12%)}.sp-gr-preview-stage{position:sticky;top:46px;display:grid;min-height:300px;place-items:center;padding:28px;overflow:hidden;border:1px solid #dcdcde;border-radius:12px;background-color:#dfe3e8;background-image:linear-gradient(45deg,#eef0f2 25%,transparent 25%),linear-gradient(-45deg,#eef0f2 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#eef0f2 75%),linear-gradient(-45deg,transparent 75%,#eef0f2 75%);background-position:0 0,0 10px,10px -10px,-10px 0;background-size:20px 20px}.sp-gr-preview-stage .sp-gr-widget{max-width:100%}.sp-gr-preview-stage.is-mobile{width:375px;max-width:100%;margin-inline:auto;padding:18px}.sp-gr-preview-stage.is-mobile .sp-gr-widget--banner{display:flex;width:100%}.sp-gr-preview-stage.is-mobile .sp-gr-widget--banner .sp-gr-widget__inner{align-items:flex-start;flex-direction:column;gap:12px}
 @media(max-width:1180px){.sp-gr-widget-editor__body{grid-template-columns:1fr}.sp-gr-widget-editor__preview{border-top:1px solid #e7eaee;border-left:0}.sp-gr-preview-stage{position:static;min-height:220px}}@media(max-width:782px){.sp-gr-control-grid,.sp-gr-control-grid--compact,.sp-gr-component-list{grid-template-columns:1fr}.sp-gr-widget-editor__header{align-items:flex-start;flex-direction:column}.sp-gr-widget-editor__actions{width:100%}.sp-gr-builder-intro{align-items:flex-start;flex-direction:column}.sp-gr-tabs{display:flex}.sp-gr-tabs .nav-tab{flex:1;text-align:center}}
 CSS;
 	}
@@ -575,8 +646,19 @@ CSS;
 (function($){
 	'use strict';
 	var presets={};
+	var brandColors={};
 	var nextIndex=$('[data-sp-gr-widget]').length;
 	try{presets=JSON.parse($('#sp-gr-widget-presets').text()||'{}');}catch(error){presets={};}
+	try{brandColors=JSON.parse($('#sp-gr-brand-colors').text()||'{}');}catch(error){brandColors={};}
+
+	function initColorPickers($scope){
+		if(typeof $.fn.wpColorPicker!=='function'){return;}
+		$scope.find('.sp-gr-color-picker').each(function(){
+			var $input=$(this);
+			if($input.hasClass('wp-color-picker')){return;}
+			$input.wpColorPicker({palettes:Object.keys(brandColors),change:function(event,ui){$input.val(ui.color.toString()).trigger('input');},clear:function(){$input.val('').trigger('input');}});
+		});
+	}
 
 	function slug(value){
 		return String(value||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
@@ -616,11 +698,13 @@ CSS;
 		var settings=config($card);
 		var $widget=$card.find('[data-sp-gr-rendered-widget]');
 		var components=settings.components||[];
+		var mobile=$card.data('previewMode')==='mobile';
+		function size(key){return Number(settings[mobile?key+'_mobile':key]||0)+'px';}
 		$widget.attr('class','sp-gr-widget sp-gr-widget--'+settings.preset).css({
 			'--sp-gr-text':settings.text_color,'--sp-gr-muted':settings.muted_color,'--sp-gr-star':settings.star_color,
-			'--sp-gr-bg':settings.background_color,'--sp-gr-avatar-size':settings.avatar_size+'px','--sp-gr-avatar-overlap':settings.avatar_overlap+'px',
-			'--sp-gr-star-size':settings.star_size+'px','--sp-gr-font-size':settings.font_size+'px','--sp-gr-pad-y':settings.padding_y+'px',
-			'--sp-gr-pad-x':settings.padding_x+'px','--sp-gr-gap':settings.gap+'px','--sp-gr-radius':settings.radius+'px',
+			'--sp-gr-bg':settings.background_color,'--sp-gr-avatar-size':size('avatar_size'),'--sp-gr-avatar-overlap':size('avatar_overlap'),
+			'--sp-gr-star-size':size('star_size'),'--sp-gr-font-size':size('font_size'),'--sp-gr-pad-y':size('padding_y'),
+			'--sp-gr-pad-x':size('padding_x'),'--sp-gr-gap':size('gap'),'--sp-gr-radius':size('radius'),
 			'--sp-gr-overlay':settings.background_image?(Number(settings.overlay_opacity||0)/100):0,
 			'--sp-gr-image':settings.background_image?'url("'+String(settings.background_image).replace(/["\\]/g,'')+'")':'none'
 		});
@@ -630,13 +714,13 @@ CSS;
 		$widget.find('[data-preview-component="count_label"]').text((settings.count_label||'').replace('{count}','95'));
 		$card.find('[data-sp-gr-card-name]').text(settings.name||'Untitled widget');
 		$card.find('[data-sp-gr-card-shortcode]').text('[google_reviews_widget id="'+(slug(settings.id)||'widget')+'"]');
-		$card.find('.sp-gr-color-control').each(function(){$(this).find('code').text($(this).find('input').val());});
 	}
 
 	function appendCard($card){
 		$('[data-sp-gr-widget]').removeClass('is-expanded').find('[data-sp-gr-toggle]').attr('aria-expanded','false');
 		$card.addClass('is-expanded').find('[data-sp-gr-toggle]').attr('aria-expanded','true');
 		$('[data-sp-gr-widget-list]').append($card);
+		initColorPickers($card);
 		render($card);
 		updateCount();
 		var element=$card.get(0);
@@ -658,14 +742,16 @@ CSS;
 	$(document).on('click','[data-sp-gr-toggle]',function(){var $card=$(this).closest('[data-sp-gr-widget]'),open=!$card.hasClass('is-expanded');$card.toggleClass('is-expanded',open);$(this).attr('aria-expanded',open?'true':'false');});
 	$(document).on('input change','[data-sp-gr-widget] input,[data-sp-gr-widget] select',function(){var $card=$(this).closest('[data-sp-gr-widget]');if($(this).is('[data-sp-gr-name]')&&!$card.data('idTouched')){$card.find('[data-sp-gr-id]').val(uniqueId($(this).val(),$card.find('[data-sp-gr-id]')));}if($(this).is('[data-sp-gr-id]')){$card.data('idTouched',true);$(this).val(uniqueId($(this).val(),$(this)));}render($card);});
 	$(document).on('change','[data-sp-gr-component-toggle]',function(){var $item=$(this).closest('[data-component]');$item.toggleClass('is-enabled',this.checked);render($(this).closest('[data-sp-gr-widget]'));});
-	$(document).on('change','[data-sp-gr-preset]',function(){var p=presets[$(this).val()]||{},$card=$(this).closest('[data-sp-gr-widget]');Object.keys(p).forEach(function(key){if(['id','name','preset','components'].indexOf(key)!==-1)return;$card.find('[data-setting="'+key+'"]').val(p[key]);});$card.find('[data-sp-gr-component-toggle]').prop('checked',false).closest('[data-component]').removeClass('is-enabled');(p.components||[]).forEach(function(key){$card.find('[data-component="'+key+'"]').addClass('is-enabled').find('input').prop('checked',true);});render($card);});
+	$(document).on('change','[data-sp-gr-preset]',function(){var p=presets[$(this).val()]||{},$card=$(this).closest('[data-sp-gr-widget]');Object.keys(p).forEach(function(key){if(['id','name','preset','components'].indexOf(key)!==-1)return;var $field=$card.find('[data-setting="'+key+'"]');if($field.hasClass('wp-color-picker')){$field.wpColorPicker('color',p[key]);}else{$field.val(p[key]);}});$card.find('[data-sp-gr-component-toggle]').prop('checked',false).closest('[data-component]').removeClass('is-enabled');(p.components||[]).forEach(function(key){$card.find('[data-component="'+key+'"]').addClass('is-enabled').find('input').prop('checked',true);});render($card);});
 	$(document).on('click','[data-sp-gr-add-widget]',newCard);
-	$(document).on('click','[data-sp-gr-duplicate]',function(){var $source=$(this).closest('[data-sp-gr-widget]'),$card=$source.clone(false,false),index=String(nextIndex++),sourceName=$source.find('[data-sp-gr-name]').val()||'Widget';$card.find('[name]').each(function(){this.name=this.name.replace(/sp_google_reviews_widgets\[[^\]]+\]/,'sp_google_reviews_widgets['+index+']');});$card.find('[data-sp-gr-name]').val(sourceName+' copy');$card.find('[data-sp-gr-id]').val(uniqueId($source.find('[data-sp-gr-id]').val()+'-copy',$card.find('[data-sp-gr-id]')));appendCard($card);});
+	$(document).on('click','[data-sp-gr-duplicate]',function(){var $source=$(this).closest('[data-sp-gr-widget]'),$card=$source.clone(false,false),index=String(nextIndex++),sourceName=$source.find('[data-sp-gr-name]').val()||'Widget';$card.find('.wp-picker-container').each(function(){var $input=$(this).find('.sp-gr-color-picker').removeClass('wp-color-picker').removeAttr('style');$(this).before($input);$(this).remove();});$card.find('[name]').each(function(){this.name=this.name.replace(/sp_google_reviews_widgets\[[^\]]+\]/,'sp_google_reviews_widgets['+index+']');});$card.find('[data-sp-gr-name]').val(sourceName+' copy');$card.find('[data-sp-gr-id]').val(uniqueId($source.find('[data-sp-gr-id]').val()+'-copy',$card.find('[data-sp-gr-id]')));appendCard($card);});
 	$(document).on('click','[data-sp-gr-delete]',function(){if($('[data-sp-gr-widget]').length<2){return;}$(this).closest('[data-sp-gr-widget]').remove();updateCount();});
 	$(document).on('click','[data-sp-gr-copy]',function(){var text=$(this).closest('[data-sp-gr-widget]').find('[data-sp-gr-card-shortcode]').text(),button=this;navigator.clipboard.writeText(text).then(function(){var old=button.textContent;button.textContent='Copied';setTimeout(function(){button.textContent=old;},1200);});});
 	$(document).on('click','[data-sp-gr-media]',function(){var $input=$(this).siblings('input'),$card=$(this).closest('[data-sp-gr-widget]'),frame=wp.media({title:'Select background image',button:{text:'Use image'},multiple:false});frame.on('select',function(){var item=frame.state().get('selection').first().toJSON();$input.val(item.url).trigger('input');render($card);});frame.open();});
 	$(document).on('click','[data-sp-gr-media-clear]',function(){$(this).siblings('input').val('').trigger('input');});
-	$('[data-sp-gr-widget]').each(function(){render($(this));});
+	$(document).on('click','[data-sp-gr-color]',function(){var $card=$(this).closest('[data-sp-gr-widget]'),$input=$(this).closest('label').find('.sp-gr-color-picker');$input.wpColorPicker('color',$(this).attr('data-sp-gr-color'));render($card);});
+	$(document).on('click','[data-sp-gr-preview-mode]',function(){var $card=$(this).closest('[data-sp-gr-widget]'),mode=$(this).data('sp-gr-preview-mode');$card.data('previewMode',mode).find('[data-sp-gr-preview-mode]').removeClass('is-active');$(this).addClass('is-active');$card.find('[data-sp-gr-preview-stage]').toggleClass('is-mobile',mode==='mobile');render($card);});
+	$('[data-sp-gr-widget]').each(function(){initColorPickers($(this));render($(this));});
 	updateCount();
 })(jQuery);
 JS;

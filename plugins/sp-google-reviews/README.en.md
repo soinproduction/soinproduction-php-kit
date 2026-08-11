@@ -113,11 +113,11 @@ Available presets are Banner, Compact and Minimal. A widget can independently co
 - reviewer avatars, stars, numeric rating, rating label and review-count label;
 - component visibility with preset-controlled layout;
 - avatar amount, size and overlap;
-- star and typography sizes, spacing, padding and radius;
-- text, muted text, star and background colors;
+- separate desktop/mobile values for sizes, spacing, padding and radius;
+- text, muted text, star and background colors with the theme brand palette from `color_palette_config()`;
 - Media Library background image and overlay opacity.
 
-The editor supports creating and duplicating any number of independently configured cards and provides a responsive live preview. Frontend output uses scoped CSS custom properties, semantic markup and standalone SVG stars, so it has no theme sprite dependency or remote fallback-avatar request. Reviews without a photo are represented by the reviewer initial.
+The editor supports creating and duplicating up to 30 independently configured cards and provides Desktop/Mobile live-preview modes. Responsive numeric values are emitted as `clamp(mobile rem, calculated rem + vw, desktop rem)` between 375px and 1440px; the conversion follows the kit convention `10px = 1rem`. Frontend output uses scoped CSS custom properties, semantic markup and standalone SVG stars, so it has no theme sprite dependency or remote fallback-avatar request. Reviews without a photo are represented by the reviewer initial.
 
 Use the shortcode displayed on the widget card:
 
