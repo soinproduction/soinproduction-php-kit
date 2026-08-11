@@ -619,17 +619,18 @@
 
         public static function render_admin_tabs( string $active_tab ): void {
             $tabs = [
-                    'sync'    => 'Synchronization',
-                    'widgets' => 'Widget Builder',
+                    'sync'    => [ 'label' => 'Synchronization', 'icon' => 'dashicons-update' ],
+                    'widgets' => [ 'label' => 'Widget Builder', 'icon' => 'dashicons-layout' ],
             ];
             ?>
             <nav class="nav-tab-wrapper sp-gr-tabs" aria-label="Google Reviews sections">
-                <?php foreach ( $tabs as $tab => $label ) :
+                <?php foreach ( $tabs as $tab => $item ) :
                     $url = add_query_arg( [ 'page' => 'sp-google-reviews', 'tab' => $tab ], admin_url( 'options-general.php' ) );
                     ?>
                     <a class="nav-tab <?php echo $active_tab === $tab ? 'nav-tab-active' : ''; ?>"
-                       href="<?php echo esc_url( $url ); ?>">
-                        <?php echo esc_html( $label ); ?>
+                       href="<?php echo esc_url( $url ); ?>" <?php echo $active_tab === $tab ? 'aria-current="page"' : ''; ?>>
+                        <span class="dashicons <?php echo esc_attr( $item['icon'] ); ?>" aria-hidden="true"></span>
+                        <span><?php echo esc_html( $item['label'] ); ?></span>
                     </a>
                 <?php endforeach; ?>
             </nav>
