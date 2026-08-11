@@ -104,25 +104,31 @@ The classic `admin-post.php?action=sp_reviews_import` flow and Ajax action `sp_r
 
 Import results report inserted, updated and skipped totals. “Skipped” includes malformed rows, missing external identity, overwrite-disabled matches and post write failures.
 
-## Frontend Widget
+## Widget Builder
 
-Basic usage:
+Open **Settings → Google Reviews → Widget Builder**. The builder stores multiple reusable widgets in the `sp_google_reviews_widgets` option. Every widget has a stable ID and uses a strictly sanitized schema; arbitrary HTML and CSS are never stored.
+
+Available presets are Banner, Compact and Minimal. A widget can independently configure:
+
+- reviewer avatars, stars, numeric rating, rating label and review-count label;
+- component visibility and drag-and-drop order;
+- avatar amount, size and overlap;
+- star and typography sizes, spacing, padding and radius;
+- text, muted text, star and background colors;
+- Media Library background image and overlay opacity.
+
+The editor provides a responsive live preview. Frontend output uses scoped CSS custom properties, semantic markup and standalone SVG stars, so it has no theme sprite dependency or remote fallback-avatar request. Reviews without a photo are represented by the reviewer initial.
+
+Use the shortcode displayed on the widget card:
 
 ```text
-[google_reviews_widget]
-[google_reviews_widget show_count="false" show_stars="true"]
+[google_reviews_widget id="hero-rating"]
+[google_reviews_widget id="footer-rating"]
 ```
 
-`show_count` and `show_stars` treat `0`, `false`, `no` and `off` as false; other values are true. The widget:
+`[google_reviews_widget]` remains compatible and renders the `default` widget (or the first saved widget). Legacy `show_count` and `show_stars` attributes remain supported as per-render visibility overrides.
 
-- chooses manual fallback aggregate values when valid, otherwise stored statistics;
-- falls back to rating `5.0` and count `1` when stored values are zero;
-- rounds the visual star sprite to an integer from 1 to 5 while printing the numeric rating with one decimal;
-- loads up to three latest published review thumbnails;
-- uses three remote Unsplash fallback avatars when fewer are available;
-- adds its inline stylesheet under handle `sp-google-reviews-widget`.
-
-The star graphic depends on the theme `sprite()` helper and sprites named `Stars1` through `Stars5`. If the module is moved outside this theme architecture, provide an equivalent helper or change the renderer.
+Rating and count are selected for the current Polylang/WPML language. Widget labels are registered with Polylang/WPML String Translation under the `SP Google Reviews` group. They can also be adjusted through `sp_google_reviews_widget_rating_label` and `sp_google_reviews_widget_count_label`; both filters receive the widget ID as their second argument.
 
 ## Public PHP API
 

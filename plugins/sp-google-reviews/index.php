@@ -2,13 +2,15 @@
     /**
      * Plugin Name: SP Google Reviews
      * Description: Imports Google reviews via SerpAPI into the Review CPT.
-     * Version:     1.3.1
+     * Version:     1.4.0
      * Requires PHP: 7.4
      */
 
     if ( ! defined( 'ABSPATH' ) ) {
         exit;
     }
+
+    require_once __DIR__ . '/includes/class-widget-builder.php';
 
     final class SP_Reviews_Importer {
 
@@ -30,6 +32,7 @@
         private const PROVIDER = 'serpapi';
 
         public static function init(): void {
+            SP_Google_Reviews_Widget_Builder::init();
             add_action( 'admin_menu',            [ __CLASS__, 'add_admin_page' ] );
             add_action( 'admin_init',            [ __CLASS__, 'register_settings' ] );
             add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_admin_assets' ] );
@@ -326,6 +329,8 @@
                     'sanitize_callback' => [ __CLASS__, 'sanitize_options' ],
                     'default'           => [],
             ] );
+
+            SP_Google_Reviews_Widget_Builder::register_settings();
         }
 
         public static function enqueue_admin_assets( string $hook ): void {
@@ -333,17 +338,29 @@
                 return;
             }
 
+            wp_enqueue_media();
+
             wp_register_style( 'sp-gr-admin', false );
             wp_enqueue_style( 'sp-gr-admin' );
             wp_add_inline_style( 'sp-gr-admin', self::admin_css() );
 
+            wp_add_inline_style( 'sp-gr-admin', SP_Google_Reviews_Widget_Builder::admin_css() );
+
             wp_register_script( 'sp-gr-admin', false, [ 'jquery' ], null, true );
             wp_enqueue_script( 'sp-gr-admin' );
             wp_add_inline_script( 'sp-gr-admin', self::admin_js() );
+
+            wp_add_inline_script( 'sp-gr-admin', SP_Google_Reviews_Widget_Builder::admin_js() );
         }
 
         public static function render_admin_page(): void {
             if ( ! current_user_can( 'manage_options' ) ) {
+                return;
+            }
+
+            $active_tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'sync';
+            if ( $active_tab === 'widgets' ) {
+                SP_Google_Reviews_Widget_Builder::render_admin_page();
                 return;
             }
 
@@ -391,6 +408,8 @@
                         <button type="submit" class="button button-primary" form="sp-gr-settings">Save settings</button>
                     </div>
                 </header>
+
+                <?php self::render_admin_tabs( 'sync' ); ?>
 
                 <section class="sp-gr-card sp-admin-card">
                     <div class="sp-gr-card-head sp-admin-card__header"><h2>Sync Status</h2></div>
@@ -578,6 +597,25 @@
                     </div>
                 </form>
             </div>
+            <?php
+        }
+
+        public static function render_admin_tabs( string $active_tab ): void {
+            $tabs = [
+                    'sync'    => 'Synchronization',
+                    'widgets' => 'Widget Builder',
+            ];
+            ?>
+            <nav class="nav-tab-wrapper sp-gr-tabs" aria-label="Google Reviews sections">
+                <?php foreach ( $tabs as $tab => $label ) :
+                    $url = add_query_arg( [ 'page' => 'sp-google-reviews', 'tab' => $tab ], admin_url( 'options-general.php' ) );
+                    ?>
+                    <a class="nav-tab <?php echo $active_tab === $tab ? 'nav-tab-active' : ''; ?>"
+                       href="<?php echo esc_url( $url ); ?>">
+                        <?php echo esc_html( $label ); ?>
+                    </a>
+                <?php endforeach; ?>
+            </nav>
             <?php
         }
 
@@ -1407,190 +1445,11 @@ JS;
         public static function enqueue_frontend_assets(): void {
             wp_register_style( 'sp-google-reviews-widget', false );
             wp_enqueue_style( 'sp-google-reviews-widget' );
-            wp_add_inline_style( 'sp-google-reviews-widget', self::widget_css() );
+            wp_add_inline_style( 'sp-google-reviews-widget', SP_Google_Reviews_Widget_Builder::frontend_css() );
         }
 
         public static function shortcode_widget( $atts ): string {
-            $atts = shortcode_atts( [
-                    'show_count' => 'true',
-                    'show_stars' => 'true',
-            ], $atts, 'google_reviews_widget' );
-
-            $show_count = ! in_array( strtolower( (string) $atts['show_count'] ), [ '0', 'false', 'no', 'off' ], true );
-            $show_stars = ! in_array( strtolower( (string) $atts['show_stars'] ), [ '0', 'false', 'no', 'off' ], true );
-
-            $opt = self::get_options();
-            $content_language = self::get_current_content_language( $opt );
-            $stats_by_language = get_option( self::STATS_OPT_BY_LANG, [] );
-            $language_stats = is_array( $stats_by_language ) && isset( $stats_by_language[ $content_language ] )
-                    ? (array) $stats_by_language[ $content_language ]
-                    : [];
-
-            $fb_rating = str_replace( ',', '.', trim( (string) $opt['fallback_rating'] ) );
-            $fb_count  = trim( (string) $opt['fallback_count'] );
-
-            $rating = is_numeric( $fb_rating ) ? (float) $fb_rating
-                    : (float) str_replace( ',', '.', (string) ( $language_stats['rating'] ?? get_option( self::STATS_OPT_RATING, '5.0' ) ) );
-            $count  = ( is_numeric( $fb_count ) && (int) $fb_count > 0 ) ? (int) $fb_count
-                    : max( 0, (int) ( $language_stats['count'] ?? get_option( self::STATS_OPT_COUNT, 0 ) ) );
-
-            if ( $rating <= 0 ) { $rating = 5.0; }
-            if ( $count  <= 0 ) { $count  = 1; }
-
-            $stars = max( 1, min( 5, (int) round( $rating ) ) );
-
-            // Fetch the 3 latest reviewer avatars having thumbnails
-            $avatars = [];
-            $avatar_query = new WP_Query([
-                'post_type'      => 'review',
-                'post_status'    => 'publish',
-                'posts_per_page' => 3,
-                'suppress_filters' => true,
-                'meta_query'     => [
-                    'relation' => 'AND',
-                    [
-                        'key'   => self::META_LANGUAGE,
-                        'value' => $content_language,
-                    ],
-                    [
-                        'key'     => '_thumbnail_id',
-                        'compare' => 'EXISTS',
-                    ],
-                ],
-            ]);
-            if ( $avatar_query->have_posts() ) {
-                while ( $avatar_query->have_posts() ) {
-                    $avatar_query->the_post();
-                    $thumb_url = get_the_post_thumbnail_url( get_the_ID(), 'thumbnail' );
-                    if ( $thumb_url ) {
-                        $avatars[] = $thumb_url;
-                    }
-                }
-                wp_reset_postdata();
-            }
-
-            // Fallback avatars in case there are no reviews or thumbnails yet
-            if ( count( $avatars ) < 3 ) {
-                $fallbacks = [
-                    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=100&q=80',
-                    'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=100&q=80',
-                    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=100&q=80',
-                ];
-                for ( $i = count( $avatars ); $i < 3; $i++ ) {
-                    $avatars[] = $fallbacks[ $i ];
-                }
-            }
-
-            ob_start(); ?>
-            <div class="sp-google-reviews-widget">
-                <div class="sp-google-reviews-widget__avatars">
-                    <?php foreach ( $avatars as $avatar_url ) : ?>
-                        <img class="sp-google-reviews-widget__avatar" src="<?php echo esc_url( $avatar_url ); ?>" alt="Reviewer Avatar" width="48" height="48" loading="lazy" />
-                    <?php endforeach; ?>
-                </div>
-                <div class="sp-google-reviews-widget__content">
-                    <div class="sp-google-reviews-widget__stars-wrap">
-                        <?php if ( $show_stars ) : ?>
-                            <div class="sp-google-reviews-widget__stars">
-                                <?php sprite(86,13,'Stars'. $stars)  ?>
-                            </div>
-                        <?php endif; ?>
-                        <span class="sp-google-reviews-widget__rating-val"><?php echo esc_html( number_format( $rating, 1 ) ); ?></span>
-                        <span class="sp-google-reviews-widget__rating-lbl"><?php esc_html_e( 'Rating', THEME_SLUG ); ?></span>
-                    </div>
-                    <?php if ( $show_count ) : ?>
-                        <div class="sp-google-reviews-widget__based-on">
-                            <?php 
-                                printf( 
-                                    esc_html__( 'Based On %s Reviews', THEME_SLUG ), 
-                                    '<span class="sp-google-reviews-widget__count-val">' . esc_html( number_format( $count ) ) . '</span>' 
-                                ); 
-                            ?>
-                        </div>
-                    <?php endif; ?>
-                </div>
-            </div>
-            <?php
-            return (string) ob_get_clean();
-        }
-
-        private static function widget_css(): string {
-            return <<<'CSS'
-                .sp-google-reviews-widget {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 2.4rem;
-                    font-family: var(--font-title), sans-serif;
-                    color: #fff;
-                    text-align: left;
-                }
-                .sp-google-reviews-widget__avatars {
-                    display: flex;
-                    align-items: center;
-                }
-                .sp-google-reviews-widget__avatar {
-                    width: 4.8rem;
-                    height: 4.8rem;
-                    border-radius: 50%;
-                    border: 0.2rem solid #fff;
-                    object-fit: cover;
-                    background: #eaecf0;
-                    box-shadow: 0 0.4rem 0.6rem -0.1rem rgba(0, 0, 0, 0.1);
-                }
-                .sp-google-reviews-widget__avatar:not(:first-child) {
-                    margin-left: -1.6rem;   
-                }
-                .sp-google-reviews-widget__content {
-                    display: flex;
-                    flex-direction: column;
-                    gap: 0.4rem;
-                }
-                .sp-google-reviews-widget__stars-wrap {
-                    display: inline-flex;
-                    align-items: center;
-                    margin-bottom: .3rem;
-                    gap: .8rem;
-                }
-                .sp-google-reviews-widget__stars {
-                    display: flex;
-                    gap: 0.4rem;
-                    color: #ff5a1f;
-                    font-size: 1.8rem;
-                    line-height: 1;
-                }
-                .sp-google-reviews-widget__stars svg {
-                    fill: currentColor;
-                    display: block;
-                    height: 2rem;
-                    margin-top: -.2rem;
-                    width: 9.7rem;
-                }
-                .sp-google-reviews-widget__rating-val {
-                     font-size: 1.8rem;
-                    font-weight: 700;
-                    color: #f2f2f5;
-                    opacity: 1;
-                }
-                .sp-google-reviews-widget__rating-lbl {
-                     font-size: 1.8rem;
-                    font-weight: 400;
-                    color: #f2f2f5;
-                    opacity: 1;
-                    margin-left: -.3rem;
-                   
-                }
-                .sp-google-reviews-widget__based-on {
-                    font-size: 1.8rem;
-                    font-weight: 400;
-                    color: #f2f2f5;
-                    opacity: 1;
-                    margin-bottom: .3rem;
-                }
-                .sp-google-reviews-widget__count-val {
-                    font-weight: 700;
-                    color: #fff;
-                }
-            CSS;
+            return SP_Google_Reviews_Widget_Builder::render_shortcode( $atts );
         }
 
         // -------------------------------------------------------------------------

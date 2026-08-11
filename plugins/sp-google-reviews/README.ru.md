@@ -107,23 +107,31 @@ Classic `admin-post.php?action=sp_reviews_import` и Ajax `sp_reviews_import` т
 
 Результат показывает inserted, updated и skipped. В skipped входят malformed rows, пустой ID, совпадение при disabled overwrite и ошибки записи.
 
-## Frontend widget
+## Конструктор виджетов
+
+Откройте **Настройки → Google Reviews → Widget Builder**. Конструктор хранит несколько переиспользуемых виджетов в option `sp_google_reviews_widgets`. У каждого виджета стабильный ID и строго проверяемая схема: произвольные HTML и CSS в базу не записываются.
+
+Доступны пресеты Banner, Compact и Minimal. Для каждого виджета отдельно настраиваются:
+
+- аватары, звёзды, числовой рейтинг, подпись рейтинга и количество отзывов;
+- включение и drag-and-drop порядок компонентов;
+- количество, размер и перекрытие аватаров;
+- размеры звёзд и текста, интервалы, padding и radius;
+- цвета текста, вторичного текста, звёзд и фона;
+- фоновое изображение из Media Library и opacity затемнения.
+
+В редакторе работает адаптивный live preview. На frontend используются scoped CSS custom properties, семантическая разметка и автономные SVG-звёзды: зависимости от theme sprite и запросов к remote fallback avatars больше нет. Если у отзыва нет фотографии, выводится инициал автора.
+
+Используйте shortcode из карточки нужного виджета:
 
 ```text
-[google_reviews_widget]
-[google_reviews_widget show_count="false" show_stars="true"]
+[google_reviews_widget id="hero-rating"]
+[google_reviews_widget id="footer-rating"]
 ```
 
-`show_count` и `show_stars` считают значения `0`, `false`, `no`, `off` выключенными; остальные значения включают параметр. Widget:
+Старый `[google_reviews_widget]` продолжает работать и выводит виджет `default` либо первый сохранённый. Атрибуты `show_count` и `show_stars` сохранены как совместимые overrides для конкретного вызова.
 
-- берёт valid manual fallback, иначе сохранённую статистику;
-- при нуле fallback-ит на rating `5.0` и count `1`;
-- округляет visual sprite до 1–5, но печатает rating с одним знаком;
-- загружает до трёх последних review thumbnails;
-- при нехватке использует remote Unsplash fallback avatars;
-- добавляет inline CSS в handle `sp-google-reviews-widget`.
-
-Звёзды зависят от theme helper `sprite()` и assets `Stars1`…`Stars5`. При переносе модуля за пределы этой архитектуры темы предоставьте совместимый helper либо замените renderer.
+Рейтинг, count и avatars выбираются для текущего языка Polylang/WPML. Подписи регистрируются в Polylang/WPML String Translation в группе `SP Google Reviews`. Дополнительно доступны filters `sp_google_reviews_widget_rating_label` и `sp_google_reviews_widget_count_label`; вторым аргументом они получают ID виджета.
 
 ## Публичный PHP API
 
