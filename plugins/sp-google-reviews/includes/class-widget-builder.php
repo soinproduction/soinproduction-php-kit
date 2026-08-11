@@ -151,6 +151,9 @@ final class SP_Google_Reviews_Widget_Builder {
 					$components[] = $component;
 				}
 			}
+			if ( in_array( 'avatars', $components, true ) ) {
+				$components = array_merge( [ 'avatars' ], array_values( array_diff( $components, [ 'avatars' ] ) ) );
+			}
 
 			$widgets[ $id ] = [
 				'id'               => $id,
@@ -303,8 +306,8 @@ final class SP_Google_Reviews_Widget_Builder {
 							foreach ( $order as $component ) :
 								$enabled = in_array( $component, $active, true );
 								?>
-								<div class="sp-gr-component <?php echo $enabled ? 'is-enabled' : ''; ?>" draggable="true" data-component="<?php echo esc_attr( $component ); ?>">
-									<span class="dashicons dashicons-menu" aria-hidden="true"></span>
+				<div class="sp-gr-component <?php echo $enabled ? 'is-enabled' : ''; ?>" draggable="<?php echo $component === 'avatars' ? 'false' : 'true'; ?>" data-component="<?php echo esc_attr( $component ); ?>">
+					<span class="dashicons <?php echo $component === 'avatars' ? 'dashicons-lock' : 'dashicons-menu'; ?>" aria-hidden="true"></span>
 									<label><input type="checkbox" <?php checked( $enabled ); ?> data-sp-gr-component-toggle> <?php echo esc_html( $component_labels[ $component ] ); ?></label>
 								</div>
 							<?php endforeach; ?>
@@ -489,14 +492,16 @@ final class SP_Google_Reviews_Widget_Builder {
 		?>
 		<div class="sp-gr-widget sp-gr-widget--<?php echo esc_attr( (string) $widget['preset'] ); ?>" style="<?php echo esc_attr( $style ); ?>" data-sp-gr-rendered-widget>
 			<div class="sp-gr-widget__inner">
-				<?php foreach ( $components as $component ) : ?>
-					<?php if ( $component === 'avatars' && (int) $widget['avatar_count'] > 0 ) : ?>
+				<?php if ( in_array( 'avatars', $components, true ) && (int) $widget['avatar_count'] > 0 ) : ?>
 						<div class="sp-gr-widget__avatars" data-preview-component="avatars">
 							<?php foreach ( array_slice( (array) $context['avatars'], 0, (int) $widget['avatar_count'] ) as $avatar ) : ?>
 								<span class="sp-gr-widget__avatar"><?php if ( ! empty( $avatar['url'] ) ) : ?><img src="<?php echo esc_url( (string) $avatar['url'] ); ?>" alt="" width="96" height="96" loading="lazy"><?php else : ?><span aria-hidden="true"><?php echo esc_html( (string) $avatar['initial'] ); ?></span><?php endif; ?></span>
 							<?php endforeach; ?>
 						</div>
-					<?php elseif ( $component === 'stars' ) : ?>
+				<?php endif; ?>
+				<div class="sp-gr-widget__content">
+				<?php foreach ( array_diff( $components, [ 'avatars' ] ) as $component ) : ?>
+					<?php if ( $component === 'stars' ) : ?>
 						<div class="sp-gr-widget__stars" role="img" aria-label="<?php echo esc_attr( sprintf( '%.1f out of 5 stars', $rating ) ); ?>" data-preview-component="stars"><?php self::render_stars( $rating ); ?></div>
 					<?php elseif ( $component === 'rating' ) : ?>
 						<strong class="sp-gr-widget__rating" data-preview-component="rating"><?php echo esc_html( number_format_i18n( $rating, 1 ) ); ?></strong>
@@ -506,6 +511,7 @@ final class SP_Google_Reviews_Widget_Builder {
 						<span class="sp-gr-widget__count" data-preview-component="count_label"><?php echo wp_kses( str_replace( '{count}', '<strong>' . esc_html( number_format_i18n( $count ) ) . '</strong>', esc_html( $count_label ) ), [ 'strong' => [] ] ); ?></span>
 					<?php endif; ?>
 				<?php endforeach; ?>
+				</div>
 			</div>
 		</div>
 		<?php
@@ -522,9 +528,10 @@ final class SP_Google_Reviews_Widget_Builder {
 
 	public static function frontend_css(): string {
 		return <<<'CSS'
-.sp-gr-widget{position:relative;isolation:isolate;display:inline-flex;max-width:100%;overflow:hidden;border-radius:var(--sp-gr-radius);background-color:var(--sp-gr-bg);background-image:var(--sp-gr-image);background-position:center;background-size:cover;color:var(--sp-gr-text);font-family:inherit;font-size:var(--sp-gr-font-size);line-height:1.25}
+.sp-gr-widget{position:relative;isolation:isolate;display:inline-flex;max-width:100%;height:max-content;overflow:hidden;border-radius:var(--sp-gr-radius);background-color:var(--sp-gr-bg);background-image:var(--sp-gr-image);background-position:center;background-size:cover;color:var(--sp-gr-text);font-family:inherit;font-size:var(--sp-gr-font-size);line-height:1.25}
 .sp-gr-widget::before{position:absolute;z-index:-1;inset:0;background:rgb(0 0 0 / var(--sp-gr-overlay));content:"";pointer-events:none}
-.sp-gr-widget__inner{display:flex;align-items:center;flex-wrap:wrap;gap:calc(var(--sp-gr-gap) * .45) var(--sp-gr-gap);padding:var(--sp-gr-pad-y) var(--sp-gr-pad-x)}
+.sp-gr-widget__inner{display:flex;align-items:center;gap:var(--sp-gr-gap);padding:var(--sp-gr-pad-y) var(--sp-gr-pad-x)}
+.sp-gr-widget__content{display:flex;align-items:center;flex:1;flex-wrap:wrap;gap:calc(var(--sp-gr-gap) * .3) calc(var(--sp-gr-gap) * .45);min-width:0}
 .sp-gr-widget__avatars{display:flex;align-items:center;margin-right:max(0px,calc(var(--sp-gr-avatar-overlap) * -.25))}
 .sp-gr-widget__avatar{display:grid;place-items:center;width:var(--sp-gr-avatar-size);height:var(--sp-gr-avatar-size);overflow:hidden;border:2px solid #fff;border-radius:50%;background:#3858e9;color:#fff;font-size:calc(var(--sp-gr-avatar-size) * .42);font-weight:700;box-shadow:0 4px 12px rgb(0 0 0 / 15%)}
 .sp-gr-widget__avatar:not(:first-child){margin-left:calc(var(--sp-gr-avatar-overlap) * -1)}
@@ -532,9 +539,9 @@ final class SP_Google_Reviews_Widget_Builder {
 .sp-gr-widget__stars{display:inline-flex;gap:2px;color:color-mix(in srgb,var(--sp-gr-star) 20%,transparent)}
 .sp-gr-widget__star{width:var(--sp-gr-star-size);height:var(--sp-gr-star-size);fill:currentColor}.sp-gr-widget__star.is-active{color:var(--sp-gr-star)}
 .sp-gr-widget__rating{font-size:1.18em;line-height:1}.sp-gr-widget__rating-label,.sp-gr-widget__count{color:var(--sp-gr-muted)}.sp-gr-widget__count{flex-basis:100%}.sp-gr-widget__count strong{color:var(--sp-gr-text)}
-.sp-gr-widget--compact .sp-gr-widget__inner{flex-wrap:nowrap}.sp-gr-widget--compact .sp-gr-widget__count{flex-basis:auto;white-space:nowrap}
-.sp-gr-widget--minimal .sp-gr-widget__inner{align-items:flex-start;flex-direction:column}.sp-gr-widget--minimal .sp-gr-widget__count{flex-basis:auto}
-@media(max-width:480px){.sp-gr-widget--banner{display:flex;width:100%}.sp-gr-widget--banner .sp-gr-widget__inner{gap:10px 14px}.sp-gr-widget--banner .sp-gr-widget__avatars{flex-basis:100%}}
+.sp-gr-widget--compact .sp-gr-widget__content{flex-wrap:nowrap}.sp-gr-widget--compact .sp-gr-widget__count{flex-basis:auto;white-space:nowrap}
+.sp-gr-widget--minimal .sp-gr-widget__inner{align-items:flex-start}.sp-gr-widget--minimal .sp-gr-widget__content{align-items:flex-start;flex-direction:column}.sp-gr-widget--minimal .sp-gr-widget__count{flex-basis:auto}
+@media(max-width:480px){.sp-gr-widget--banner{display:flex;width:100%}.sp-gr-widget--banner .sp-gr-widget__inner{align-items:flex-start;flex-direction:column;gap:12px}}
 CSS;
 	}
 
@@ -558,7 +565,7 @@ CSS;
 	function slug(value){return String(value||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
 	function syncComponents($card){var values=[];$card.find('[data-sp-gr-component-list] .is-enabled').each(function(){values.push($(this).data('component'));});$card.find('[data-sp-gr-components]').val(values.join(','));return values;}
 	function config($card){var out={};$card.find('[data-setting]').each(function(){out[$(this).data('setting')]=$(this).val();});out.id=$card.find('[data-sp-gr-id]').val();out.name=$card.find('[data-sp-gr-name]').val();out.preset=$card.find('[data-sp-gr-preset]').val();out.components=syncComponents($card);return out;}
-	function render($card){var c=config($card),$w=$card.find('[data-sp-gr-rendered-widget]'),$inner=$w.find('.sp-gr-widget__inner'),components=c.components||[];$w.attr('class','sp-gr-widget sp-gr-widget--'+c.preset).css({'--sp-gr-text':c.text_color,'--sp-gr-muted':c.muted_color,'--sp-gr-star':c.star_color,'--sp-gr-bg':c.background_color,'--sp-gr-avatar-size':c.avatar_size+'px','--sp-gr-avatar-overlap':c.avatar_overlap+'px','--sp-gr-star-size':c.star_size+'px','--sp-gr-font-size':c.font_size+'px','--sp-gr-pad-y':c.padding_y+'px','--sp-gr-pad-x':c.padding_x+'px','--sp-gr-gap':c.gap+'px','--sp-gr-radius':c.radius+'px','--sp-gr-overlay':c.background_image?(Number(c.overlay_opacity||0)/100):0,'--sp-gr-image':c.background_image?'url("'+String(c.background_image).replace(/["\\]/g,'')+'")':'none'});components.forEach(function(component){var $component=$inner.find('[data-preview-component="'+component+'"]');if($component.length)$inner.append($component);});$w.find('[data-preview-component]').each(function(){$(this).toggle(components.indexOf($(this).data('preview-component'))!==-1);});$w.find('.sp-gr-widget__avatar').each(function(i){$(this).toggle(i<Number(c.avatar_count||0));});$w.find('[data-preview-component="rating_label"]').text(c.rating_label||'');var count=(c.count_label||'').replace('{count}','95');$w.find('[data-preview-component="count_label"]').text(count);$card.find('[data-sp-card-name]').text(c.name||'Untitled widget');var shortcode='[google_reviews_widget id="'+(slug(c.id)||'widget')+'"]';$card.find('[data-sp-card-shortcode]').text(shortcode);$card.find('.sp-gr-color-control').each(function(){$(this).find('code').text($(this).find('input').val());});}
+	function render($card){var c=config($card),$w=$card.find('[data-sp-gr-rendered-widget]'),$content=$w.find('.sp-gr-widget__content'),components=c.components||[];$w.attr('class','sp-gr-widget sp-gr-widget--'+c.preset).css({'--sp-gr-text':c.text_color,'--sp-gr-muted':c.muted_color,'--sp-gr-star':c.star_color,'--sp-gr-bg':c.background_color,'--sp-gr-avatar-size':c.avatar_size+'px','--sp-gr-avatar-overlap':c.avatar_overlap+'px','--sp-gr-star-size':c.star_size+'px','--sp-gr-font-size':c.font_size+'px','--sp-gr-pad-y':c.padding_y+'px','--sp-gr-pad-x':c.padding_x+'px','--sp-gr-gap':c.gap+'px','--sp-gr-radius':c.radius+'px','--sp-gr-overlay':c.background_image?(Number(c.overlay_opacity||0)/100):0,'--sp-gr-image':c.background_image?'url("'+String(c.background_image).replace(/["\\]/g,'')+'")':'none'});components.forEach(function(component){if(component==='avatars')return;var $component=$content.find('[data-preview-component="'+component+'"]');if($component.length)$content.append($component);});$w.find('[data-preview-component]').each(function(){$(this).toggle(components.indexOf($(this).data('preview-component'))!==-1);});$w.find('.sp-gr-widget__avatar').each(function(i){$(this).toggle(i<Number(c.avatar_count||0));});$w.find('[data-preview-component="rating_label"]').text(c.rating_label||'');var count=(c.count_label||'').replace('{count}','95');$w.find('[data-preview-component="count_label"]').text(count);$card.find('[data-sp-card-name]').text(c.name||'Untitled widget');var shortcode='[google_reviews_widget id="'+(slug(c.id)||'widget')+'"]';$card.find('[data-sp-card-shortcode]').text(shortcode);$card.find('.sp-gr-color-control').each(function(){$(this).find('code').text($(this).find('input').val());});}
 	function bindCard($card){render($card);}
 	$(document).on('click','[data-sp-gr-toggle]',function(){var $card=$(this).closest('[data-sp-gr-widget]'),open=!$card.hasClass('is-expanded');$card.toggleClass('is-expanded',open);$(this).attr('aria-expanded',open?'true':'false');});
 	$(document).on('input change','[data-sp-gr-widget] input,[data-sp-gr-widget] select',function(){var $card=$(this).closest('[data-sp-gr-widget]');if($(this).is('[data-sp-gr-name]')&&!$card.data('idTouched')){$card.find('[data-sp-gr-id]').val(slug($(this).val()));}if($(this).is('[data-sp-gr-id]')){$card.data('idTouched',true).find('[data-sp-gr-id]').val(slug($(this).val()));}render($card);});
