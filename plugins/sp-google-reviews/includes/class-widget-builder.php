@@ -624,8 +624,8 @@ CSS;
 		$widget.find('.sp-gr-widget__avatar').each(function(index){$(this).toggle(index<Number(settings.avatar_count||0));});
 		$widget.find('[data-preview-component="rating_label"]').text(settings.rating_label||'');
 		$widget.find('[data-preview-component="count_label"]').text((settings.count_label||'').replace('{count}','95'));
-		$card.find('[data-sp-card-name]').text(settings.name||'Untitled widget');
-		$card.find('[data-sp-card-shortcode]').text('[google_reviews_widget id="'+(slug(settings.id)||'widget')+'"]');
+		$card.find('[data-sp-gr-card-name]').text(settings.name||'Untitled widget');
+		$card.find('[data-sp-gr-card-shortcode]').text('[google_reviews_widget id="'+(slug(settings.id)||'widget')+'"]');
 		$card.find('.sp-gr-color-control').each(function(){$(this).find('code').text($(this).find('input').val());});
 	}
 
