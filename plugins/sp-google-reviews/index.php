@@ -1052,6 +1052,17 @@ JS;
                 return (int) $q->posts[0];
             }
 
+            $unassigned = new WP_Query( array_merge( $base_args, [
+                    'meta_query' => [
+                            [ 'key' => self::META_PROVIDER,  'value' => $provider ],
+                            [ 'key' => self::META_SOURCE_ID, 'value' => $source_id ],
+                            [ 'key' => self::META_LANGUAGE,  'compare' => 'NOT EXISTS' ],
+                    ],
+            ] ) );
+            if ( ! empty( $unassigned->posts ) ) {
+                return (int) $unassigned->posts[0];
+            }
+
             if ( $legacy_id === '' ) {
                 return 0;
             }
