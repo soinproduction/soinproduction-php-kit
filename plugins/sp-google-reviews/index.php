@@ -2,7 +2,7 @@
     /**
      * Plugin Name: SP Google Reviews
      * Description: Imports Google reviews via SerpAPI into the Review CPT.
-     * Version:     1.2.0
+     * Version:     1.3.0
      * Requires PHP: 7.4
      */
 
@@ -18,10 +18,14 @@
         private const META_EXTERNAL_ID = '_sp_review_external_id';
         private const META_REVIEW_URL  = '_sp_review_url';
         private const META_PLACE_ID    = '_sp_review_place_id';
+        private const META_SOURCE_ID   = '_sp_review_source_id';
+        private const META_LANGUAGE    = '_sp_review_language';
+        private const META_IMAGES      = '_sp_review_images';
 
         private const STATS_OPT_RATING = 'sp_google_reviews_rating';
         private const STATS_OPT_COUNT  = 'sp_google_reviews_count';
         private const STATS_OPT_LAST   = 'sp_google_reviews_last_fetch';
+        private const STATS_OPT_BY_LANG = 'sp_google_reviews_stats_by_language';
 
         private const PROVIDER = 'serpapi';
 
@@ -36,11 +40,11 @@
             add_action( 'wp_enqueue_scripts',    [ __CLASS__, 'enqueue_frontend_assets' ] );
             add_shortcode( 'google_reviews_widget', [ __CLASS__, 'shortcode_widget' ] );
 
-            // Exclude reviewer avatars from the Media Library
+            // Exclude review-owned media from the Media Library.
             add_filter( 'ajax_query_attachments_args', [ __CLASS__, 'exclude_avatars_from_media_library' ] );
             add_action( 'pre_get_posts',               [ __CLASS__, 'exclude_avatars_from_media_list' ] );
 
-            // Auto-delete reviewer avatar on review deletion
+            // Auto-delete review-owned media when a review is deleted.
             add_action( 'before_delete_post',          [ __CLASS__, 'delete_review_thumbnail' ] );
 
             // Clear cache when attachments are deleted
@@ -107,6 +111,133 @@
                    && trim( (string) ( $opt['place_id'] ?? '' ) ) !== '';
         }
 
+        /**
+         * Return the content languages that must be synchronized.
+         *
+         * The array key is the Polylang/WPML language code. `provider` is the
+         * two-letter language sent to SerpAPI as `hl`.
+         */
+        private static function get_import_languages( array $opt ): array {
+            $fallback = self::normalize_provider_language( (string) ( $opt['language'] ?? 'en' ) );
+
+            if ( function_exists( 'pll_languages_list' ) ) {
+                $slugs   = pll_languages_list( [ 'fields' => 'slug' ] );
+                $locales = pll_languages_list( [ 'fields' => 'locale' ] );
+                $result  = [];
+
+                foreach ( (array) $slugs as $index => $slug ) {
+                    $code = sanitize_key( (string) $slug );
+                    if ( $code === '' ) {
+                        continue;
+                    }
+                    $result[ $code ] = self::normalize_provider_language( (string) ( $locales[ $index ] ?? $code ) );
+                }
+
+                if ( $result !== [] ) {
+                    return $result;
+                }
+            }
+
+            $wpml_languages = apply_filters( 'wpml_active_languages', null, [
+                    'skip_missing' => 0,
+                    'orderby'      => 'code',
+            ] );
+            if ( ! is_array( $wpml_languages ) || $wpml_languages === [] ) {
+                global $sitepress;
+                if ( is_object( $sitepress ) && method_exists( $sitepress, 'get_active_languages' ) ) {
+                    $wpml_languages = $sitepress->get_active_languages();
+                }
+            }
+            if ( is_array( $wpml_languages ) && $wpml_languages !== [] ) {
+                $result = [];
+                foreach ( $wpml_languages as $key => $language ) {
+                    $language = is_array( $language ) ? $language : [];
+                    $code = sanitize_key( (string) ( $language['language_code'] ?? $key ) );
+                    if ( $code === '' ) {
+                        continue;
+                    }
+                    $result[ $code ] = self::normalize_provider_language(
+                            (string) ( $language['default_locale'] ?? $code )
+                    );
+                }
+
+                if ( $result !== [] ) {
+                    return $result;
+                }
+            }
+
+            return [ $fallback => $fallback ];
+        }
+
+        private static function normalize_provider_language( string $language ): string {
+            $language = strtolower( trim( str_replace( '_', '-', $language ) ) );
+            $language = explode( '-', $language )[0] ?? '';
+            $language = preg_replace( '/[^a-z]/', '', $language );
+            return $language !== '' ? $language : 'en';
+        }
+
+        private static function assign_post_language( int $post_id, string $language ): void {
+            if ( function_exists( 'pll_set_post_language' ) ) {
+                pll_set_post_language( $post_id, $language );
+                return;
+            }
+
+            if ( has_action( 'wpml_set_element_language_details' ) ) {
+                do_action( 'wpml_set_element_language_details', [
+                        'element_id'           => $post_id,
+                        'element_type'         => apply_filters( 'wpml_element_type', 'review' ),
+                        'trid'                 => false,
+                        'language_code'        => $language,
+                        'source_language_code' => null,
+                ] );
+            }
+        }
+
+        private static function connect_post_translations( array $posts_by_language ): void {
+            $posts_by_language = array_filter( array_map( 'absint', $posts_by_language ) );
+            if ( count( $posts_by_language ) < 2 ) {
+                return;
+            }
+
+            if ( function_exists( 'pll_save_post_translations' ) ) {
+                pll_save_post_translations( $posts_by_language );
+                return;
+            }
+
+            if ( ! has_action( 'wpml_set_element_language_details' ) ) {
+                return;
+            }
+
+            $default_language = (string) apply_filters( 'wpml_default_language', '' );
+            $source_language  = isset( $posts_by_language[ $default_language ] )
+                    ? $default_language
+                    : (string) array_key_first( $posts_by_language );
+            $source_id   = (int) $posts_by_language[ $source_language ];
+            $element_type = apply_filters( 'wpml_element_type', 'review' );
+            $trid = apply_filters( 'wpml_element_trid', null, $source_id, $element_type );
+
+            if ( ! $trid ) {
+                self::assign_post_language( $source_id, $source_language );
+                $trid = apply_filters( 'wpml_element_trid', null, $source_id, $element_type );
+            }
+            if ( ! $trid ) {
+                return;
+            }
+
+            foreach ( $posts_by_language as $language => $post_id ) {
+                if ( (int) $post_id === $source_id ) {
+                    continue;
+                }
+                do_action( 'wpml_set_element_language_details', [
+                        'element_id'           => (int) $post_id,
+                        'element_type'         => $element_type,
+                        'trid'                 => (int) $trid,
+                        'language_code'        => (string) $language,
+                        'source_language_code' => $source_language,
+                ] );
+            }
+        }
+
         // -------------------------------------------------------------------------
         // Admin page
         // -------------------------------------------------------------------------
@@ -153,6 +284,8 @@
             }
 
             $opt  = self::get_options();
+            $import_languages = self::get_import_languages( $opt );
+            $is_multilingual  = function_exists( 'pll_languages_list' ) || has_filter( 'wpml_active_languages' );
             $last = get_option( self::STATS_OPT_LAST, '' );
             $last = is_string( $last ) ? trim( $last ) : '';
 
@@ -287,6 +420,13 @@
                             <tr class="sp-gr-row">
                                 <th scope="row"><label for="sp-language">Reviews Language</label></th>
                                 <td>
+                                    <?php if ( $is_multilingual ) : ?>
+                                        <input type="hidden"
+                                               name="<?php echo esc_attr( self::OPT_KEY ); ?>[language]"
+                                               value="<?php echo esc_attr( $opt['language'] ); ?>" />
+                                        <strong><?php echo esc_html( implode( ', ', array_keys( $import_languages ) ) ); ?></strong>
+                                        <p class="description">Detected from Polylang/WPML. Every active language is synchronized and linked automatically.</p>
+                                    <?php else : ?>
                                     <select id="sp-language" name="<?php echo esc_attr( self::OPT_KEY ); ?>[language]">
                                         <?php foreach ( $languages as $code => $name ) : ?>
                                             <option value="<?php echo esc_attr( $code ); ?>" <?php selected( $opt['language'], $code ); ?>>
@@ -295,6 +435,7 @@
                                         <?php endforeach; ?>
                                     </select>
                                     <p class="description">Select the language for the fetched reviews.</p>
+                                    <?php endif; ?>
                                 </td>
                             </tr>
 
@@ -688,40 +829,79 @@ JS;
         // -------------------------------------------------------------------------
 
         private static function fetch_and_upsert( array $opt ): array {
-            $data = self::fetch_serpapi_reviews( $opt );
-
-            if ( empty( $data['success'] ) ) {
-                return self::normalize_result( $data, 'Failed to fetch reviews from SerpAPI.' );
-            }
-
-            $items    = is_array( $data['reviews'] ) ? $data['reviews'] : [];
             $imported = $updated = $skipped = 0;
+            $languages = self::get_import_languages( $opt );
+            $translations = [];
 
-            foreach ( $items as $item ) {
-                if ( ! is_array( $item ) ) { $skipped++; continue; }
+            foreach ( $languages as $content_language => $provider_language ) {
+                $language_opt = $opt;
+                $language_opt['language']         = $provider_language;
+                $language_opt['content_language'] = $content_language;
+                $data = self::fetch_serpapi_reviews( $language_opt );
 
-                $ext_id = (string) ( $item['external_id'] ?? '' );
-                if ( $ext_id === '' ) { $skipped++; continue; }
-
-                $post_id = self::find_existing_review_id( self::PROVIDER, $ext_id );
-
-                if ( $post_id > 0 ) {
-                    if ( empty( $opt['overwrite'] ) ) { $skipped++; continue; }
-                    $ok = self::update_review_post( $post_id, self::PROVIDER, $ext_id, $opt, $item );
-                    $ok ? $updated++ : $skipped++;
-                    continue;
+                if ( empty( $data['success'] ) ) {
+                    return self::normalize_result(
+                            $data,
+                            sprintf( 'Failed to fetch %s reviews from SerpAPI.', $content_language )
+                    );
                 }
 
-                $new_id = self::insert_review_post( self::PROVIDER, $ext_id, $opt, $item );
-                $new_id > 0 ? $imported++ : $skipped++;
+                foreach ( (array) ( $data['reviews'] ?? [] ) as $item ) {
+                    if ( ! is_array( $item ) ) { $skipped++; continue; }
+
+                    $source_id = (string) ( $item['source_id'] ?? '' );
+                    $ext_id    = (string) ( $item['external_id'] ?? '' );
+                    $legacy_id = (string) ( $item['legacy_external_id'] ?? '' );
+                    if ( $source_id === '' || $ext_id === '' ) { $skipped++; continue; }
+
+                    $post_id = self::find_existing_review_id(
+                            self::PROVIDER,
+                            $source_id,
+                            $content_language,
+                            $legacy_id
+                    );
+
+                    if ( $post_id > 0 ) {
+                        $translations[ $source_id ][ $content_language ] = $post_id;
+                        if ( empty( $opt['overwrite'] ) ) {
+                            update_post_meta( $post_id, self::META_EXTERNAL_ID, $ext_id );
+                            update_post_meta( $post_id, self::META_SOURCE_ID, $source_id );
+                            update_post_meta( $post_id, self::META_LANGUAGE, $content_language );
+                            self::assign_post_language( $post_id, $content_language );
+                            $skipped++;
+                            continue;
+                        }
+                        $ok = self::update_review_post( $post_id, self::PROVIDER, $ext_id, $language_opt, $item );
+                        $ok ? $updated++ : $skipped++;
+                        continue;
+                    }
+
+                    $new_id = self::insert_review_post( self::PROVIDER, $ext_id, $language_opt, $item );
+                    if ( $new_id > 0 ) {
+                        $translations[ $source_id ][ $content_language ] = $new_id;
+                        $imported++;
+                    } else {
+                        $skipped++;
+                    }
+                }
             }
 
-            self::update_stats_from_posts();
+            foreach ( $translations as $posts_by_language ) {
+                self::connect_post_translations( $posts_by_language );
+            }
+
+            self::update_stats_from_posts( array_keys( $languages ) );
             update_option( self::STATS_OPT_LAST, current_time( 'mysql' ) );
 
             return self::normalize_result( [
                     'success' => true,
-                    'message' => sprintf( 'Import completed. Imported: %d, Updated: %d, Skipped: %d', $imported, $updated, $skipped ),
+                    'message' => sprintf(
+                            'Import completed for %d language(s). Imported: %d, Updated: %d, Skipped: %d',
+                            count( $languages ),
+                            $imported,
+                            $updated,
+                            $skipped
+                    ),
             ] );
         }
 
@@ -741,7 +921,7 @@ JS;
             $out             = [];
             $seen            = [];
             $next_page_token = null;
-            $place_saved     = false;
+            $place_info      = [];
 
             for ( $page = 0; $page < $max_pages; $page++ ) {
                 $args = [
@@ -779,15 +959,12 @@ JS;
                     break;
                 }
 
-                if ( ! $place_saved && ! empty( $body['place_info'] ) ) {
+                if ( $place_info === [] && ! empty( $body['place_info'] ) ) {
                     $pi = $body['place_info'];
-                    if ( ! empty( $pi['rating'] ) ) {
-                        update_option( self::STATS_OPT_RATING, number_format( (float) $pi['rating'], 1, '.', '' ) );
-                    }
-                    if ( ! empty( $pi['reviews'] ) ) {
-                        update_option( self::STATS_OPT_COUNT, (int) $pi['reviews'] );
-                    }
-                    $place_saved = true;
+                    $place_info = [
+                            'rating' => isset( $pi['rating'] ) ? (float) $pi['rating'] : 0.0,
+                            'count'  => isset( $pi['reviews'] ) ? (int) $pi['reviews'] : 0,
+                    ];
                 }
 
                 $reviews = isset( $body['reviews'] ) && is_array( $body['reviews'] ) ? $body['reviews'] : [];
@@ -804,12 +981,15 @@ JS;
 
                     $user_link = (string) ( $r['user']['link'] ?? '' );
                     $iso_date  = (string) ( $r['iso_date'] ?? $r['date'] ?? '' );
-                    $ext_id    = md5( $user_link . '|' . $iso_date . '|' . (string) ( $r['snippet'] ?? '' ) );
+                    $snippet   = (string) ( $r['snippet'] ?? '' );
+                    $legacy_id = md5( $user_link . '|' . $iso_date . '|' . $snippet );
+                    $source_id = sanitize_text_field( (string) ( $r['review_id'] ?? '' ) );
+                    $source_id = $source_id !== '' ? $source_id : $legacy_id;
 
-                    if ( isset( $seen[ $ext_id ] ) ) {
+                    if ( isset( $seen[ $source_id ] ) ) {
                         continue;
                     }
-                    $seen[ $ext_id ] = true;
+                    $seen[ $source_id ] = true;
 
                     $ts = 0;
                     if ( ! empty( $r['iso_date'] ) ) {
@@ -819,14 +999,18 @@ JS;
                         }
                     }
 
+                    $translated_snippet = trim( (string) ( $r['translated_snippet'] ?? '' ) );
                     $out[] = [
-                            'external_id' => $ext_id,
+                            'external_id'        => $source_id,
+                            'legacy_external_id' => $legacy_id,
+                            'source_id'           => $source_id,
                             'author'      => (string) ( $r['user']['name'] ?? 'Anonymous' ),
-                            'text'        => (string) ( $r['snippet'] ?? '' ),
+                            'text'        => $translated_snippet !== '' ? $translated_snippet : $snippet,
                             'rating'      => $rating,
                             'timestamp'   => $ts,
                             'avatar_url'  => (string) ( $r['user']['thumbnail'] ?? '' ),
-                            'url'         => $user_link,
+                            'image_urls'  => self::normalize_review_image_urls( $r['images'] ?? [] ),
+                            'url'         => (string) ( $r['link'] ?? $user_link ),
                      ];
                     $added++;
 
@@ -841,26 +1025,46 @@ JS;
                 }
             }
 
-            return [ 'success' => true, 'message' => '', 'reviews' => $out ];
+            return [ 'success' => true, 'message' => '', 'reviews' => $out, 'place_info' => $place_info ];
         }
 
         // -------------------------------------------------------------------------
         // DB helpers
         // -------------------------------------------------------------------------
 
-        private static function find_existing_review_id( string $provider, string $external_id ): int {
-            $q = new WP_Query( [
+        private static function find_existing_review_id( string $provider, string $source_id, string $language, string $legacy_id = '' ): int {
+            $base_args = [
                     'post_type'      => 'review',
                     'post_status'    => [ 'publish', 'future', 'draft', 'pending', 'private' ],
                     'posts_per_page' => 1,
                     'fields'         => 'ids',
+                    'suppress_filters' => true,
+            ];
+            $q = new WP_Query( array_merge( $base_args, [
                     'meta_query'     => [
                             [ 'key' => self::META_PROVIDER,    'value' => $provider ],
-                            [ 'key' => self::META_EXTERNAL_ID, 'value' => $external_id ],
+                            [ 'key' => self::META_SOURCE_ID,   'value' => $source_id ],
+                            [ 'key' => self::META_LANGUAGE,    'value' => $language ],
                     ],
-            ] );
+            ] ) );
 
-            return ! empty( $q->posts ) ? (int) $q->posts[0] : 0;
+            if ( ! empty( $q->posts ) ) {
+                return (int) $q->posts[0];
+            }
+
+            if ( $legacy_id === '' ) {
+                return 0;
+            }
+
+            $legacy = new WP_Query( array_merge( $base_args, [
+                    'meta_query' => [
+                            [ 'key' => self::META_PROVIDER,    'value' => $provider ],
+                            [ 'key' => self::META_EXTERNAL_ID, 'value' => $legacy_id ],
+                            [ 'key' => self::META_LANGUAGE,    'compare' => 'NOT EXISTS' ],
+                    ],
+            ] ) );
+
+            return ! empty( $legacy->posts ) ? (int) $legacy->posts[0] : 0;
         }
 
         private static function insert_review_post( string $provider, string $external_id, array $opt, array $item ): int {
@@ -883,6 +1087,7 @@ JS;
             }
 
             self::apply_review_meta( (int) $post_id, $provider, $external_id, $opt, $item, $rating );
+            self::assign_post_language( (int) $post_id, (string) ( $opt['content_language'] ?? $opt['language'] ?? 'en' ) );
 
             return (int) $post_id;
         }
@@ -906,6 +1111,7 @@ JS;
             }
 
             self::apply_review_meta( $post_id, $provider, $external_id, $opt, $item, $rating );
+            self::assign_post_language( $post_id, (string) ( $opt['content_language'] ?? $opt['language'] ?? 'en' ) );
 
             return true;
         }
@@ -914,6 +1120,8 @@ JS;
             update_post_meta( $post_id, self::META_PROVIDER,    $provider );
             update_post_meta( $post_id, self::META_EXTERNAL_ID, $external_id );
             update_post_meta( $post_id, self::META_PLACE_ID,    (string) ( $opt['place_id'] ?? '' ) );
+            update_post_meta( $post_id, self::META_SOURCE_ID,   (string) ( $item['source_id'] ?? $external_id ) );
+            update_post_meta( $post_id, self::META_LANGUAGE,    (string) ( $opt['content_language'] ?? $opt['language'] ?? 'en' ) );
 
             if ( ! empty( $item['url'] ) ) {
                 update_post_meta( $post_id, self::META_REVIEW_URL, (string) $item['url'] );
@@ -928,11 +1136,34 @@ JS;
             if ( ! empty( $item['avatar_url'] ) ) {
                 self::set_thumbnail_from_url( $post_id, (string) $item['avatar_url'], ! empty( $opt['overwrite'] ) );
             }
+
+            if ( ! empty( $item['image_urls'] ) && is_array( $item['image_urls'] ) ) {
+                self::set_review_images_from_urls( $post_id, $item['image_urls'], ! empty( $opt['overwrite'] ) );
+            }
         }
 
         // -------------------------------------------------------------------------
-        // Avatar sideload
+        // Review media sideload
         // -------------------------------------------------------------------------
+
+        private static function normalize_review_image_urls( $images ): array {
+            if ( ! is_array( $images ) ) {
+                return [];
+            }
+
+            $urls = [];
+            foreach ( $images as $image ) {
+                $url = is_string( $image )
+                        ? $image
+                        : ( is_array( $image ) ? (string) ( $image['image'] ?? $image['thumbnail'] ?? '' ) : '' );
+                $url = trim( $url );
+                if ( $url !== '' && self::is_safe_remote_url( $url ) ) {
+                    $urls[ $url ] = $url;
+                }
+            }
+
+            return array_values( $urls );
+        }
 
         private static function set_thumbnail_from_url( int $post_id, string $url, bool $overwrite ): void {
             $url = trim( $url );
@@ -943,27 +1174,84 @@ JS;
                 return;
             }
 
+            $old_thumbnail_id = get_post_thumbnail_id( $post_id );
+            $attachment_id = self::sideload_review_media( $post_id, $url, 'review-avatar-' . $post_id . '.jpg' );
+            if ( $attachment_id <= 0 ) {
+                return;
+            }
+
+            set_post_thumbnail( $post_id, $attachment_id );
+            if ( $overwrite && $old_thumbnail_id && $old_thumbnail_id !== $attachment_id ) {
+                self::delete_owned_attachment( $post_id, (int) $old_thumbnail_id );
+            }
+            self::delete_review_avatars_cache();
+        }
+
+        private static function set_review_images_from_urls( int $post_id, array $urls, bool $overwrite ): void {
+            $existing_ids = array_values( array_filter( array_map(
+                    'absint',
+                    (array) get_post_meta( $post_id, self::META_IMAGES, true )
+            ) ) );
+            if ( $existing_ids !== [] && ! $overwrite ) {
+                return;
+            }
+
+            $new_ids = [];
+            foreach ( array_values( array_unique( $urls ) ) as $index => $url ) {
+                $attachment_id = self::sideload_review_media(
+                        $post_id,
+                        (string) $url,
+                        sprintf( 'review-image-%d-%d.jpg', $post_id, $index + 1 )
+                );
+                if ( $attachment_id > 0 ) {
+                    $new_ids[] = $attachment_id;
+                }
+            }
+
+            // A temporary network failure must not destroy an existing gallery.
+            if ( $new_ids === [] ) {
+                return;
+            }
+
+            update_post_meta( $post_id, self::META_IMAGES, $new_ids );
+            foreach ( array_diff( $existing_ids, $new_ids ) as $old_id ) {
+                self::delete_owned_attachment( $post_id, (int) $old_id );
+            }
+            self::delete_review_avatars_cache();
+        }
+
+        private static function sideload_review_media( int $post_id, string $url, string $filename ): int {
+            $url = trim( $url );
+            if ( $url === '' || ! self::is_safe_remote_url( $url ) ) {
+                return 0;
+            }
+
             require_once ABSPATH . 'wp-admin/includes/media.php';
             require_once ABSPATH . 'wp-admin/includes/file.php';
             require_once ABSPATH . 'wp-admin/includes/image.php';
 
             $tmp = download_url( $url );
             if ( is_wp_error( $tmp ) ) {
-                return;
+                return 0;
             }
 
             $attachment_id = media_handle_sideload( [
-                    'name'     => 'review-avatar-' . $post_id . '.jpg',
+                    'name'     => sanitize_file_name( $filename ),
                     'tmp_name' => $tmp,
             ], $post_id );
 
             if ( is_wp_error( $attachment_id ) ) {
                 @unlink( $tmp );
-                return;
+                return 0;
             }
 
-            set_post_thumbnail( $post_id, (int) $attachment_id );
-            self::delete_review_avatars_cache();
+            return (int) $attachment_id;
+        }
+
+        private static function delete_owned_attachment( int $post_id, int $attachment_id ): void {
+            if ( $attachment_id > 0 && (int) wp_get_post_parent_id( $attachment_id ) === $post_id ) {
+                wp_delete_attachment( $attachment_id, true );
+            }
         }
 
         private static function is_safe_remote_url( string $url ): bool {
@@ -990,27 +1278,51 @@ JS;
         // Stats
         // -------------------------------------------------------------------------
 
-        private static function update_stats_from_posts(): void {
-            $q = new WP_Query( [
+        private static function update_stats_from_posts( array $languages ): void {
+            $stats = [];
+
+            foreach ( $languages as $language ) {
+                $q = new WP_Query( [
                     'post_type'      => 'review',
                     'post_status'    => 'publish',
                     'posts_per_page' => -1,
                     'fields'         => 'ids',
-            ] );
+                    'suppress_filters' => true,
+                    'meta_query'     => [
+                            [ 'key' => self::META_LANGUAGE, 'value' => (string) $language ],
+                    ],
+                ] );
 
-            $ids   = is_array( $q->posts ) ? $q->posts : [];
-            $count = count( $ids );
-
-            if ( $count <= 0 ) {
-                update_option( self::STATS_OPT_COUNT,  0 );
-                update_option( self::STATS_OPT_RATING, '0.0' );
-                return;
+                $ids   = is_array( $q->posts ) ? $q->posts : [];
+                $count = count( $ids );
+                $sum   = array_reduce( $ids, fn( $carry, $id ) => $carry + self::get_stars_value( (int) $id ), 0.0 );
+                $stats[ (string) $language ] = [
+                        'count'  => $count,
+                        'rating' => $count > 0 ? number_format( $sum / $count, 1, '.', '' ) : '0.0',
+                ];
             }
 
-            $sum = array_reduce( $ids, fn( $carry, $id ) => $carry + self::get_stars_value( (int) $id ), 0.0 );
+            update_option( self::STATS_OPT_BY_LANG, $stats );
 
-            update_option( self::STATS_OPT_COUNT,  $count );
-            update_option( self::STATS_OPT_RATING, number_format( $sum / $count, 1, '.', '' ) );
+            $primary = $stats !== [] ? reset( $stats ) : [ 'count' => 0, 'rating' => '0.0' ];
+            update_option( self::STATS_OPT_COUNT,  (int) $primary['count'] );
+            update_option( self::STATS_OPT_RATING, (string) $primary['rating'] );
+        }
+
+        private static function get_current_content_language( array $opt ): string {
+            if ( function_exists( 'pll_current_language' ) ) {
+                $language = pll_current_language( 'slug' );
+                if ( is_string( $language ) && $language !== '' ) {
+                    return sanitize_key( $language );
+                }
+            }
+
+            $language = apply_filters( 'wpml_current_language', null );
+            if ( is_string( $language ) && $language !== '' ) {
+                return sanitize_key( $language );
+            }
+
+            return self::normalize_provider_language( (string) ( $opt['language'] ?? 'en' ) );
         }
 
         // -------------------------------------------------------------------------
@@ -1033,14 +1345,19 @@ JS;
             $show_stars = ! in_array( strtolower( (string) $atts['show_stars'] ), [ '0', 'false', 'no', 'off' ], true );
 
             $opt = self::get_options();
+            $content_language = self::get_current_content_language( $opt );
+            $stats_by_language = get_option( self::STATS_OPT_BY_LANG, [] );
+            $language_stats = is_array( $stats_by_language ) && isset( $stats_by_language[ $content_language ] )
+                    ? (array) $stats_by_language[ $content_language ]
+                    : [];
 
             $fb_rating = str_replace( ',', '.', trim( (string) $opt['fallback_rating'] ) );
             $fb_count  = trim( (string) $opt['fallback_count'] );
 
             $rating = is_numeric( $fb_rating ) ? (float) $fb_rating
-                    : (float) str_replace( ',', '.', (string) get_option( self::STATS_OPT_RATING, '5.0' ) );
+                    : (float) str_replace( ',', '.', (string) ( $language_stats['rating'] ?? get_option( self::STATS_OPT_RATING, '5.0' ) ) );
             $count  = ( is_numeric( $fb_count ) && (int) $fb_count > 0 ) ? (int) $fb_count
-                    : max( 0, (int) get_option( self::STATS_OPT_COUNT, 0 ) );
+                    : max( 0, (int) ( $language_stats['count'] ?? get_option( self::STATS_OPT_COUNT, 0 ) ) );
 
             if ( $rating <= 0 ) { $rating = 5.0; }
             if ( $count  <= 0 ) { $count  = 1; }
@@ -1053,7 +1370,13 @@ JS;
                 'post_type'      => 'review',
                 'post_status'    => 'publish',
                 'posts_per_page' => 3,
+                'suppress_filters' => true,
                 'meta_query'     => [
+                    'relation' => 'AND',
+                    [
+                        'key'   => self::META_LANGUAGE,
+                        'value' => $content_language,
+                    ],
                     [
                         'key'     => '_thumbnail_id',
                         'compare' => 'EXISTS',
@@ -1207,6 +1530,17 @@ JS;
             if ( ! ( $post instanceof WP_Post ) || $post->post_type !== 'review' ) { return null; }
 
             $thumb = get_the_post_thumbnail_url( $post_id, 'thumbnail' );
+            $image_ids = array_values( array_filter( array_map(
+                    'absint',
+                    (array) get_post_meta( $post_id, self::META_IMAGES, true )
+            ) ) );
+            $images = [];
+            foreach ( $image_ids as $image_id ) {
+                $image_url = wp_get_attachment_image_url( $image_id, 'full' );
+                if ( is_string( $image_url ) && $image_url !== '' ) {
+                    $images[] = $image_url;
+                }
+            }
 
             return [
                     'id'        => $post_id,
@@ -1217,8 +1551,11 @@ JS;
                     'date'      => get_the_date( 'Y-m-d H:i:s', $post_id ),
                     'timestamp' => get_post_time( 'U', true, $post_id ),
                     'thumb'     => is_string( $thumb ) ? $thumb : '',
+                    'images'    => $images,
+                    'image_ids' => $image_ids,
                     'url'       => (string) get_post_meta( $post_id, self::META_REVIEW_URL, true ),
                     'provider'  => (string) get_post_meta( $post_id, self::META_PROVIDER, true ),
+                    'language'  => (string) get_post_meta( $post_id, self::META_LANGUAGE, true ),
             ];
         }
 
@@ -1255,7 +1592,9 @@ JS;
                     AND (
                         post_parent IN (SELECT ID FROM {$wpdb->posts} WHERE post_type = 'review')
                         OR post_name LIKE 'review-avatar-%'
+                        OR post_name LIKE 'review-image-%'
                         OR guid LIKE '%review-avatar-%'
+                        OR guid LIKE '%review-image-%'
                     )
                 " );
                 $ids = array_map( 'intval', $ids );
@@ -1303,7 +1642,12 @@ JS;
 
             $thumbnail_id = get_post_thumbnail_id( $post_id );
             if ( $thumbnail_id ) {
-                wp_delete_attachment( $thumbnail_id, true );
+                self::delete_owned_attachment( $post_id, (int) $thumbnail_id );
+            }
+
+            $image_ids = (array) get_post_meta( $post_id, self::META_IMAGES, true );
+            foreach ( array_filter( array_map( 'absint', $image_ids ) ) as $image_id ) {
+                self::delete_owned_attachment( $post_id, (int) $image_id );
             }
 
             self::delete_review_avatars_cache();

@@ -1,6 +1,6 @@
 # Google Reviews
 
-Imports Google Maps reviews through SerpAPI into the theme’s `review` custom post type, keeps provider identity and reviewer media attached to each post, calculates aggregate statistics and exposes a compact frontend widget.
+Imports Google Maps reviews through SerpAPI into the theme’s `review` custom post type, creates linked Polylang/WPML language versions, stores reviewer avatars and review photos, calculates per-language statistics and exposes a frontend widget.
 
 ## Requirements and Data Flow
 
@@ -9,12 +9,12 @@ The module expects the theme to register the `review` post type. ACF is optional
 Synchronization follows this pipeline:
 
 1. Validate an administrator request and read sanitized provider settings.
-2. Request `google_maps_reviews` pages from SerpAPI, newest first.
-3. Reject reviews below the configured rating and deduplicate the current response.
-4. Find an existing WordPress review by provider plus generated external ID.
-5. Insert, update or skip the `review` post according to **Overwrite existing reviews**.
-6. Sideload a safe reviewer avatar and set it as the featured image.
-7. Recalculate local statistics and store the last successful fetch time.
+2. Discover active Polylang/WPML languages, or use `language` when neither integration is active.
+3. Request `google_maps_reviews` pages for every language with the matching `hl`, newest first.
+4. Reject low-rated reviews and deduplicate by stable source identity.
+5. Find, insert or update each language version and connect matching posts as translations.
+6. Sideload the reviewer avatar as the featured image and review photos as child attachments.
+7. Recalculate per-language statistics and store the last successful fetch time.
 
 There is no built-in recurring cron schedule. **Sync now** is a deliberate admin operation; automate it only by invoking an approved integration around the same import behavior and respecting provider quotas.
 
@@ -26,10 +26,10 @@ All settings are stored in `sp_reviews_importer_options`.
 | --- | ---: | --- |
 | `api_key` | empty | Only letters and digits are retained. Required for import. |
 | `place_id` | empty | Letters, digits, underscore and hyphen. Required for import. |
-| `language` | site locale prefix | Lowercase letters; passed as SerpAPI `hl`. |
+| `language` | site locale prefix | Fallback without Polylang/WPML. Every active site language is synchronized when either integration is active. |
 | `min_rating` | `1` | Integer clamped to 1–5. |
 | `limit` | `30` | Imported review target, clamped to 1–200. |
-| `overwrite` | `1` | Updates existing matching reviews and their avatars when enabled. |
+| `overwrite` | `1` | Updates matching content, avatar and review gallery when enabled. |
 | `fallback_rating` | empty | Manual aggregate widget override when numeric. Comma decimal is accepted. |
 | `fallback_count` | empty | Manual positive review-count override when numeric. |
 
@@ -45,19 +45,19 @@ Each request targets `https://serpapi.com/search.json` with:
 - `sort_by=newestFirst`;
 - `next_page_token` for subsequent pages.
 
-HTTP timeout is 25 seconds. The maximum number of pages is `ceil(limit / 10)`, so 30 requested reviews may use three queries. Filtering low ratings does not reduce the requested page count in advance and may produce fewer than the requested limit.
+HTTP timeout is 25 seconds. The maximum number of pages is `ceil(limit / 10)` per language, so a limit of 30 across three languages can consume up to nine queries. Rating filtering may produce fewer than the requested limit.
 
-The first available `place_info.rating` and `place_info.reviews` values update aggregate options. Non-2xx responses or WordPress HTTP errors fail the import when nothing has been collected; a later page failure preserves reviews already collected in that run.
+Non-2xx responses or WordPress HTTP errors fail the import when nothing has been collected; a later page failure preserves reviews already collected in that language response.
 
 ## Identity and WordPress Storage
 
-SerpAPI review rows do not use a stable source ID here. The module creates one with:
+The primary source identity is SerpAPI `review_id`. If it is absent, the module uses the legacy fallback:
 
 ```text
 md5(user link + "|" + ISO/date value + "|" + review snippet)
 ```
 
-An existing post is found by the pair `_sp_review_provider=serpapi` and `_sp_review_external_id={hash}` across publish, future, draft, pending and private statuses.
+An existing post is found by provider, `_sp_review_source_id` and `_sp_review_language`. Legacy posts without the new metadata are matched by the old external hash and migrated during the next sync.
 
 | WordPress field | Imported value |
 | --- | --- |
@@ -67,20 +67,23 @@ An existing post is found by the pair `_sp_review_provider=serpapi` and `_sp_rev
 | date | provider ISO timestamp when valid, otherwise current site time |
 | `stars` | integer 1–5 in post meta and optionally ACF |
 | `_sp_review_provider` | `serpapi` |
-| `_sp_review_external_id` | generated hash |
+| `_sp_review_external_id` | stable source ID; legacy imports may initially contain the old hash |
 | `_sp_review_place_id` | configured Place ID |
+| `_sp_review_source_id` | stable `review_id` or legacy hash |
+| `_sp_review_language` | Polylang/WPML language code |
 | `_sp_review_url` | reviewer/source URL when supplied |
+| `_sp_review_images` | array of sideloaded photo attachment IDs |
 | featured image | sideloaded reviewer thumbnail |
 
-Changing the snippet or date can change the generated identity and produce a new post. If provider data has been edited upstream, review duplicates after a sync should be checked against these identity inputs.
+When `review_id` is unavailable, changing the snippet or date can still change the legacy fallback identity and produce a new post.
 
-## Avatar Handling and SSRF Protection
+## Media Handling and SSRF Protection
 
 Avatar URLs must pass `wp_http_validate_url()`, use HTTP/HTTPS, have a non-local host and not point to private/reserved IP ranges. Accepted files are downloaded with WordPress `download_url()` and imported through `media_handle_sideload()` as `review-avatar-{post_id}.jpg`.
 
-Avatar attachment IDs are cached for one hour in `sp_review_avatar_ids`. Those attachments are excluded from the normal Media Library grid/list so the library is not cluttered. Deleting a review permanently deletes its featured avatar; deleting an avatar clears the cached ID list.
+String and object values from SerpAPI `images` are normalized, sideloaded as `review-image-{post_id}-{n}.jpg`, and stored in `_sp_review_images`. All review-owned attachments are excluded from normal Media Library grid/list views. Deleting a review permanently deletes its owned avatar and gallery attachments.
 
-When overwrite is disabled, an existing thumbnail is kept. When enabled, a new provider thumbnail may be sideloaded. Review deletion is therefore a destructive media operation if the avatar is used elsewhere manually.
+With overwrite disabled, existing media is kept. With overwrite enabled, old media is replaced only after a successful new download, so a temporary network failure does not erase the existing gallery. Do not reuse these owned attachments manually without accounting for this lifecycle.
 
 ## Aggregate Options
 
@@ -89,8 +92,9 @@ When overwrite is disabled, an existing thumbnail is kept. When enabled, a new p
 | `sp_google_reviews_rating` | Provider rating or recalculated local average, formatted to one decimal. |
 | `sp_google_reviews_count` | Provider count or local published review count. |
 | `sp_google_reviews_last_fetch` | Site-time MySQL timestamp after a completed upsert. |
+| `sp_google_reviews_stats_by_language` | Local count and average keyed by language code. |
 
-After each import the module recalculates count and average from all published `review` posts. Consequently the local values may replace provider aggregate values and reflect the imported/local dataset rather than every live Google review. Manual fallback settings take precedence in the widget.
+After each import the module recalculates count and average separately for every imported language. The widget selects the current Polylang/WPML language stats. Manual fallback settings still take precedence.
 
 ## Admin Endpoints and Security
 
@@ -132,8 +136,11 @@ The star graphic depends on the theme `sprite()` helper and sprites named `Stars
     'date'      => '2026-08-01 12:00:00',
     'timestamp' => 1785585600,
     'thumb'     => 'https://…',
+    'images'    => ['https://…'],
+    'image_ids' => [456],
     'url'       => 'https://…',
     'provider'  => 'serpapi',
+    'language'  => 'en',
 ]
 ```
 
@@ -153,10 +160,10 @@ Use this helper for custom cards instead of depending on private meta implementa
 
 - **Sync button disabled:** API key or Place ID is empty after sanitization.
 - **HTTP/provider error:** verify key, quota, Place ID, outbound HTTPS and the SerpAPI error message.
-- **Fewer reviews than limit:** minimum rating filtering, missing pagination token, duplicate hashes or an interrupted later page can reduce output.
-- **Duplicates:** compare reviewer URL, date and snippet; any change alters the generated hash.
+- **Fewer reviews than limit:** minimum rating filtering, missing pagination token, duplicate source IDs or an interrupted later page can reduce output.
+- **Duplicates:** inspect `_sp_review_source_id`; only rows without provider `review_id` depend on the URL/date/snippet fallback hash.
 - **Rating/count differs from Google:** local post recalculation and fallback overrides can supersede `place_info` totals.
 - **Avatar absent:** source URL may fail safety validation/download, the remote server may reject the request, or WordPress cannot write uploads.
-- **Avatar visible nowhere in Media Library:** this is intentional; review avatars are filtered from normal attachment screens.
+- **Review media absent from Media Library:** intentional; owned avatars and photos are filtered from normal attachment screens.
 - **Stars do not render:** confirm the theme `sprite()` helper and `Stars{n}` assets exist.
 - **Import times out:** lower the limit and retry; each remote page can wait up to 25 seconds.

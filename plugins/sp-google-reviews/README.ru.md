@@ -1,6 +1,6 @@
 # Google Reviews
 
-Импортирует отзывы Google Maps через SerpAPI в custom post type `review`, сохраняет provider identity и аватары, рассчитывает агрегированную статистику и выводит компактный shortcode widget.
+Импортирует отзывы Google Maps через SerpAPI в custom post type `review`, создаёт связанные языковые версии для Polylang/WPML, сохраняет аватары и фотографии отзывов, рассчитывает статистику и выводит shortcode widget.
 
 ## Требования и поток данных
 
@@ -9,12 +9,13 @@
 Синхронизация проходит так:
 
 1. Проверяется admin request и очищенные provider settings.
-2. Страницы `google_maps_reviews` запрашиваются у SerpAPI с сортировкой newest first.
-3. Отзывы ниже minimum rating отбрасываются, текущий ответ дедуплицируется.
-4. Existing review ищется по provider + generated external ID.
-5. Запись создаётся, обновляется или пропускается согласно **Overwrite existing reviews**.
-6. Безопасный reviewer avatar загружается как featured image.
-7. Локальная статистика пересчитывается и сохраняется время успешного fetch.
+2. Определяются активные языки Polylang/WPML; без мультиязычного плагина используется настройка `language`.
+3. Для каждого языка страницы `google_maps_reviews` запрашиваются у SerpAPI с соответствующим `hl` и сортировкой newest first.
+4. Отзывы ниже minimum rating отбрасываются, текущий ответ дедуплицируется.
+5. Existing review ищется по provider, стабильному `review_id` и языку; старый hash поддерживается для миграции.
+6. Запись создаётся, обновляется или пропускается, затем версии одного отзыва связываются как переводы.
+7. Reviewer avatar загружается как featured image, а review images — как дочерние attachments.
+8. Статистика пересчитывается отдельно по языкам и сохраняется время успешного fetch.
 
 Встроенного регулярного cron нет. **Sync now** — ручная административная операция; автоматизацию следует строить отдельно с учётом квоты provider.
 
@@ -26,10 +27,10 @@
 | --- | ---: | --- |
 | `api_key` | пусто | Сохраняются только буквы и цифры; обязателен. |
 | `place_id` | пусто | Буквы, цифры, `_` и `-`; обязателен. |
-| `language` | prefix locale сайта | Строчные буквы; передаётся как `hl`. |
+| `language` | prefix locale сайта | Fallback без Polylang/WPML. При активной мультиязычности синхронизируются все языки сайта. |
 | `min_rating` | `1` | Целое 1–5. |
 | `limit` | `30` | Цель импорта 1–200. |
-| `overwrite` | `1` | Обновляет совпавшие отзывы и их avatar. |
+| `overwrite` | `1` | Обновляет текст, avatar и gallery совпавших отзывов. |
 | `fallback_rating` | пусто | Ручной numeric rating widget; допускается запятая. |
 | `fallback_count` | пусто | Ручной положительный count widget. |
 
@@ -47,19 +48,19 @@
 
 Timeout — 25 секунд.
 
-Максимум страниц равен `ceil(limit / 10)`: limit 30 может стоить три SerpAPI query. Фильтрация minimum rating происходит после ответа, поэтому итог может быть меньше заданного limit.
+Максимум страниц равен `ceil(limit / 10)`. Квота расходуется отдельно на каждый язык: при limit 30 и трёх языках возможно до девяти запросов. Фильтрация minimum rating происходит после ответа.
 
-Первые доступные `place_info.rating` и `place_info.reviews` сохраняются в aggregate options. Ошибка WordPress HTTP или non-2xx ломает импорт, если ничего ещё не собрано; ошибка поздней страницы оставляет уже собранные элементы текущего запуска.
+Ошибка WordPress HTTP или non-2xx ломает импорт, если ничего ещё не собрано; ошибка поздней страницы оставляет уже собранные элементы ответа текущего языка.
 
 ## Идентичность и хранение
 
-В этой интеграции строки отзывов SerpAPI не предоставляют стабильный source ID. External ID вычисляется как:
+Основной source ID — поле SerpAPI `review_id`. Если provider его не вернул, используется legacy fallback:
 
 ```text
 md5(user link + "|" + ISO/date value + "|" + review snippet)
 ```
 
-Existing post находится по `_sp_review_provider=serpapi` и `_sp_review_external_id={hash}` среди publish/future/draft/pending/private.
+Existing post находится по provider + `_sp_review_source_id` + `_sp_review_language`. Старые записи без этих meta ищутся по прежнему `_sp_review_external_id={hash}` и мигрируют при следующей синхронизации.
 
 | Поле WordPress | Значение |
 | --- | --- |
@@ -69,20 +70,23 @@ Existing post находится по `_sp_review_provider=serpapi` и `_sp_revi
 | date | provider timestamp либо текущее site time |
 | `stars` | 1–5 в post meta и при наличии ACF |
 | `_sp_review_provider` | `serpapi` |
-| `_sp_review_external_id` | generated hash |
+| `_sp_review_external_id` | стабильный source ID; у legacy imports до миграции может быть старый hash |
 | `_sp_review_place_id` | текущий Place ID |
+| `_sp_review_source_id` | стабильный `review_id` либо legacy hash |
+| `_sp_review_language` | код языка Polylang/WPML |
 | `_sp_review_url` | source/user URL |
+| `_sp_review_images` | массив ID загруженных фотографий |
 | featured image | reviewer thumbnail |
 
-Изменение snippet или даты меняет hash и может создать новую запись. При duplicate после sync сравнивайте именно эти identity inputs.
+Если provider не вернул `review_id`, изменение snippet или даты всё ещё меняет fallback hash и может создать новую запись.
 
-## Аватары и SSRF-защита
+## Медиа и SSRF-защита
 
 URL должен пройти `wp_http_validate_url()`, использовать HTTP/HTTPS, иметь не-local host и не указывать на private/reserved IP. Файл загружается через `download_url()` и `media_handle_sideload()` под именем `review-avatar-{post_id}.jpg`.
 
-ID аватаров кешируются на час в `sp_review_avatar_ids` и скрываются из обычных Media Library grid/list. Удаление review навсегда удаляет его featured avatar; удаление attachment очищает transient.
+Строки и объекты из SerpAPI `images` нормализуются, загружаются как `review-image-{post_id}-{n}.jpg` и сохраняются в `_sp_review_images`. Все принадлежащие review медиа скрываются из обычных Media Library grid/list. Удаление review навсегда удаляет принадлежащие ему avatar и gallery attachments.
 
-При выключенном overwrite existing thumbnail остаётся. При включённом новый provider thumbnail может быть загружен. Не используйте такой avatar вручную в других местах без учёта этого lifecycle.
+При выключенном overwrite существующие avatar и gallery остаются. При включённом они заменяются только после успешной новой загрузки; сетевой сбой не уничтожает старую gallery. Не используйте эти attachments вручную в других местах без учёта lifecycle.
 
 ## Агрегированные options
 
@@ -91,8 +95,9 @@ ID аватаров кешируются на час в `sp_review_avatar_ids` �
 | `sp_google_reviews_rating` | Provider rating или local average с одним знаком. |
 | `sp_google_reviews_count` | Provider count или число published local reviews. |
 | `sp_google_reviews_last_fetch` | MySQL timestamp site time после upsert. |
+| `sp_google_reviews_stats_by_language` | Local count/rating по коду языка. |
 
-После импорта count и average пересчитываются по всем published `review`. Поэтому они могут отражать локальную выборку, а не все live Google reviews. Manual fallback имеет приоритет в widget.
+После импорта count и average пересчитываются по published `review` отдельно для каждого языка. Widget выбирает статистику текущего языка. Manual fallback имеет приоритет.
 
 ## Admin endpoints и безопасность
 
@@ -132,8 +137,11 @@ Classic `admin-post.php?action=sp_reviews_import` и Ajax `sp_reviews_import` т
     'date'      => '2026-08-01 12:00:00',
     'timestamp' => 1785585600,
     'thumb'     => 'https://…',
+    'images'    => ['https://…'],
+    'image_ids' => [456],
     'url'       => 'https://…',
     'provider'  => 'serpapi',
+    'language'  => 'uk',
 ]
 ```
 
@@ -153,10 +161,10 @@ Classic `admin-post.php?action=sp_reviews_import` и Ajax `sp_reviews_import` т
 
 - **Sync disabled:** key или Place ID пуст после sanitization.
 - **Provider error:** проверить key, quota, Place ID, outbound HTTPS и текст SerpAPI.
-- **Меньше отзывов:** rating filter, отсутствие next token, duplicate hashes или поздняя ошибка.
-- **Duplicates:** user URL, date или snippet изменились и дали новый hash.
+- **Меньше отзывов:** rating filter, отсутствие next token, duplicate source IDs или поздняя ошибка.
+- **Duplicates:** проверить `_sp_review_source_id`; только строки без provider `review_id` зависят от fallback hash URL/date/snippet.
 - **Count/rating не как в Google:** local recalc или fallback переопределил totals `place_info`.
 - **Нет avatar:** URL не прошёл safety/download либо uploads недоступен для записи.
-- **Avatar не виден в Media Library:** это намеренная фильтрация.
+- **Review media не видны в Media Library:** это намеренная фильтрация owned avatars и photos.
 - **Нет stars:** проверить `sprite()` и `Stars{n}`.
 - **Timeout:** уменьшить limit; каждый remote page ждёт до 25 секунд.
