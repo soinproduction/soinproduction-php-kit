@@ -149,6 +149,86 @@ Classic `admin-post.php?action=sp_reviews_import` и Ajax `sp_reviews_import` т
 
 Для custom cards используйте этот helper вместо прямой зависимости от private meta и деталей её хранения.
 
+### Пример разметки отзыва
+
+Рекомендуемый вариант использует `image_ids` и `wp_get_attachment_image()`: WordPress сам формирует `srcset`, размеры и локальные URL.
+
+```php
+<?php
+$reviews = new WP_Query( [
+    'post_type'      => 'review',
+    'post_status'    => 'publish',
+    'posts_per_page' => 6,
+] );
+?>
+
+<?php while ( $reviews->have_posts() ) : $reviews->the_post(); ?>
+    <?php $review = SP_Reviews_Importer::get_review_data( get_the_ID() ); ?>
+    <?php if ( $review === null ) { continue; } ?>
+
+    <article class="review-card">
+        <header class="review-card__header">
+            <?php if ( $review['thumb'] !== '' ) : ?>
+                <img
+                    class="review-card__avatar"
+                    src="<?php echo esc_url( $review['thumb'] ); ?>"
+                    alt=""
+                    width="64"
+                    height="64"
+                    loading="lazy"
+                >
+            <?php endif; ?>
+
+            <div>
+                <h3><?php echo esc_html( $review['name'] ); ?></h3>
+                <span><?php echo esc_html( number_format_i18n( $review['stars'], 1 ) ); ?>/5</span>
+            </div>
+        </header>
+
+        <div class="review-card__body">
+            <?php echo wp_kses_post( $review['content'] ); ?>
+        </div>
+
+        <?php if ( $review['image_ids'] !== [] ) : ?>
+            <div class="review-card__gallery">
+                <?php foreach ( $review['image_ids'] as $image_id ) : ?>
+                    <figure class="review-card__photo">
+                        <?php
+                        echo wp_get_attachment_image(
+                            $image_id,
+                            'large',
+                            false,
+                            [ 'loading' => 'lazy' ]
+                        );
+                        ?>
+                    </figure>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </article>
+<?php endwhile; ?>
+
+<?php wp_reset_postdata(); ?>
+```
+
+Polylang и WPML автоматически фильтруют `WP_Query` по текущему языку. Если используется custom query с `suppress_filters => true`, языковую фильтрацию нужно добавить самостоятельно.
+
+### Упрощённый вывод картинок по URL
+
+Если responsive WordPress markup не нужен, можно использовать готовый массив `images`:
+
+```php
+<?php foreach ( $review['images'] as $image_url ) : ?>
+    <img
+        src="<?php echo esc_url( $image_url ); ?>"
+        alt=""
+        loading="lazy"
+    >
+<?php endforeach; ?>
+```
+
+Для production-разметки предпочтителен `image_ids`: этот вариант поддерживает зарегистрированные image sizes, `srcset` и оптимизацию WordPress.
+
 ## Чек-лист
 
 1. Проверить CPT `review` и поле/meta `stars`.

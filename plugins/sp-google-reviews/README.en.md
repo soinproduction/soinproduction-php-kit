@@ -148,6 +148,86 @@ The star graphic depends on the theme `sprite()` helper and sprites named `Stars
 
 Use this helper for custom cards instead of depending on private meta implementation details.
 
+### Review Card Markup Example
+
+The recommended approach uses `image_ids` with `wp_get_attachment_image()`, allowing WordPress to generate local URLs, dimensions and responsive `srcset` markup.
+
+```php
+<?php
+$reviews = new WP_Query( [
+    'post_type'      => 'review',
+    'post_status'    => 'publish',
+    'posts_per_page' => 6,
+] );
+?>
+
+<?php while ( $reviews->have_posts() ) : $reviews->the_post(); ?>
+    <?php $review = SP_Reviews_Importer::get_review_data( get_the_ID() ); ?>
+    <?php if ( $review === null ) { continue; } ?>
+
+    <article class="review-card">
+        <header class="review-card__header">
+            <?php if ( $review['thumb'] !== '' ) : ?>
+                <img
+                    class="review-card__avatar"
+                    src="<?php echo esc_url( $review['thumb'] ); ?>"
+                    alt=""
+                    width="64"
+                    height="64"
+                    loading="lazy"
+                >
+            <?php endif; ?>
+
+            <div>
+                <h3><?php echo esc_html( $review['name'] ); ?></h3>
+                <span><?php echo esc_html( number_format_i18n( $review['stars'], 1 ) ); ?>/5</span>
+            </div>
+        </header>
+
+        <div class="review-card__body">
+            <?php echo wp_kses_post( $review['content'] ); ?>
+        </div>
+
+        <?php if ( $review['image_ids'] !== [] ) : ?>
+            <div class="review-card__gallery">
+                <?php foreach ( $review['image_ids'] as $image_id ) : ?>
+                    <figure class="review-card__photo">
+                        <?php
+                        echo wp_get_attachment_image(
+                            $image_id,
+                            'large',
+                            false,
+                            [ 'loading' => 'lazy' ]
+                        );
+                        ?>
+                    </figure>
+                <?php endforeach; ?>
+            </div>
+        <?php endif; ?>
+    </article>
+<?php endwhile; ?>
+
+<?php wp_reset_postdata(); ?>
+```
+
+Polylang and WPML normally filter `WP_Query` to the current language. If a custom query sets `suppress_filters => true`, language filtering must be handled explicitly.
+
+### Simplified Image URL Output
+
+When responsive WordPress markup is unnecessary, use the ready-to-render `images` array:
+
+```php
+<?php foreach ( $review['images'] as $image_url ) : ?>
+    <img
+        src="<?php echo esc_url( $image_url ); ?>"
+        alt=""
+        loading="lazy"
+    >
+<?php endforeach; ?>
+```
+
+Prefer `image_ids` in production because it supports registered image sizes, `srcset` and WordPress image optimization.
+
 ## Operational Checklist
 
 1. Confirm the `review` CPT and `stars` field/meta are available.
