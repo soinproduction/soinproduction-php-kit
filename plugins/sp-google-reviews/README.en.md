@@ -111,13 +111,13 @@ Open **Settings → Google Reviews → Widget Builder**. The builder stores mult
 Available presets are Banner, Compact and Minimal. A widget can independently configure:
 
 - reviewer avatars, stars, numeric rating, rating label and review-count label;
-- component visibility and drag-and-drop order;
+- component visibility with preset-controlled layout;
 - avatar amount, size and overlap;
 - star and typography sizes, spacing, padding and radius;
 - text, muted text, star and background colors;
 - Media Library background image and overlay opacity.
 
-The editor provides a responsive live preview. Frontend output uses scoped CSS custom properties, semantic markup and standalone SVG stars, so it has no theme sprite dependency or remote fallback-avatar request. Reviews without a photo are represented by the reviewer initial.
+The editor supports creating and duplicating any number of independently configured cards and provides a responsive live preview. Frontend output uses scoped CSS custom properties, semantic markup and standalone SVG stars, so it has no theme sprite dependency or remote fallback-avatar request. Reviews without a photo are represented by the reviewer initial.
 
 Use the shortcode displayed on the widget card:
 

@@ -100,6 +100,11 @@ final class SP_Google_Reviews_Widget_Builder {
 				continue;
 			}
 			$widget = wp_parse_args( $widget, self::defaults() );
+			$enabled_components = (array) $widget['components'];
+			$widget['components'] = array_values( array_filter(
+				[ 'avatars', 'stars', 'rating', 'rating_label', 'count_label' ],
+				static fn( string $component ): bool => in_array( $component, $enabled_components, true )
+			) );
 			$id = sanitize_key( (string) ( $widget['id'] ?? $key ) );
 			if ( $id !== '' ) {
 				$widget['id'] = $id;
@@ -154,6 +159,11 @@ final class SP_Google_Reviews_Widget_Builder {
 			if ( in_array( 'avatars', $components, true ) ) {
 				$components = array_merge( [ 'avatars' ], array_values( array_diff( $components, [ 'avatars' ] ) ) );
 			}
+			$enabled_components = $components;
+			$components = array_values( array_filter(
+				$allowed_components,
+				static fn( string $component ): bool => in_array( $component, $enabled_components, true )
+			) );
 
 			$widgets[ $id ] = [
 				'id'               => $id,
@@ -241,7 +251,7 @@ final class SP_Google_Reviews_Widget_Builder {
 				<div class="sp-gr-builder-intro sp-gr-card">
 					<div>
 						<h2>Widget library</h2>
-						<p>Each widget has a stable ID and its own shortcode. Drag components to change their visual order.</p>
+						<p>Each widget has a stable ID, independent design settings and its own shortcode.</p>
 					</div>
 					<span class="sp-gr-builder-count"><strong data-sp-gr-widget-count><?php echo esc_html( (string) count( $widgets ) ); ?></strong> widgets</span>
 				</div>
@@ -281,6 +291,7 @@ final class SP_Google_Reviews_Widget_Builder {
 				</button>
 				<div class="sp-gr-widget-editor__actions">
 					<button type="button" class="button button-small" data-sp-gr-copy>Copy shortcode</button>
+					<button type="button" class="button button-small" data-sp-gr-duplicate>Duplicate</button>
 					<button type="button" class="button-link-delete" data-sp-gr-delete>Delete</button>
 				</div>
 			</header>
@@ -298,7 +309,7 @@ final class SP_Google_Reviews_Widget_Builder {
 
 					<section class="sp-gr-control-section">
 						<h3>Components</h3>
-						<p class="description">Enable elements and drag them into the required order.</p>
+						<p class="description">Choose what the widget displays. The selected preset controls the layout.</p>
 						<input type="hidden" name="<?php echo esc_attr( $name ); ?>[components]" value="<?php echo esc_attr( implode( ',', $active ) ); ?>" data-sp-gr-components>
 						<div class="sp-gr-component-list" data-sp-gr-component-list>
 							<?php
@@ -306,9 +317,8 @@ final class SP_Google_Reviews_Widget_Builder {
 							foreach ( $order as $component ) :
 								$enabled = in_array( $component, $active, true );
 								?>
-				<div class="sp-gr-component <?php echo $enabled ? 'is-enabled' : ''; ?>" draggable="<?php echo $component === 'avatars' ? 'false' : 'true'; ?>" data-component="<?php echo esc_attr( $component ); ?>">
-					<span class="dashicons <?php echo $component === 'avatars' ? 'dashicons-lock' : 'dashicons-menu'; ?>" aria-hidden="true"></span>
-									<label><input type="checkbox" <?php checked( $enabled ); ?> data-sp-gr-component-toggle> <?php echo esc_html( $component_labels[ $component ] ); ?></label>
+								<div class="sp-gr-component <?php echo $enabled ? 'is-enabled' : ''; ?>" data-component="<?php echo esc_attr( $component ); ?>">
+									<label><span><?php echo esc_html( $component_labels[ $component ] ); ?></span><input type="checkbox" <?php checked( $enabled ); ?> data-sp-gr-component-toggle><i aria-hidden="true"></i></label>
 								</div>
 							<?php endforeach; ?>
 						</div>
@@ -547,12 +557,12 @@ CSS;
 
 	public static function admin_css(): string {
 		return self::frontend_css() . <<<'CSS'
-.sp-gr-tabs{margin:0 0 18px}.sp-gr-builder-intro{display:flex;align-items:center;justify-content:space-between;gap:20px}.sp-gr-builder-intro h2{margin:0 0 4px}.sp-gr-builder-intro p{margin:0;color:#646970}.sp-gr-builder-count{padding:8px 12px;border-radius:999px;background:#f0f3ff;color:#2746c7;white-space:nowrap}
-.sp-gr-widget-list{display:grid;gap:14px}.sp-gr-widget-editor{overflow:hidden;border:1px solid #dcdcde;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgb(0 0 0 / 4%)}.sp-gr-widget-editor__header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px}.sp-gr-widget-editor__toggle{display:flex;flex:1;align-items:center;gap:10px;padding:0;border:0;background:none;text-align:left;cursor:pointer}.sp-gr-widget-editor__toggle>span:last-child{display:grid;gap:3px}.sp-gr-widget-editor__toggle small{color:#646970;font-weight:400}.sp-gr-widget-editor__toggle .dashicons{transition:transform .16s}.sp-gr-widget-editor.is-expanded .sp-gr-widget-editor__toggle .dashicons{transform:rotate(90deg)}.sp-gr-widget-editor__actions{display:flex;align-items:center;gap:12px}.sp-gr-widget-editor__body{display:none;grid-template-columns:minmax(0,1.05fr) minmax(360px,.95fr);border-top:1px solid #e7eaee}.sp-gr-widget-editor.is-expanded .sp-gr-widget-editor__body{display:grid}
+.sp-gr-admin-wrap.sp-gr-builder-page{max-width:1440px}.sp-gr-tabs{display:inline-flex;gap:4px;margin:0 0 20px;padding:4px;border:0;border-radius:10px;background:#e9edf3}.sp-gr-tabs .nav-tab{margin:0;padding:7px 14px;border:0;border-radius:7px;background:transparent;color:#4b5563;font-size:13px;font-weight:600;line-height:20px}.sp-gr-tabs .nav-tab:hover{background:rgb(255 255 255 / 60%);color:#1d2327}.sp-gr-tabs .nav-tab-active{background:#fff;color:#2746c7;box-shadow:0 1px 3px rgb(16 24 40 / 12%)}.sp-gr-builder-intro{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 20px}.sp-gr-builder-intro h2{margin:0 0 4px;font-size:18px}.sp-gr-builder-intro p{margin:0;color:#646970}.sp-gr-builder-count{padding:7px 11px;border-radius:999px;background:#eef2ff;color:#2746c7;white-space:nowrap}
+.sp-gr-widget-list{display:grid;gap:16px}.sp-gr-widget-editor{overflow:hidden;border:1px solid #dfe3e8;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgb(16 24 40 / 4%);transition:border-color .16s,box-shadow .16s}.sp-gr-widget-editor.is-expanded{border-color:#c9d1dc;box-shadow:0 8px 24px rgb(16 24 40 / 7%)}.sp-gr-widget-editor__header{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:58px;padding:10px 16px}.sp-gr-widget-editor__toggle{display:flex;flex:1;align-items:center;gap:10px;min-width:0;padding:0;border:0;background:none;text-align:left;cursor:pointer}.sp-gr-widget-editor__toggle>span:last-child{display:grid;gap:3px;min-width:0}.sp-gr-widget-editor__toggle strong{font-size:14px}.sp-gr-widget-editor__toggle small{overflow:hidden;color:#646970;font-weight:400;text-overflow:ellipsis;white-space:nowrap}.sp-gr-widget-editor__toggle code{padding:0;background:none}.sp-gr-widget-editor__toggle .dashicons{color:#667085;transition:transform .16s}.sp-gr-widget-editor.is-expanded .sp-gr-widget-editor__toggle .dashicons{transform:rotate(90deg)}.sp-gr-widget-editor__actions{display:flex;align-items:center;gap:8px}.sp-gr-widget-editor__body{display:none;grid-template-columns:minmax(520px,1fr) minmax(420px,.9fr);border-top:1px solid #e7eaee}.sp-gr-widget-editor.is-expanded .sp-gr-widget-editor__body{display:grid}.sp-gr-widget-list>.sp-gr-widget-editor:only-child [data-sp-gr-delete]{display:none}
 .sp-gr-widget-editor__controls{padding:18px}.sp-gr-control-section+ .sp-gr-control-section{margin-top:24px;padding-top:20px;border-top:1px solid #edf0f2}.sp-gr-control-section h3{margin:0 0 12px;font-size:15px}.sp-gr-control-section>.description{margin:-6px 0 12px}.sp-gr-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.sp-gr-control-grid--compact{grid-template-columns:repeat(3,minmax(0,1fr))}.sp-gr-control-grid label{display:grid;align-content:start;gap:6px}.sp-gr-control-grid label>span:first-child{color:#3c434a;font-size:12px;font-weight:600}.sp-gr-control-grid input:not([type=color]),.sp-gr-control-grid select{width:100%;min-height:38px}.sp-gr-control-grid small{color:#646970}.sp-gr-control-grid__wide{grid-column:1/-1}.sp-gr-number-control,.sp-gr-color-control,.sp-gr-media-control{display:flex;align-items:center}.sp-gr-number-control input{min-width:0}.sp-gr-number-control em{margin-left:-34px;color:#646970;font-style:normal;pointer-events:none}.sp-gr-color-control{gap:8px}.sp-gr-color-control input{width:44px;height:38px;padding:2px;border:1px solid #8c8f94;border-radius:4px;background:#fff}.sp-gr-media-control{gap:7px}.sp-gr-media-control input{flex:1}
-.sp-gr-component-list{display:flex;flex-wrap:wrap;gap:8px}.sp-gr-component{display:flex;align-items:center;gap:5px;padding:8px 10px;border:1px solid #dcdcde;border-radius:8px;background:#f6f7f7;color:#646970;cursor:grab}.sp-gr-component.is-enabled{border-color:#8fa2f1;background:#f0f3ff;color:#1d3fb8}.sp-gr-component.is-dragging{opacity:.45}.sp-gr-component .dashicons{font-size:16px;width:16px;height:16px}.sp-gr-component label{white-space:nowrap}
+.sp-gr-component-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.sp-gr-component{min-width:0}.sp-gr-component label{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:42px;padding:8px 10px;border:1px solid #dfe3e8;border-radius:9px;background:#f8fafc;color:#475467;font-weight:600;cursor:pointer;transition:border-color .15s,background .15s,color .15s}.sp-gr-component input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}.sp-gr-component i{position:relative;flex:0 0 34px;width:34px;height:20px;border-radius:999px;background:#c9d1dc;box-shadow:inset 0 0 0 1px rgb(0 0 0 / 5%);transition:background .15s}.sp-gr-component i::after{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 25%);content:"";transition:transform .15s}.sp-gr-component.is-enabled label{border-color:#a9b8f5;background:#f5f7ff;color:#2442b5}.sp-gr-component.is-enabled i{background:#3858e9}.sp-gr-component.is-enabled i::after{transform:translateX(14px)}.sp-gr-component input:focus-visible+i{outline:2px solid #3858e9;outline-offset:2px}
 .sp-gr-widget-editor__preview{position:relative;min-width:0;padding:18px;border-left:1px solid #e7eaee;background:#f6f7f7}.sp-gr-preview-toolbar{display:flex;justify-content:space-between;margin-bottom:12px;color:#646970;font-size:12px}.sp-gr-preview-toolbar strong{color:#1d2327;font-size:13px}.sp-gr-preview-stage{position:sticky;top:46px;display:grid;min-height:300px;place-items:center;padding:28px;overflow:hidden;border:1px solid #dcdcde;border-radius:12px;background-color:#dfe3e8;background-image:linear-gradient(45deg,#eef0f2 25%,transparent 25%),linear-gradient(-45deg,#eef0f2 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#eef0f2 75%),linear-gradient(-45deg,transparent 75%,#eef0f2 75%);background-position:0 0,0 10px,10px -10px,-10px 0;background-size:20px 20px}.sp-gr-preview-stage .sp-gr-widget{max-width:100%}
-@media(max-width:1100px){.sp-gr-widget-editor__body{grid-template-columns:1fr}.sp-gr-widget-editor__preview{border-top:1px solid #e7eaee;border-left:0}.sp-gr-preview-stage{position:static;min-height:220px}}@media(max-width:782px){.sp-gr-control-grid,.sp-gr-control-grid--compact{grid-template-columns:1fr}.sp-gr-widget-editor__actions{align-items:flex-end;flex-direction:column}.sp-gr-builder-intro{align-items:flex-start;flex-direction:column}}
+@media(max-width:1180px){.sp-gr-widget-editor__body{grid-template-columns:1fr}.sp-gr-widget-editor__preview{border-top:1px solid #e7eaee;border-left:0}.sp-gr-preview-stage{position:static;min-height:220px}}@media(max-width:782px){.sp-gr-control-grid,.sp-gr-control-grid--compact,.sp-gr-component-list{grid-template-columns:1fr}.sp-gr-widget-editor__header{align-items:flex-start;flex-direction:column}.sp-gr-widget-editor__actions{width:100%}.sp-gr-builder-intro{align-items:flex-start;flex-direction:column}.sp-gr-tabs{display:flex}.sp-gr-tabs .nav-tab{flex:1;text-align:center}}
 CSS;
 	}
 
@@ -560,24 +570,99 @@ CSS;
 		return <<<'JS'
 (function($){
 	'use strict';
-	var presets={};try{presets=JSON.parse($('#sp-gr-widget-presets').text()||'{}');}catch(e){}
+	var presets={};
 	var nextIndex=$('[data-sp-gr-widget]').length;
-	function slug(value){return String(value||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');}
-	function syncComponents($card){var values=[];$card.find('[data-sp-gr-component-list] .is-enabled').each(function(){values.push($(this).data('component'));});$card.find('[data-sp-gr-components]').val(values.join(','));return values;}
-	function config($card){var out={};$card.find('[data-setting]').each(function(){out[$(this).data('setting')]=$(this).val();});out.id=$card.find('[data-sp-gr-id]').val();out.name=$card.find('[data-sp-gr-name]').val();out.preset=$card.find('[data-sp-gr-preset]').val();out.components=syncComponents($card);return out;}
-	function render($card){var c=config($card),$w=$card.find('[data-sp-gr-rendered-widget]'),$content=$w.find('.sp-gr-widget__content'),components=c.components||[];$w.attr('class','sp-gr-widget sp-gr-widget--'+c.preset).css({'--sp-gr-text':c.text_color,'--sp-gr-muted':c.muted_color,'--sp-gr-star':c.star_color,'--sp-gr-bg':c.background_color,'--sp-gr-avatar-size':c.avatar_size+'px','--sp-gr-avatar-overlap':c.avatar_overlap+'px','--sp-gr-star-size':c.star_size+'px','--sp-gr-font-size':c.font_size+'px','--sp-gr-pad-y':c.padding_y+'px','--sp-gr-pad-x':c.padding_x+'px','--sp-gr-gap':c.gap+'px','--sp-gr-radius':c.radius+'px','--sp-gr-overlay':c.background_image?(Number(c.overlay_opacity||0)/100):0,'--sp-gr-image':c.background_image?'url("'+String(c.background_image).replace(/["\\]/g,'')+'")':'none'});components.forEach(function(component){if(component==='avatars')return;var $component=$content.find('[data-preview-component="'+component+'"]');if($component.length)$content.append($component);});$w.find('[data-preview-component]').each(function(){$(this).toggle(components.indexOf($(this).data('preview-component'))!==-1);});$w.find('.sp-gr-widget__avatar').each(function(i){$(this).toggle(i<Number(c.avatar_count||0));});$w.find('[data-preview-component="rating_label"]').text(c.rating_label||'');var count=(c.count_label||'').replace('{count}','95');$w.find('[data-preview-component="count_label"]').text(count);$card.find('[data-sp-card-name]').text(c.name||'Untitled widget');var shortcode='[google_reviews_widget id="'+(slug(c.id)||'widget')+'"]';$card.find('[data-sp-card-shortcode]').text(shortcode);$card.find('.sp-gr-color-control').each(function(){$(this).find('code').text($(this).find('input').val());});}
-	function bindCard($card){render($card);}
+	try{presets=JSON.parse($('#sp-gr-widget-presets').text()||'{}');}catch(error){presets={};}
+
+	function slug(value){
+		return String(value||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+	}
+
+	function uniqueId(base,$ignore){
+		base=slug(base)||'widget';
+		var candidate=base,suffix=2;
+		while($('[data-sp-gr-id]').not($ignore).filter(function(){return $(this).val()===candidate;}).length){candidate=base+'-'+suffix++;}
+		return candidate;
+	}
+
+	function updateCount(){
+		var count=$('[data-sp-gr-widget]').length;
+		$('[data-sp-gr-widget-count]').text(count);
+		$('.sp-gr-builder-count').contents().last()[0].textContent=count===1?' widget':' widgets';
+	}
+
+	function syncComponents($card){
+		var values=[];
+		$card.find('[data-sp-gr-component-list] .is-enabled').each(function(){values.push($(this).data('component'));});
+		$card.find('[data-sp-gr-components]').val(values.join(','));
+		return values;
+	}
+
+	function config($card){
+		var output={};
+		$card.find('[data-setting]').each(function(){output[$(this).data('setting')]=$(this).val();});
+		output.id=$card.find('[data-sp-gr-id]').val();
+		output.name=$card.find('[data-sp-gr-name]').val();
+		output.preset=$card.find('[data-sp-gr-preset]').val();
+		output.components=syncComponents($card);
+		return output;
+	}
+
+	function render($card){
+		var settings=config($card);
+		var $widget=$card.find('[data-sp-gr-rendered-widget]');
+		var components=settings.components||[];
+		$widget.attr('class','sp-gr-widget sp-gr-widget--'+settings.preset).css({
+			'--sp-gr-text':settings.text_color,'--sp-gr-muted':settings.muted_color,'--sp-gr-star':settings.star_color,
+			'--sp-gr-bg':settings.background_color,'--sp-gr-avatar-size':settings.avatar_size+'px','--sp-gr-avatar-overlap':settings.avatar_overlap+'px',
+			'--sp-gr-star-size':settings.star_size+'px','--sp-gr-font-size':settings.font_size+'px','--sp-gr-pad-y':settings.padding_y+'px',
+			'--sp-gr-pad-x':settings.padding_x+'px','--sp-gr-gap':settings.gap+'px','--sp-gr-radius':settings.radius+'px',
+			'--sp-gr-overlay':settings.background_image?(Number(settings.overlay_opacity||0)/100):0,
+			'--sp-gr-image':settings.background_image?'url("'+String(settings.background_image).replace(/["\\]/g,'')+'")':'none'
+		});
+		$widget.find('[data-preview-component]').each(function(){$(this).toggle(components.indexOf($(this).data('preview-component'))!==-1);});
+		$widget.find('.sp-gr-widget__avatar').each(function(index){$(this).toggle(index<Number(settings.avatar_count||0));});
+		$widget.find('[data-preview-component="rating_label"]').text(settings.rating_label||'');
+		$widget.find('[data-preview-component="count_label"]').text((settings.count_label||'').replace('{count}','95'));
+		$card.find('[data-sp-card-name]').text(settings.name||'Untitled widget');
+		$card.find('[data-sp-card-shortcode]').text('[google_reviews_widget id="'+(slug(settings.id)||'widget')+'"]');
+		$card.find('.sp-gr-color-control').each(function(){$(this).find('code').text($(this).find('input').val());});
+	}
+
+	function appendCard($card){
+		$('[data-sp-gr-widget]').removeClass('is-expanded').find('[data-sp-gr-toggle]').attr('aria-expanded','false');
+		$card.addClass('is-expanded').find('[data-sp-gr-toggle]').attr('aria-expanded','true');
+		$('[data-sp-gr-widget-list]').append($card);
+		render($card);
+		updateCount();
+		var element=$card.get(0);
+		if(element&&typeof element.scrollIntoView==='function'){element.scrollIntoView({behavior:'smooth',block:'start'});}
+	}
+
+	function newCard(){
+		var template=document.getElementById('sp-gr-widget-template');
+		if(!template){return;}
+		var holder=document.createElement('div');
+		holder.innerHTML=template.innerHTML.replace(/__INDEX__/g,String(nextIndex++));
+		var $card=$(holder).children('[data-sp-gr-widget]').first();
+		var number=$('[data-sp-gr-widget]').length+1;
+		$card.find('[data-sp-gr-name]').val('Widget '+number);
+		$card.find('[data-sp-gr-id]').val(uniqueId('widget-'+number,$card.find('[data-sp-gr-id]')));
+		appendCard($card);
+	}
+
 	$(document).on('click','[data-sp-gr-toggle]',function(){var $card=$(this).closest('[data-sp-gr-widget]'),open=!$card.hasClass('is-expanded');$card.toggleClass('is-expanded',open);$(this).attr('aria-expanded',open?'true':'false');});
-	$(document).on('input change','[data-sp-gr-widget] input,[data-sp-gr-widget] select',function(){var $card=$(this).closest('[data-sp-gr-widget]');if($(this).is('[data-sp-gr-name]')&&!$card.data('idTouched')){$card.find('[data-sp-gr-id]').val(slug($(this).val()));}if($(this).is('[data-sp-gr-id]')){$card.data('idTouched',true).find('[data-sp-gr-id]').val(slug($(this).val()));}render($card);});
+	$(document).on('input change','[data-sp-gr-widget] input,[data-sp-gr-widget] select',function(){var $card=$(this).closest('[data-sp-gr-widget]');if($(this).is('[data-sp-gr-name]')&&!$card.data('idTouched')){$card.find('[data-sp-gr-id]').val(uniqueId($(this).val(),$card.find('[data-sp-gr-id]')));}if($(this).is('[data-sp-gr-id]')){$card.data('idTouched',true);$(this).val(uniqueId($(this).val(),$(this)));}render($card);});
 	$(document).on('change','[data-sp-gr-component-toggle]',function(){var $item=$(this).closest('[data-component]');$item.toggleClass('is-enabled',this.checked);render($(this).closest('[data-sp-gr-widget]'));});
 	$(document).on('change','[data-sp-gr-preset]',function(){var p=presets[$(this).val()]||{},$card=$(this).closest('[data-sp-gr-widget]');Object.keys(p).forEach(function(key){if(['id','name','preset','components'].indexOf(key)!==-1)return;$card.find('[data-setting="'+key+'"]').val(p[key]);});$card.find('[data-sp-gr-component-toggle]').prop('checked',false).closest('[data-component]').removeClass('is-enabled');(p.components||[]).forEach(function(key){$card.find('[data-component="'+key+'"]').addClass('is-enabled').find('input').prop('checked',true);});render($card);});
-	$(document).on('click','[data-sp-gr-add-widget]',function(){var html=$('#sp-gr-widget-template').html().replace(/__INDEX__/g,String(nextIndex++)),$card=$(html),number=$('[data-sp-gr-widget]').length+1;$card.find('[data-sp-gr-name]').val('Widget '+number);$card.find('[data-sp-gr-id]').val('widget-'+number);$('[data-sp-gr-widget-list]').append($card);$('[data-sp-gr-widget-count]').text($('[data-sp-gr-widget]').length);bindCard($card);$card[0].scrollIntoView({behavior:'smooth',block:'start'});});
-	$(document).on('click','[data-sp-gr-delete]',function(){var $cards=$('[data-sp-gr-widget]');if($cards.length===1){window.alert('At least one widget must remain.');return;}if(window.confirm('Delete this widget? Save the page to confirm the change.')){$(this).closest('[data-sp-gr-widget]').remove();$('[data-sp-gr-widget-count]').text($('[data-sp-gr-widget]').length);}});
+	$(document).on('click','[data-sp-gr-add-widget]',newCard);
+	$(document).on('click','[data-sp-gr-duplicate]',function(){var $source=$(this).closest('[data-sp-gr-widget]'),$card=$source.clone(false,false),index=String(nextIndex++),sourceName=$source.find('[data-sp-gr-name]').val()||'Widget';$card.find('[name]').each(function(){this.name=this.name.replace(/sp_google_reviews_widgets\[[^\]]+\]/,'sp_google_reviews_widgets['+index+']');});$card.find('[data-sp-gr-name]').val(sourceName+' copy');$card.find('[data-sp-gr-id]').val(uniqueId($source.find('[data-sp-gr-id]').val()+'-copy',$card.find('[data-sp-gr-id]')));appendCard($card);});
+	$(document).on('click','[data-sp-gr-delete]',function(){if($('[data-sp-gr-widget]').length<2){return;}$(this).closest('[data-sp-gr-widget]').remove();updateCount();});
 	$(document).on('click','[data-sp-gr-copy]',function(){var text=$(this).closest('[data-sp-gr-widget]').find('[data-sp-gr-card-shortcode]').text(),button=this;navigator.clipboard.writeText(text).then(function(){var old=button.textContent;button.textContent='Copied';setTimeout(function(){button.textContent=old;},1200);});});
 	$(document).on('click','[data-sp-gr-media]',function(){var $input=$(this).siblings('input'),$card=$(this).closest('[data-sp-gr-widget]'),frame=wp.media({title:'Select background image',button:{text:'Use image'},multiple:false});frame.on('select',function(){var item=frame.state().get('selection').first().toJSON();$input.val(item.url).trigger('input');render($card);});frame.open();});
 	$(document).on('click','[data-sp-gr-media-clear]',function(){$(this).siblings('input').val('').trigger('input');});
-	var dragged=null;$(document).on('dragstart','[data-component]',function(e){dragged=this;$(this).addClass('is-dragging');e.originalEvent.dataTransfer.effectAllowed='move';}).on('dragend','[data-component]',function(){$(this).removeClass('is-dragging');dragged=null;}).on('dragover','[data-component]',function(e){e.preventDefault();if(!dragged||dragged===this)return;var rect=this.getBoundingClientRect(),before=e.originalEvent.clientX<rect.left+rect.width/2;this.parentNode.insertBefore(dragged,before?this:this.nextSibling);}).on('drop','[data-component-list]',function(e){e.preventDefault();render($(this).closest('[data-sp-gr-widget]'));});
-	$('[data-sp-gr-widget]').each(function(){bindCard($(this));});
+	$('[data-sp-gr-widget]').each(function(){render($(this));});
+	updateCount();
 })(jQuery);
 JS;
 	}
