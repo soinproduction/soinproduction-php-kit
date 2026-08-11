@@ -119,6 +119,7 @@ Classic `admin-post.php?action=sp_reviews_import` и Ajax `sp_reviews_import` т
 - отдельные Desktop/Mobile значения размеров, интервалов, padding и radius;
 - цвета текста, вторичного текста, звёзд и фона с брендовой палитрой темы из `color_palette_config()`;
 - фоновое изображение из Media Library и opacity затемнения.
+- безопасная ссылка на всю плашку либо только на подпись количества отзывов, включая настройки новой вкладки и `nofollow`.
 
 В редакторе можно создавать и дублировать до 30 независимо настроенных карточек; для каждой работают Desktop/Mobile режимы live preview. Responsive-значения выводятся как `clamp(mobile rem, рассчитанный rem + vw, desktop rem)` в диапазоне viewport 375–1440px; пересчёт использует соглашение кита `10px = 1rem`. На frontend используются scoped CSS custom properties, семантическая разметка и автономные SVG-звёзды: зависимости от theme sprite и запросов к remote fallback avatars больше нет. Если у отзыва нет фотографии, выводится инициал автора.
 
@@ -130,6 +131,14 @@ Classic `admin-post.php?action=sp_reviews_import` и Ajax `sp_reviews_import` т
 ```
 
 Старый `[google_reviews_widget]` продолжает работать и выводит виджет `default` либо первый сохранённый. Атрибуты `show_count` и `show_stars` сохранены как совместимые overrides для конкретного вызова.
+
+Не вставляйте HTML-ссылку в поле **Count label**. Оставьте там обычный текст с плейсхолдером `{count}`, а URL и кликабельную область задайте в секции **Interaction**. Так разметка остаётся валидной, а произвольный небезопасный HTML не попадает на frontend.
+
+CSS плагина можно глобально отключить в **Synchronization → Widget Overrides → Frontend styles**. HTML-разметка виджета сохранится, и её можно полностью стилизовать в теме. Для управления из кода доступен фильтр:
+
+```php
+add_filter( 'sp_google_reviews_load_widget_styles', '__return_false' );
+```
 
 Рейтинг, count и avatars выбираются для текущего языка Polylang/WPML. Подписи регистрируются в Polylang/WPML String Translation в группе `SP Google Reviews`. Дополнительно доступны filters `sp_google_reviews_widget_rating_label` и `sp_google_reviews_widget_count_label`; вторым аргументом они получают ID виджета.
 

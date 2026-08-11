@@ -135,6 +135,7 @@
                     'fallback_rating' => '',
                     'fallback_count'  => '',
                     'overwrite'       => 1,
+                    'load_widget_styles' => 1,
             ] );
 
             $opt['api_key']   = is_string( $opt['api_key'] ) ? trim( $opt['api_key'] ) : '';
@@ -143,6 +144,7 @@
             $opt['min_rating'] = max( 1, min( 5, (int) $opt['min_rating'] ) );
             $opt['limit']      = max( 1, min( 200, (int) $opt['limit'] ) );
             $opt['overwrite']  = ! empty( $opt['overwrite'] ) ? 1 : 0;
+            $opt['load_widget_styles'] = ! empty( $opt['load_widget_styles'] ) ? 1 : 0;
 
             $opt['fallback_rating'] = is_string( $opt['fallback_rating'] ) ? trim( $opt['fallback_rating'] ) : '';
             $opt['fallback_count']  = is_string( $opt['fallback_count'] ) ? trim( $opt['fallback_count'] ) : '';
@@ -166,11 +168,12 @@
             $min_rating = max( 1, min( 5, (int) ( $input['min_rating'] ?? 1 ) ) );
             $limit      = max( 1, min( 200, (int) ( $input['limit'] ?? 30 ) ) );
             $overwrite  = ! empty( $input['overwrite'] ) ? 1 : 0;
+            $load_widget_styles = ! empty( $input['load_widget_styles'] ) ? 1 : 0;
 
             $fallback_rating = isset( $input['fallback_rating'] ) ? trim( (string) $input['fallback_rating'] ) : '';
             $fallback_count  = isset( $input['fallback_count'] ) ? trim( (string) $input['fallback_count'] ) : '';
 
-            return compact( 'api_key', 'place_id', 'language', 'min_rating', 'limit', 'fallback_rating', 'fallback_count', 'overwrite' );
+            return compact( 'api_key', 'place_id', 'language', 'min_rating', 'limit', 'fallback_rating', 'fallback_count', 'overwrite', 'load_widget_styles' );
         }
 
         private static function can_import_now( array $opt ): bool {
@@ -582,6 +585,18 @@
                                            value="<?php echo esc_attr( $opt['fallback_count'] ); ?>"
                                            placeholder="(leave blank to use actual)" />
                                     <p class="description">If empty, the actual count of imported reviews will be used.</p>
+                                </td>
+                            </tr>
+                            <tr class="sp-gr-row">
+                                <th scope="row">Frontend styles</th>
+                                <td>
+                                    <label>
+                                        <input type="checkbox"
+                                               name="<?php echo esc_attr( self::OPT_KEY ); ?>[load_widget_styles]"
+                                               value="1" <?php checked( ! empty( $opt['load_widget_styles'] ) ); ?> />
+                                        Load the plugin's widget CSS.
+                                    </label>
+                                    <p class="description">Disable this to keep only semantic widget markup and style <code>.sp-gr-widget</code> in your theme.</p>
                                 </td>
                             </tr>
                         </table>
@@ -1445,6 +1460,10 @@ JS;
         // -------------------------------------------------------------------------
 
         public static function enqueue_frontend_assets(): void {
+            $enabled = ! empty( self::get_options()['load_widget_styles'] );
+            if ( ! apply_filters( 'sp_google_reviews_load_widget_styles', $enabled ) ) {
+                return;
+            }
             wp_register_style( 'sp-google-reviews-widget', false );
             wp_enqueue_style( 'sp-google-reviews-widget' );
             wp_add_inline_style( 'sp-google-reviews-widget', SP_Google_Reviews_Widget_Builder::frontend_css() );

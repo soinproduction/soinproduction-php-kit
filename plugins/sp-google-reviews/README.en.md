@@ -116,6 +116,7 @@ Available presets are Banner, Compact and Minimal. A widget can independently co
 - separate desktop/mobile values for sizes, spacing, padding and radius;
 - text, muted text, star and background colors with the theme brand palette from `color_palette_config()`;
 - Media Library background image and overlay opacity.
+- an optional safe link on either the whole widget or only its review-count label, with new-tab and `nofollow` controls.
 
 The editor supports creating and duplicating up to 30 independently configured cards and provides Desktop/Mobile live-preview modes. Responsive numeric values are emitted as `clamp(mobile rem, calculated rem + vw, desktop rem)` between 375px and 1440px; the conversion follows the kit convention `10px = 1rem`. Frontend output uses scoped CSS custom properties, semantic markup and standalone SVG stars, so it has no theme sprite dependency or remote fallback-avatar request. Reviews without a photo are represented by the reviewer initial.
 
@@ -127,6 +128,14 @@ Use the shortcode displayed on the widget card:
 ```
 
 `[google_reviews_widget]` remains compatible and renders the `default` widget (or the first saved widget). Legacy `show_count` and `show_stars` attributes remain supported as per-render visibility overrides.
+
+Do not insert anchor markup into **Count label**. Enter plain text with the `{count}` placeholder, then configure the URL and clickable area in **Interaction**. This keeps the output valid and prevents unsafe arbitrary HTML.
+
+The plugin CSS can be disabled globally under **Synchronization → Widget Overrides → Frontend styles**. The widget markup remains available for custom theme styling. Code-controlled installations can override the setting as well:
+
+```php
+add_filter( 'sp_google_reviews_load_widget_styles', '__return_false' );
+```
 
 Rating and count are selected for the current Polylang/WPML language. Widget labels are registered with Polylang/WPML String Translation under the `SP Google Reviews` group. They can also be adjusted through `sp_google_reviews_widget_rating_label` and `sp_google_reviews_widget_count_label`; both filters receive the widget ID as their second argument.
 

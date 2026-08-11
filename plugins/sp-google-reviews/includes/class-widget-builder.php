@@ -60,6 +60,10 @@ final class SP_Google_Reviews_Widget_Builder {
 			'overlay_opacity' => 35,
 			'rating_label'    => 'Rating',
 			'count_label'     => 'Based on {count} reviews',
+			'link_url'        => '',
+			'link_scope'      => 'none',
+			'link_target'     => 'same',
+			'link_nofollow'   => 0,
 		];
 	}
 
@@ -217,6 +221,10 @@ final class SP_Google_Reviews_Widget_Builder {
 				'overlay_opacity'   => self::clamp_int( $raw['overlay_opacity'] ?? 35, 0, 100 ),
 				'rating_label'      => sanitize_text_field( (string) ( $raw['rating_label'] ?? 'Rating' ) ),
 				'count_label'       => sanitize_text_field( (string) ( $raw['count_label'] ?? 'Based on {count} reviews' ) ),
+				'link_url'          => esc_url_raw( (string) ( $raw['link_url'] ?? '' ) ),
+				'link_scope'        => in_array( (string) ( $raw['link_scope'] ?? 'none' ), [ 'none', 'widget', 'count' ], true ) ? (string) $raw['link_scope'] : 'none',
+				'link_target'       => ( $raw['link_target'] ?? 'same' ) === 'blank' ? 'blank' : 'same',
+				'link_nofollow'     => empty( $raw['link_nofollow'] ) ? 0 : 1,
 			];
 		}
 
@@ -383,6 +391,19 @@ final class SP_Google_Reviews_Widget_Builder {
 					</section>
 
 					<section class="sp-gr-control-section">
+						<h3>Interaction</h3>
+						<p class="description">Add a structured, safe link without placing HTML inside the labels.</p>
+						<div class="sp-gr-control-grid sp-gr-control-grid--interaction">
+							<label class="sp-gr-control-grid__wide"><span>Destination URL</span><input type="url" name="<?php echo esc_attr( $name ); ?>[link_url]" value="<?php echo esc_attr( (string) $widget['link_url'] ); ?>" placeholder="https://example.com/reviews" data-setting="link_url"></label>
+							<label><span>Clickable area</span><select name="<?php echo esc_attr( $name ); ?>[link_scope]" data-setting="link_scope"><option value="none" <?php selected( $widget['link_scope'], 'none' ); ?>>No link</option><option value="widget" <?php selected( $widget['link_scope'], 'widget' ); ?>>Entire widget</option><option value="count" <?php selected( $widget['link_scope'], 'count' ); ?>>Review count only</option></select></label>
+							<div class="sp-gr-link-options">
+								<label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[link_target]" value="blank" data-setting="link_target" <?php checked( $widget['link_target'], 'blank' ); ?>><span>Open in a new tab</span></label>
+								<label><input type="checkbox" name="<?php echo esc_attr( $name ); ?>[link_nofollow]" value="1" data-setting="link_nofollow" <?php checked( ! empty( $widget['link_nofollow'] ) ); ?>><span>Add nofollow</span></label>
+							</div>
+						</div>
+					</section>
+
+					<section class="sp-gr-control-section">
 						<h3>Appearance</h3>
 						<div class="sp-gr-control-grid sp-gr-control-grid--compact">
 							<?php self::responsive_number_control( $name, $widget, 'avatar_size', 'Avatar size', 20, 96 ); ?>
@@ -393,12 +414,16 @@ final class SP_Google_Reviews_Widget_Builder {
 							<?php self::responsive_number_control( $name, $widget, 'radius', 'Radius', 0, 80 ); ?>
 							<?php self::responsive_number_control( $name, $widget, 'padding_y', 'Vertical padding', 0, 80 ); ?>
 							<?php self::responsive_number_control( $name, $widget, 'padding_x', 'Horizontal padding', 0, 100 ); ?>
+						</div>
+						<div class="sp-gr-color-grid">
 							<?php self::color_control( $name, $widget, 'text_color', 'Text' ); ?>
 							<?php self::color_control( $name, $widget, 'muted_color', 'Muted text' ); ?>
 							<?php self::color_control( $name, $widget, 'star_color', 'Stars' ); ?>
 							<?php self::color_control( $name, $widget, 'background_color', 'Background' ); ?>
+						</div>
+						<div class="sp-gr-asset-grid">
 							<?php self::number_control( $name, $widget, 'overlay_opacity', 'Image overlay', 0, 100, '%' ); ?>
-							<label class="sp-gr-control-grid__wide"><span>Background image</span><span class="sp-gr-media-control"><input type="url" name="<?php echo esc_attr( $name ); ?>[background_image]" value="<?php echo esc_attr( (string) $widget['background_image'] ); ?>" data-setting="background_image"><button type="button" class="button" data-sp-gr-media>Select</button><button type="button" class="button-link" data-sp-gr-media-clear>Clear</button></span></label>
+							<label><span>Background image</span><span class="sp-gr-media-control"><input type="url" name="<?php echo esc_attr( $name ); ?>[background_image]" value="<?php echo esc_attr( (string) $widget['background_image'] ); ?>" data-setting="background_image"><button type="button" class="button" data-sp-gr-media>Select</button><button type="button" class="button-link" data-sp-gr-media-clear>Clear</button></span></label>
 						</div>
 					</section>
 				</div>
@@ -557,6 +582,7 @@ final class SP_Google_Reviews_Widget_Builder {
 	private static function render_widget( array $widget, array $context, bool $preview ): string {
 		$widget = wp_parse_args( $widget, self::defaults() );
 		$components = (array) $widget['components'];
+		$render_components = $preview ? [ 'stars', 'rating', 'rating_label', 'count_label' ] : array_values( array_diff( $components, [ 'avatars' ] ) );
 		$rating = max( 0, min( 5, (float) $context['rating'] ) );
 		$count = max( 0, (int) $context['count'] );
 		$id = sanitize_key( (string) $widget['id'] );
@@ -564,6 +590,15 @@ final class SP_Google_Reviews_Widget_Builder {
 		$count_label = self::translate_label( $id, 'count_label', (string) $widget['count_label'] );
 		$background = esc_url_raw( (string) $widget['background_image'] );
 		$background = str_replace( [ '\\', '"', "\r", "\n" ], [ '\\\\', '\\"', '', '' ], $background );
+		$link_url = esc_url( (string) $widget['link_url'] );
+		$link_scope = in_array( (string) $widget['link_scope'], [ 'widget', 'count' ], true ) && $link_url !== '' ? (string) $widget['link_scope'] : 'none';
+		$link_target = (string) $widget['link_target'] === 'blank' ? '_blank' : '';
+		$link_rel = array_filter( [ $link_target === '_blank' ? 'noopener' : '', ! empty( $widget['link_nofollow'] ) ? 'nofollow' : '' ] );
+		$link_attributes = $link_url !== '' ? ' href="' . esc_url( $link_url ) . '"' : '';
+		$link_attributes .= $link_target !== '' ? ' target="_blank"' : '';
+		$link_attributes .= $link_rel !== [] ? ' rel="' . esc_attr( implode( ' ', $link_rel ) ) . '"' : '';
+		$wrapper_tag = ! $preview && $link_scope === 'widget' ? 'a' : 'div';
+		$formatted_count = wp_kses( str_replace( '{count}', '<strong>' . esc_html( number_format_i18n( $count ) ) . '</strong>', esc_html( $count_label ) ), [ 'strong' => [] ] );
 		$style = sprintf(
 			'--sp-gr-text:%1$s;--sp-gr-muted:%2$s;--sp-gr-star:%3$s;--sp-gr-bg:%4$s;--sp-gr-avatar-size:%5$s;--sp-gr-avatar-overlap:%6$s;--sp-gr-star-size:%7$s;--sp-gr-font-size:%8$s;--sp-gr-pad-y:%9$s;--sp-gr-pad-x:%10$s;--sp-gr-gap:%11$s;--sp-gr-radius:%12$s;--sp-gr-overlay:%13$s;--sp-gr-image:%14$s;',
 			esc_attr( (string) $widget['text_color'] ), esc_attr( (string) $widget['muted_color'] ), esc_attr( (string) $widget['star_color'] ), esc_attr( (string) $widget['background_color'] ),
@@ -573,9 +608,9 @@ final class SP_Google_Reviews_Widget_Builder {
 
 		ob_start();
 		?>
-		<div class="sp-gr-widget sp-gr-widget--<?php echo esc_attr( (string) $widget['preset'] ); ?>" style="<?php echo esc_attr( $style ); ?>" data-sp-gr-rendered-widget>
+		<<?php echo esc_html( $wrapper_tag ); ?> class="sp-gr-widget sp-gr-widget--<?php echo esc_attr( (string) $widget['preset'] ); ?><?php echo $link_scope !== 'none' ? ' is-linked' : ''; ?>" style="<?php echo esc_attr( $style ); ?>" data-sp-gr-rendered-widget<?php echo $wrapper_tag === 'a' ? $link_attributes : ''; ?>>
 			<div class="sp-gr-widget__inner">
-				<?php if ( in_array( 'avatars', $components, true ) && (int) $widget['avatar_count'] > 0 ) : ?>
+				<?php if ( ( $preview || in_array( 'avatars', $components, true ) ) && (int) $widget['avatar_count'] > 0 ) : ?>
 						<div class="sp-gr-widget__avatars" data-preview-component="avatars">
 							<?php foreach ( array_slice( (array) $context['avatars'], 0, (int) $widget['avatar_count'] ) as $avatar ) : ?>
 								<span class="sp-gr-widget__avatar"><?php if ( ! empty( $avatar['url'] ) ) : ?><img src="<?php echo esc_url( (string) $avatar['url'] ); ?>" alt="" width="96" height="96" loading="lazy"><?php else : ?><span aria-hidden="true"><?php echo esc_html( (string) $avatar['initial'] ); ?></span><?php endif; ?></span>
@@ -583,7 +618,7 @@ final class SP_Google_Reviews_Widget_Builder {
 						</div>
 				<?php endif; ?>
 				<div class="sp-gr-widget__content">
-				<?php foreach ( array_diff( $components, [ 'avatars' ] ) as $component ) : ?>
+				<?php foreach ( $render_components as $component ) : ?>
 					<?php if ( $component === 'stars' ) : ?>
 						<div class="sp-gr-widget__stars" role="img" aria-label="<?php echo esc_attr( sprintf( '%.1f out of 5 stars', $rating ) ); ?>" data-preview-component="stars"><?php self::render_stars( $rating ); ?></div>
 					<?php elseif ( $component === 'rating' ) : ?>
@@ -591,12 +626,12 @@ final class SP_Google_Reviews_Widget_Builder {
 					<?php elseif ( $component === 'rating_label' ) : ?>
 						<span class="sp-gr-widget__rating-label" data-preview-component="rating_label"><?php echo esc_html( $rating_label ); ?></span>
 					<?php elseif ( $component === 'count_label' ) : ?>
-						<span class="sp-gr-widget__count" data-preview-component="count_label"><?php echo wp_kses( str_replace( '{count}', '<strong>' . esc_html( number_format_i18n( $count ) ) . '</strong>', esc_html( $count_label ) ), [ 'strong' => [] ] ); ?></span>
+						<span class="sp-gr-widget__count" data-preview-component="count_label"><?php if ( ! $preview && $link_scope === 'count' ) : ?><a class="sp-gr-widget__count-link"<?php echo $link_attributes; ?>><?php echo $formatted_count; ?></a><?php else : ?><?php echo $formatted_count; ?><?php endif; ?></span>
 					<?php endif; ?>
 				<?php endforeach; ?>
 				</div>
 			</div>
-		</div>
+		</<?php echo esc_html( $wrapper_tag ); ?>>
 		<?php
 		return (string) ob_get_clean();
 	}
@@ -612,6 +647,7 @@ final class SP_Google_Reviews_Widget_Builder {
 	public static function frontend_css(): string {
 		return <<<'CSS'
 .sp-gr-widget{position:relative;isolation:isolate;display:inline-flex;max-width:100%;height:max-content;overflow:hidden;border-radius:var(--sp-gr-radius);background-color:var(--sp-gr-bg);background-image:var(--sp-gr-image);background-position:center;background-size:cover;color:var(--sp-gr-text);font-family:inherit;font-size:var(--sp-gr-font-size);line-height:1.25}
+.sp-gr-widget.is-linked{text-decoration:none;cursor:pointer}.sp-gr-widget.is-linked:focus-visible{outline:3px solid currentColor;outline-offset:3px}.sp-gr-widget__count-link{color:inherit;text-decoration:underline;text-decoration-thickness:.08em;text-underline-offset:.14em}.sp-gr-widget__count-link:hover{text-decoration-thickness:.14em}
 .sp-gr-widget::before{position:absolute;z-index:-1;inset:0;background:rgb(0 0 0 / var(--sp-gr-overlay));content:"";pointer-events:none}
 .sp-gr-widget__inner{display:flex;align-items:center;gap:var(--sp-gr-gap);padding:var(--sp-gr-pad-y) var(--sp-gr-pad-x)}
 .sp-gr-widget__content{display:flex;align-items:center;flex:1;flex-wrap:wrap;gap:calc(var(--sp-gr-gap) * .3) calc(var(--sp-gr-gap) * .45);min-width:0}
@@ -633,10 +669,10 @@ CSS;
 .sp-gr-admin-wrap.sp-gr-builder-page{width:auto;max-width:none}.sp-gr-tabs{display:inline-flex;gap:4px;margin:0 0 20px;padding:4px;border:0;border-radius:10px;background:#e9edf3}.sp-gr-tabs .nav-tab{margin:0;padding:7px 14px;border:0;border-radius:7px;background:transparent;color:#4b5563;font-size:13px;font-weight:600;line-height:20px}.sp-gr-tabs .nav-tab:hover{background:rgb(255 255 255 / 60%);color:#1d2327}.sp-gr-tabs .nav-tab-active{background:#fff;color:#2746c7;box-shadow:0 1px 3px rgb(16 24 40 / 12%)}.sp-gr-builder-intro{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:18px 20px}.sp-gr-builder-intro h2{margin:0 0 4px;font-size:18px}.sp-gr-builder-intro p{margin:0;color:#646970}.sp-gr-builder-count{padding:7px 11px;border-radius:999px;background:#eef2ff;color:#2746c7;white-space:nowrap}
 .sp-gr-widget-list{display:grid;gap:16px}.sp-gr-widget-editor{overflow:hidden;border:1px solid #dfe3e8;border-radius:14px;background:#fff;box-shadow:0 1px 2px rgb(16 24 40 / 4%);transition:border-color .16s,box-shadow .16s}.sp-gr-widget-editor.is-expanded{border-color:#c9d1dc;box-shadow:0 8px 24px rgb(16 24 40 / 7%)}.sp-gr-widget-editor__header{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:58px;padding:10px 16px}.sp-gr-widget-editor__toggle{display:flex;flex:1;align-items:center;gap:10px;min-width:0;padding:0;border:0;background:none;text-align:left;cursor:pointer}.sp-gr-widget-editor__toggle>span:last-child{display:grid;gap:3px;min-width:0}.sp-gr-widget-editor__toggle strong{font-size:14px}.sp-gr-widget-editor__toggle small{overflow:hidden;color:#646970;font-weight:400;text-overflow:ellipsis;white-space:nowrap}.sp-gr-widget-editor__toggle code{padding:0;background:none}.sp-gr-widget-editor__toggle .dashicons{color:#667085;transition:transform .16s}.sp-gr-widget-editor.is-expanded .sp-gr-widget-editor__toggle .dashicons{transform:rotate(90deg)}.sp-gr-widget-editor__actions{display:flex;align-items:center;gap:8px}.sp-gr-widget-editor__body{display:none;grid-template-columns:minmax(520px,1fr) minmax(420px,.9fr);border-top:1px solid #e7eaee}.sp-gr-widget-editor.is-expanded .sp-gr-widget-editor__body{display:grid}.sp-gr-widget-list>.sp-gr-widget-editor:only-child [data-sp-gr-delete]{display:none}
 .sp-gr-delete-button{display:inline-flex!important;align-items:center;gap:4px!important;border-color:#f1b8b3!important;background:#fff7f6!important;color:#b42318!important}.sp-gr-delete-button .dashicons{width:15px;height:15px;font-size:15px;line-height:15px}.sp-gr-delete-button:hover,.sp-gr-delete-button:focus{border-color:#d92d20!important;background:#d92d20!important;color:#fff!important}.sp-gr-delete-button:focus{box-shadow:0 0 0 1px #fff,0 0 0 3px #d92d20!important}
-.sp-gr-widget-editor__controls{padding:18px}.sp-gr-control-section+ .sp-gr-control-section{margin-top:24px;padding-top:20px;border-top:1px solid #edf0f2}.sp-gr-control-section h3{margin:0 0 12px;font-size:15px}.sp-gr-control-section>.description{margin:-6px 0 12px}.sp-gr-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.sp-gr-control-grid--identity,.sp-gr-control-grid--compact{grid-template-columns:repeat(3,minmax(0,1fr))}.sp-gr-control-grid label{display:grid;align-content:start;gap:6px}.sp-gr-control-grid label>span:first-child{color:#3c434a;font-size:12px;font-weight:600}.sp-gr-control-grid input,.sp-gr-control-grid select{width:100%;min-height:38px}.sp-gr-control-grid small{color:#646970}.sp-gr-control-grid__wide{grid-column:1/-1}.sp-gr-number-control,.sp-gr-color-control,.sp-gr-media-control{display:flex;align-items:center}.sp-gr-number-control{position:relative}.sp-gr-number-control input{min-width:0;padding-right:32px!important;-moz-appearance:textfield}.sp-gr-number-control input::-webkit-inner-spin-button,.sp-gr-number-control input::-webkit-outer-spin-button{margin:0;-webkit-appearance:none}.sp-gr-number-control em{position:absolute;right:10px;color:#646970;font-style:normal;pointer-events:none}.sp-gr-responsive-values{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sp-gr-responsive-values>span{display:grid;gap:4px}.sp-gr-responsive-values small{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}.sp-gr-color-control{display:block}.sp-gr-color-control .wp-picker-container{display:block}.sp-gr-color-control .wp-color-result{margin:0}.sp-gr-brand-swatches{display:flex!important;flex-wrap:wrap;gap:5px}.sp-gr-brand-swatches button{width:22px;height:22px;padding:0;border:2px solid #fff;border-radius:50%;background:var(--swatch);box-shadow:0 0 0 1px #c7cdd4;cursor:pointer}.sp-gr-brand-swatches button:hover,.sp-gr-brand-swatches button:focus{box-shadow:0 0 0 2px #3858e9;outline:0}.sp-gr-media-control{gap:7px}.sp-gr-media-control input{flex:1}
+.sp-gr-widget-editor__controls{padding:18px}.sp-gr-control-section+ .sp-gr-control-section{margin-top:24px;padding-top:20px;border-top:1px solid #edf0f2}.sp-gr-control-section h3{margin:0 0 12px;font-size:15px}.sp-gr-control-section>.description{margin:-6px 0 12px}.sp-gr-control-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}.sp-gr-control-grid--identity,.sp-gr-control-grid--compact{grid-template-columns:repeat(3,minmax(0,1fr))}.sp-gr-control-grid label{display:grid;align-content:start;gap:6px}.sp-gr-control-grid label>span:first-child{color:#3c434a;font-size:12px;font-weight:600}.sp-gr-control-grid input,.sp-gr-control-grid select{width:100%;min-height:38px}.sp-gr-control-grid small{color:#646970}.sp-gr-control-grid__wide{grid-column:1/-1}.sp-gr-number-control,.sp-gr-color-control,.sp-gr-media-control{display:flex;align-items:center}.sp-gr-number-control{position:relative}.sp-gr-number-control input{min-width:0;padding-right:32px!important;-moz-appearance:textfield}.sp-gr-number-control input::-webkit-inner-spin-button,.sp-gr-number-control input::-webkit-outer-spin-button{margin:0;-webkit-appearance:none}.sp-gr-number-control em{position:absolute;right:10px;color:#646970;font-style:normal;pointer-events:none}.sp-gr-responsive-values{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sp-gr-responsive-values>span{display:grid;gap:4px}.sp-gr-responsive-values small{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em}.sp-gr-color-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-top:18px;padding-top:18px;border-top:1px solid #edf0f2}.sp-gr-color-grid>label,.sp-gr-asset-grid>label{display:grid;align-content:start;gap:6px}.sp-gr-color-grid>label>span:first-child,.sp-gr-asset-grid>label>span:first-child{color:#3c434a;font-size:12px;font-weight:600}.sp-gr-color-control{display:block}.sp-gr-color-control .wp-picker-container{display:block}.sp-gr-color-control .wp-color-result{margin:0}.sp-gr-asset-grid{display:grid;grid-template-columns:minmax(160px,1fr) minmax(0,3fr);gap:14px;margin-top:14px;align-items:end}.sp-gr-asset-grid input{width:100%;min-height:38px}.sp-gr-media-control{gap:7px}.sp-gr-media-control input{flex:1}.sp-gr-link-options{display:flex;align-items:center;gap:18px;padding-top:24px}.sp-gr-link-options label{display:flex;align-items:center;gap:7px}.sp-gr-link-options input{width:auto;min-height:0}
 .sp-gr-component-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.sp-gr-component{min-width:0}.sp-gr-component button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:42px;padding:8px 10px;border:1px solid #dfe3e8;border-radius:9px;background:#f8fafc;color:#475467;font:inherit;font-weight:600;text-align:left;cursor:pointer;transition:border-color .15s,background .15s,color .15s}.sp-gr-component i{position:relative;flex:0 0 34px;width:34px;height:20px;border-radius:999px;background:#c9d1dc;box-shadow:inset 0 0 0 1px rgb(0 0 0 / 5%);transition:background .15s}.sp-gr-component i::after{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / 25%);content:"";transition:transform .15s}.sp-gr-component.is-enabled button{border-color:#a9b8f5;background:#f5f7ff;color:#2442b5}.sp-gr-component.is-enabled i{background:#3858e9}.sp-gr-component.is-enabled i::after{transform:translateX(14px)}.sp-gr-component button:focus-visible{outline:2px solid #3858e9;outline-offset:2px}
 .sp-gr-widget-editor__preview{position:relative;min-width:0;padding:18px;border-left:1px solid #e7eaee;background:#f6f7f7}.sp-gr-preview-toolbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;color:#646970;font-size:12px}.sp-gr-preview-toolbar strong{color:#1d2327;font-size:13px}.sp-gr-preview-modes{display:inline-flex;padding:2px;border-radius:7px;background:#e4e8ee}.sp-gr-preview-modes button{padding:4px 8px;border:0;border-radius:5px;background:transparent;color:#667085;font-size:11px;cursor:pointer}.sp-gr-preview-modes button.is-active{background:#fff;color:#2746c7;box-shadow:0 1px 2px rgb(16 24 40 / 12%)}.sp-gr-preview-stage{position:sticky;top:46px;display:grid;min-height:300px;place-items:center;padding:28px;overflow:hidden;border:1px solid #dcdcde;border-radius:12px;background-color:#dfe3e8;background-image:linear-gradient(45deg,#eef0f2 25%,transparent 25%),linear-gradient(-45deg,#eef0f2 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#eef0f2 75%),linear-gradient(-45deg,transparent 75%,#eef0f2 75%);background-position:0 0,0 10px,10px -10px,-10px 0;background-size:20px 20px}.sp-gr-preview-stage .sp-gr-widget{max-width:100%}.sp-gr-preview-stage.is-mobile{width:375px;max-width:100%;margin-inline:auto;padding:18px}.sp-gr-preview-stage.is-mobile .sp-gr-widget--banner{display:flex;width:100%}.sp-gr-preview-stage.is-mobile .sp-gr-widget--banner .sp-gr-widget__inner{align-items:flex-start;flex-direction:column;gap:12px}
-@media(max-width:1180px){.sp-gr-widget-editor__body{grid-template-columns:1fr}.sp-gr-widget-editor__preview{border-top:1px solid #e7eaee;border-left:0}.sp-gr-preview-stage{position:static;min-height:220px}}@media(max-width:782px){.sp-gr-control-grid,.sp-gr-control-grid--compact,.sp-gr-component-list{grid-template-columns:1fr}.sp-gr-widget-editor__header{align-items:flex-start;flex-direction:column}.sp-gr-widget-editor__actions{width:100%}.sp-gr-builder-intro{align-items:flex-start;flex-direction:column}.sp-gr-tabs{display:flex}.sp-gr-tabs .nav-tab{flex:1;text-align:center}}
+@media(max-width:1180px){.sp-gr-widget-editor__body{grid-template-columns:1fr}.sp-gr-widget-editor__preview{border-top:1px solid #e7eaee;border-left:0}.sp-gr-preview-stage{position:static;min-height:220px}}@media(max-width:782px){.sp-gr-control-grid,.sp-gr-control-grid--compact,.sp-gr-component-list,.sp-gr-color-grid,.sp-gr-asset-grid{grid-template-columns:1fr}.sp-gr-link-options{align-items:flex-start;flex-direction:column;padding-top:0}.sp-gr-widget-editor__header{align-items:flex-start;flex-direction:column}.sp-gr-widget-editor__actions{width:100%}.sp-gr-builder-intro{align-items:flex-start;flex-direction:column}.sp-gr-tabs{display:flex}.sp-gr-tabs .nav-tab{flex:1;text-align:center}}
 CSS;
 	}
 
@@ -685,7 +721,7 @@ CSS;
 
 	function config($card){
 		var output={};
-		$card.find('[data-setting]').each(function(){output[$(this).data('setting')]=$(this).val();});
+		$card.find('[data-setting]').each(function(){var $field=$(this),key=$field.data('setting');if($field.is(':checkbox')){output[key]=$field.prop('checked')?$field.val():key==='link_target'?'same':'0';}else{output[key]=$field.val();}});
 		output.id=$card.find('[data-sp-gr-id]').val();
 		output.name=$card.find('[data-sp-gr-name]').val();
 		output.preset=$card.find('[data-sp-gr-preset]').val();
@@ -699,7 +735,8 @@ CSS;
 		var components=settings.components||[];
 		var mobile=$card.data('previewMode')==='mobile';
 		function size(key){return Number(settings[mobile?key+'_mobile':key]||0)+'px';}
-		$widget.attr('class','sp-gr-widget sp-gr-widget--'+settings.preset).css({
+		var linked=Boolean(settings.link_url&&settings.link_scope&&settings.link_scope!=='none');
+		$widget.attr('class','sp-gr-widget sp-gr-widget--'+settings.preset+(linked?' is-linked':'')).css({
 			'--sp-gr-text':settings.text_color,'--sp-gr-muted':settings.muted_color,'--sp-gr-star':settings.star_color,
 			'--sp-gr-bg':settings.background_color,'--sp-gr-avatar-size':size('avatar_size'),'--sp-gr-avatar-overlap':size('avatar_overlap'),
 			'--sp-gr-star-size':size('star_size'),'--sp-gr-font-size':size('font_size'),'--sp-gr-pad-y':size('padding_y'),
@@ -711,6 +748,7 @@ CSS;
 		$widget.find('.sp-gr-widget__avatar').each(function(index){$(this).toggle(index<Number(settings.avatar_count||0));});
 		$widget.find('[data-preview-component="rating_label"]').text(settings.rating_label||'');
 		$widget.find('[data-preview-component="count_label"]').text((settings.count_label||'').replace('{count}','95'));
+		$widget.find('[data-preview-component="count_label"]').toggleClass('is-preview-link',linked&&settings.link_scope==='count');
 		$card.find('[data-sp-gr-card-name]').text(settings.name||'Untitled widget');
 		$card.find('[data-sp-gr-card-shortcode]').text('[google_reviews_widget id="'+(slug(settings.id)||'widget')+'"]');
 	}
