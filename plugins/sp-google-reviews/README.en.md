@@ -4,7 +4,7 @@ Imports Google Maps reviews through SerpAPI into the theme’s `review` custom p
 
 ## Requirements and Data Flow
 
-The module expects the theme to register the `review` post type. ACF is optional: when available, rating is also written with `update_field('stars', ...)`; otherwise the normal `stars` post meta remains the source of truth.
+The module expects the theme to register the `review` post type. It adds that CPT to Polylang and configures WPML translation mode as `translate`. ACF is optional: when available, rating is also written with `update_field('stars', ...)`; otherwise the normal `stars` post meta remains the source of truth.
 
 Synchronization follows this pipeline:
 

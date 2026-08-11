@@ -39,6 +39,8 @@
             add_action( 'wp_ajax_sp_reviews_import',    [ __CLASS__, 'ajax_import_handler' ] );
             add_action( 'wp_enqueue_scripts',    [ __CLASS__, 'enqueue_frontend_assets' ] );
             add_shortcode( 'google_reviews_widget', [ __CLASS__, 'shortcode_widget' ] );
+            add_filter( 'pll_get_post_types', [ __CLASS__, 'register_polylang_post_type' ], 10, 2 );
+            add_action( 'init', [ __CLASS__, 'register_wpml_post_type' ], 20 );
 
             // Exclude review-owned media from the Media Library.
             add_filter( 'ajax_query_attachments_args', [ __CLASS__, 'exclude_avatars_from_media_library' ] );
@@ -49,6 +51,18 @@
 
             // Clear cache when attachments are deleted
             add_action( 'delete_attachment',           [ __CLASS__, 'delete_review_avatars_cache' ] );
+        }
+
+        public static function register_polylang_post_type( array $post_types, bool $is_settings ): array {
+            $post_types['review'] = 'review';
+            return $post_types;
+        }
+
+        public static function register_wpml_post_type(): void {
+            if ( apply_filters( 'wpml_is_translated_post_type', null, 'review' ) ) {
+                return;
+            }
+            do_action( 'wpml_set_translation_mode_for_post_type', 'review', 'translate' );
         }
 
         // -------------------------------------------------------------------------
