@@ -83,6 +83,8 @@ Avatar URLs must pass `wp_http_validate_url()`, use HTTP/HTTPS, have a non-local
 
 String and object values from SerpAPI `images` are normalized, sideloaded as `review-image-{post_id}-{n}.jpg`, and stored in `_sp_review_images`. All review-owned attachments are excluded from normal Media Library grid/list views. Deleting a review permanently deletes its owned avatar and gallery attachments.
 
+The review editor exposes these attachments in a read-only **Review Photos** metabox. The files remain importer-owned; click a thumbnail to inspect the attachment, and use synchronization rather than the metabox to replace the gallery.
+
 With overwrite disabled, existing media is kept. With overwrite enabled, old media is replaced only after a successful new download, so a temporary network failure does not erase the existing gallery. Do not reuse these owned attachments manually without accounting for this lifecycle.
 
 ## Aggregate Options

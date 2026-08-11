@@ -86,6 +86,8 @@ URL должен пройти `wp_http_validate_url()`, использовать
 
 Строки и объекты из SerpAPI `images` нормализуются, загружаются как `review-image-{post_id}-{n}.jpg` и сохраняются в `_sp_review_images`. Все принадлежащие review медиа скрываются из обычных Media Library grid/list. Удаление review навсегда удаляет принадлежащие ему avatar и gallery attachments.
 
+В редакторе review эти attachments выводятся в read-only metabox **Review Photos**. По thumbnail можно перейти к attachment, а заменять gallery следует повторной синхронизацией, поскольку файлы принадлежат importer lifecycle.
+
 При выключенном overwrite существующие avatar и gallery остаются. При включённом они заменяются только после успешной новой загрузки; сетевой сбой не уничтожает старую gallery. Не используйте эти attachments вручную в других местах без учёта lifecycle.
 
 ## Агрегированные options

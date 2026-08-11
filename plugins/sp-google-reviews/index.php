@@ -2,7 +2,7 @@
     /**
      * Plugin Name: SP Google Reviews
      * Description: Imports Google reviews via SerpAPI into the Review CPT.
-     * Version:     1.3.0
+     * Version:     1.3.1
      * Requires PHP: 7.4
      */
 
@@ -41,6 +41,7 @@
             add_shortcode( 'google_reviews_widget', [ __CLASS__, 'shortcode_widget' ] );
             add_filter( 'pll_get_post_types', [ __CLASS__, 'register_polylang_post_type' ], 10, 2 );
             add_action( 'init', [ __CLASS__, 'register_wpml_post_type' ], 20 );
+            add_action( 'add_meta_boxes_review', [ __CLASS__, 'register_review_media_metabox' ] );
 
             // Exclude review-owned media from the Media Library.
             add_filter( 'ajax_query_attachments_args', [ __CLASS__, 'exclude_avatars_from_media_library' ] );
@@ -63,6 +64,55 @@
                 return;
             }
             do_action( 'wpml_set_translation_mode_for_post_type', 'review', 'translate' );
+        }
+
+        public static function register_review_media_metabox(): void {
+            add_meta_box(
+                    'sp-review-photos',
+                    'Review Photos',
+                    [ __CLASS__, 'render_review_media_metabox' ],
+                    'review',
+                    'normal',
+                    'default'
+            );
+        }
+
+        public static function render_review_media_metabox( WP_Post $post ): void {
+            $image_ids = array_values( array_filter( array_map(
+                    'absint',
+                    (array) get_post_meta( $post->ID, self::META_IMAGES, true )
+            ) ) );
+            ?>
+            <div class="sp-review-photos sp-admin-component" data-sp-admin-component>
+                <?php if ( $image_ids === [] ) : ?>
+                    <p class="description">No review photos have been imported. Run Google Reviews sync with overwrite enabled.</p>
+                <?php else : ?>
+                    <div class="sp-review-photos__grid">
+                        <?php foreach ( $image_ids as $image_id ) :
+                            $edit_url = get_edit_post_link( $image_id );
+                            $image    = wp_get_attachment_image( $image_id, 'medium', false, [
+                                    'class'   => 'sp-review-photos__image',
+                                    'loading' => 'lazy',
+                            ] );
+                            if ( ! is_string( $image ) || $image === '' ) {
+                                continue;
+                            }
+                            ?>
+                            <a class="sp-review-photos__item" href="<?php echo esc_url( $edit_url ?: '#' ); ?>">
+                                <?php echo $image; ?>
+                            </a>
+                        <?php endforeach; ?>
+                    </div>
+                    <p class="description"><?php echo esc_html( sprintf( '%d photo(s) imported from Google.', count( $image_ids ) ) ); ?></p>
+                <?php endif; ?>
+            </div>
+            <style>
+                #sp-review-photos .inside { margin: 0; padding: 16px; }
+                .sp-review-photos__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 12px; margin-bottom: 12px; }
+                .sp-review-photos__item { display: block; overflow: hidden; border: 1px solid #dcdcde; background: #f6f7f7; aspect-ratio: 1; }
+                .sp-review-photos__image { display: block; width: 100%; height: 100%; object-fit: cover; }
+            </style>
+            <?php
         }
 
         // -------------------------------------------------------------------------
