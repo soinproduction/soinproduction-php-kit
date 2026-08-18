@@ -11,6 +11,7 @@
 | `sp-cf7-mailchimp-sync` | Синхронизация с Mailchimp audience. |
 | `sp-cf7-webhook` | Исходящий HTTP webhook отдельной формы. |
 | `sp-cf7-redirects` | Redirect/modal metadata в разметке форм. |
+| `sp-cf7-messages` | Rich success/error сообщения отдельной формы в модальном редакторе. |
 | `sp-cf7-select-field` | Custom Select shortcode, form tag и mail tags. |
 | `sp-cf7-icon-generator` | Генератор UI Icon в редакторе CF7. |
 
@@ -24,6 +25,7 @@
 		'_sp-cf7-mailchimp-sync',
 		'_sp-cf7-webhook',
 		'sp-cf7-redirects',
+		'sp-cf7-messages',
 		'sp-cf7-select-field',
 		'sp-cf7-icon-generator',
 	],

@@ -258,12 +258,9 @@ function cf7_custom_metabox_scripts()
             $('input[name="cf7_action_type"]').on('change', function() {
                 var val = $(this).val();
                 $('.cf7-conditional-fields').removeClass('active');
-
-                if (val === 'redirect') {
-                    $('.cf7-redirect-fields').addClass('active');
-                } else if (val === 'modal') {
-                    $('.cf7-modal-fields').addClass('active');
-                }
+                $('.cf7-conditional-fields').filter(function() {
+                    return String($(this).data('cf7-action') || '') === String(val || '');
+                }).addClass('active');
             });
         });
     </script>
@@ -307,9 +304,21 @@ function cf7_custom_redirect_metabox($form_id)
 
     wp_nonce_field('cf7_redirect_settings', 'cf7_redirect_nonce');
 
-    $none_checked     = ($action_type === 'none' || $action_type === '') ? 'checked' : '';
-    $redirect_checked = ($action_type === 'redirect') ? 'checked' : '';
-    $modal_checked    = ($action_type === 'modal') ? 'checked' : '';
+    $action_type = $action_type !== '' ? sanitize_key((string) $action_type) : 'none';
+    $action_choices = apply_filters('sp_cf7_redirect_action_choices', array(
+        'none' => array(
+            'label'       => 'Default',
+            'description' => '',
+        ),
+        'redirect' => array(
+            'label'       => 'Redirect',
+            'description' => 'Go to page',
+        ),
+        'modal' => array(
+            'label'       => 'Modal',
+            'description' => 'Open popup',
+        ),
+    ), $form_id);
 ?>
 
     <div id="cf7-submit-action-metabox" class="sp-admin-component" data-sp-admin-component>
@@ -322,34 +331,34 @@ function cf7_custom_redirect_metabox($form_id)
         <div class="metabox-content">
             <div class="cf7-field-group">
                 <div class="cf7-radio-group">
-                    <div class="cf7-radio-item">
-                        <input type="radio" name="cf7_action_type" id="cf7_action_none"
-                            value="none" <?php echo $none_checked; ?>>
-                        <label for="cf7_action_none">
-                            Default
-                        </label>
-                    </div>
-                    <div class="cf7-radio-item">
-                        <input type="radio" name="cf7_action_type" id="cf7_action_redirect"
-                            value="redirect" <?php echo $redirect_checked; ?>>
-                        <label for="cf7_action_redirect">
-                            Redirect
-                            <span class="radio-description">Go to page</span>
-                        </label>
-                    </div>
-                    <div class="cf7-radio-item">
-                        <input type="radio" name="cf7_action_type" id="cf7_action_modal"
-                            value="modal" <?php echo $modal_checked; ?>>
-                        <label for="cf7_action_modal">
-                            Modal
-                            <span class="radio-description">Open popup</span>
-                        </label>
-                    </div>
+                    <?php foreach ((array) $action_choices as $choice_value => $choice) :
+                        $choice_value = sanitize_key((string) $choice_value);
+                        if ($choice_value === '' || ! is_array($choice)) continue;
+
+                        $choice_label = (string) ($choice['label'] ?? $choice_value);
+                        $choice_description = (string) ($choice['description'] ?? '');
+                        $choice_id = 'cf7_action_' . $choice_value;
+                        ?>
+                        <div class="cf7-radio-item">
+                            <input
+                                type="radio"
+                                name="cf7_action_type"
+                                id="<?php echo esc_attr($choice_id); ?>"
+                                value="<?php echo esc_attr($choice_value); ?>"
+                                <?php checked($action_type, $choice_value); ?>>
+                            <label for="<?php echo esc_attr($choice_id); ?>">
+                                <?php echo esc_html($choice_label); ?>
+                                <?php if ($choice_description !== '') : ?>
+                                    <span class="radio-description"><?php echo esc_html($choice_description); ?></span>
+                                <?php endif; ?>
+                            </label>
+                        </div>
+                    <?php endforeach; ?>
                 </div>
             </div>
 
             <!-- Redirect Options -->
-            <div class="cf7-conditional-fields cf7-redirect-fields <?php echo $action_type === 'redirect' ? 'active' : ''; ?>">
+            <div class="cf7-conditional-fields cf7-redirect-fields <?php echo $action_type === 'redirect' ? 'active' : ''; ?>" data-cf7-action="redirect">
                 <div class="cf7-select-group">
                     <label class="cf7-select-label" for="cf7_redirect_page">Thank You Page</label>
                     <select name="cf7_redirect_page" id="cf7_redirect_page">
@@ -364,7 +373,7 @@ function cf7_custom_redirect_metabox($form_id)
             </div>
 
             <!-- Modal Options -->
-            <div class="cf7-conditional-fields cf7-modal-fields <?php echo $action_type === 'modal' ? 'active' : ''; ?>">
+            <div class="cf7-conditional-fields cf7-modal-fields <?php echo $action_type === 'modal' ? 'active' : ''; ?>" data-cf7-action="modal">
                 <div class="cf7-select-group">
                     <label class="cf7-select-label" for="cf7_success_modal">Success Modal</label>
                     <select name="cf7_success_modal" id="cf7_success_modal">
@@ -389,6 +398,8 @@ function cf7_custom_redirect_metabox($form_id)
                     </select>
                 </div>
             </div>
+
+            <?php do_action('sp_cf7_redirect_action_fields', $form_id, $action_type); ?>
         </div>
     </div>
 
@@ -402,7 +413,13 @@ add_action('wpcf7_save_contact_form', 'cf7_save_redirect_settings', 10, 1);
 
 function cf7_save_redirect_settings($contact_form)
 {
-    if (! isset($_POST['cf7_redirect_nonce']) || ! wp_verify_nonce($_POST['cf7_redirect_nonce'], 'cf7_redirect_settings')) {
+    if (
+        ! isset($_POST['cf7_redirect_nonce'])
+        || ! wp_verify_nonce(
+            sanitize_text_field(wp_unslash($_POST['cf7_redirect_nonce'])),
+            'cf7_redirect_settings'
+        )
+    ) {
         return;
     }
 
@@ -412,14 +429,28 @@ function cf7_save_redirect_settings($contact_form)
         $form_id = absint($contact_form);
     }
 
-    if (! $form_id) {
+    if (! $form_id || ! current_user_can('wpcf7_edit_contact_form', $form_id)) {
         return;
     }
 
-    $action_type   = isset($_POST['cf7_action_type']) ? sanitize_text_field($_POST['cf7_action_type']) : 'none';
-    $redirect_page = isset($_POST['cf7_redirect_page']) ? esc_url_raw($_POST['cf7_redirect_page']) : '';
-    $success_modal = isset($_POST['cf7_success_modal']) ? absint($_POST['cf7_success_modal']) : '';
-    $error_modal   = isset($_POST['cf7_error_modal']) ? absint($_POST['cf7_error_modal']) : '';
+    $allowed_action_types = apply_filters('sp_cf7_redirect_action_types', array('none', 'redirect', 'modal'));
+    $allowed_action_types = array_values(array_filter(array_map('sanitize_key', (array) $allowed_action_types)));
+    $action_type = isset($_POST['cf7_action_type'])
+        ? sanitize_key(wp_unslash($_POST['cf7_action_type']))
+        : 'none';
+    if (! in_array($action_type, $allowed_action_types, true)) {
+        $action_type = 'none';
+    }
+
+    $redirect_page = isset($_POST['cf7_redirect_page'])
+        ? esc_url_raw(wp_unslash($_POST['cf7_redirect_page']))
+        : '';
+    $success_modal = isset($_POST['cf7_success_modal'])
+        ? absint(wp_unslash($_POST['cf7_success_modal']))
+        : 0;
+    $error_modal = isset($_POST['cf7_error_modal'])
+        ? absint(wp_unslash($_POST['cf7_error_modal']))
+        : 0;
 
     update_post_meta($form_id, '_cf7_action_type', $action_type);
     update_post_meta($form_id, '_cf7_redirect_page', $redirect_page);
