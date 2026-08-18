@@ -5,7 +5,7 @@ A collection of reusable WordPress administration UI components. Enable it with 
 | Module | Purpose |
 | --- | --- |
 | `sp-admin-ui-menu-heading` | Adds draggable, non-clickable headings to Appearance → Menus. |
-| `sp-admin-ui-text-column` | Adds read-only ACF text or native excerpt/description columns to post-type and taxonomy list tables. |
+| `sp-admin-ui-text-column` | Adds inline-editable ACF text or native excerpt/description columns to post-type and taxonomy list tables. |
 | `sp-admin-ui-thumbnail-column` | Adds editable image columns to post-type and taxonomy list tables. |
 | `sp-admin-ui-taxonomy-checklist` | Renders and saves a multi-select taxonomy metabox. |
 | `sp-admin-ui-taxonomy-radio` | Renders and saves a single-select taxonomy metabox. |
