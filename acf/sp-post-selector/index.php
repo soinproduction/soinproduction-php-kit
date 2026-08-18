@@ -15,7 +15,7 @@
 	 *       'modes'         => ['favorites', 'manual', 'all'],
 	 *       'default_mode'  => 'manual',
 	 *       'taxonomy'      => [],            // optional taxonomy filter
-	 *       'thumb_field'   => '',            // ACF image field name, empty = featured image
+	 *       'thumb_field'   => '',            // ACF image field name or ordered names, empty = featured image
 	 *       'min'           => 0,
 	 *       'max'           => 0,
 	 *   ]) )
@@ -312,20 +312,59 @@
 
 			/* ── Render single post item ───────────────────── */
 
-			public static function render_post_item( WP_Post $post, string $field_name, bool $is_selected, string $thumb_field = 'none' ): string {
-				$pid        = (int) $post->ID;
-				$hide_thumb = ( $thumb_field === 'none' );
-				$thumb      = '';
+			private static function normalize_thumb_fields( $thumb_field ): array {
+				$values = is_array( $thumb_field ) ? $thumb_field : [ $thumb_field ];
+				$fields = [];
+
+				foreach ( $values as $value ) {
+					if ( ! is_scalar( $value ) ) {
+						continue;
+					}
+
+					$raw   = trim( (string) $value );
+					$field = sanitize_key( $raw );
+
+					if ( $raw !== '' && $field === '' ) {
+						continue;
+					}
+
+					if ( ! in_array( $field, $fields, true ) ) {
+						$fields[] = $field;
+					}
+				}
+
+				return $fields ?: [ '' ];
+			}
+
+			public static function render_post_item( WP_Post $post, string $field_name, bool $is_selected, $thumb_field = 'none' ): string {
+				$pid          = (int) $post->ID;
+				$thumb_fields = self::normalize_thumb_fields( $thumb_field );
+				$hide_thumb   = count( $thumb_fields ) === 1 && $thumb_fields[0] === 'none';
+				$thumb        = '';
 
 				if ( ! $hide_thumb ) {
-					if ( $thumb_field !== '' && $thumb_field !== 'featured_image' && function_exists( 'get_field' ) ) {
-						$acf_img = get_field( $thumb_field, $pid );
-						if ( is_array( $acf_img ) && ! empty( $acf_img['sizes']['thumbnail'] ) ) {
-							$thumb = $acf_img['sizes']['thumbnail'];
-						} elseif ( is_array( $acf_img ) && ! empty( $acf_img['url'] ) ) {
-							$thumb = $acf_img['url'];
-						} elseif ( is_string( $acf_img ) && $acf_img !== '' ) {
-							$thumb = $acf_img;
+					foreach ( $thumb_fields as $candidate ) {
+						if ( $candidate === 'none' ) {
+							continue;
+						}
+
+						if ( $candidate === '' || $candidate === 'featured_image' ) {
+							$thumb = get_the_post_thumbnail_url( $pid, 'thumbnail' ) ?: '';
+						} elseif ( function_exists( 'get_field' ) ) {
+							$acf_img = get_field( $candidate, $pid );
+							if ( is_array( $acf_img ) && ! empty( $acf_img['sizes']['thumbnail'] ) ) {
+								$thumb = $acf_img['sizes']['thumbnail'];
+							} elseif ( is_array( $acf_img ) && ! empty( $acf_img['url'] ) ) {
+								$thumb = $acf_img['url'];
+							} elseif ( is_numeric( $acf_img ) ) {
+								$thumb = wp_get_attachment_image_url( absint( $acf_img ), 'thumbnail' ) ?: '';
+							} elseif ( is_string( $acf_img ) && $acf_img !== '' ) {
+								$thumb = $acf_img;
+							}
+						}
+
+						if ( $thumb !== '' ) {
+							break;
 						}
 					}
 
@@ -1299,7 +1338,10 @@ JS;
 		$taxonomy    = sanitize_key( $_POST['taxonomy'] ?? '' );
 		$term_id     = absint( $_POST['term_id'] ?? 0 );
 		$page        = max( 1, absint( $_POST['page'] ?? 1 ) );
-		$thumb_field = sanitize_key( $_POST['thumb_field'] ?? '' );
+		$raw_thumb_field = wp_unslash( $_POST['thumb_field'] ?? '' );
+		$thumb_field     = is_array( $raw_thumb_field )
+			? array_values( array_map( 'sanitize_key', array_filter( $raw_thumb_field, 'is_scalar' ) ) )
+			: sanitize_key( (string) $raw_thumb_field );
 		$per_page    = 20;
 
 		$args = [
@@ -1360,7 +1402,7 @@ JS;
 		 *       'post_type'     => ['team'],
 		 *       'return_format' => 'id',
 		 *       'modes'         => ['favorites', 'manual', 'all'],
-		 *       'thumb_field'   => 'image',
+		 *       'thumb_field'   => 'image', // string or ordered array of fallback fields
 		 *   ]) )
 		 */
 		function smart_relationship( string $name, array $args = [] ): StoutLogic\AcfBuilder\FieldsBuilder {
