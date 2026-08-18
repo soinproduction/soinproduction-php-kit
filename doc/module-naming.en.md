@@ -41,6 +41,6 @@ Bootstrapper accepts the following legacy aliases for backward compatibility. Ne
 
 ## Composite Modules
 
-The short Admin UI IDs map to `sp-admin-ui-menu-heading`, `sp-admin-ui-thumbnail-column`, `sp-admin-ui-taxonomy-checklist`, and `sp-admin-ui-taxonomy-radio`.
+The short Admin UI IDs map to `sp-admin-ui-menu-heading`, `sp-admin-ui-text-column`, `sp-admin-ui-thumbnail-column`, `sp-admin-ui-taxonomy-checklist`, and `sp-admin-ui-taxonomy-radio`.
 
 The short CF7 IDs map to `sp-cf7-core`, `sp-cf7-mail-viewer`, `sp-cf7-mailchimp-sync`, `sp-cf7-webhook`, `sp-cf7-redirects`, `sp-cf7-select-field`, and `sp-cf7-icon-generator`.

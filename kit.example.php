@@ -33,6 +33,7 @@ $plugins = [
 	'sp-svg-support',
 	'sp-admin-ui' => [
 		'sp-admin-ui-menu-heading',
+		'sp-admin-ui-text-column',
 		'sp-admin-ui-thumbnail-column',
 		'sp-admin-ui-taxonomy-checklist',
 		'sp-admin-ui-taxonomy-radio',
