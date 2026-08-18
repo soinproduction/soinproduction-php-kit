@@ -163,6 +163,7 @@ function cf7_custom_metabox_styles()
             font-weight: 400;
             color: var(--sp-admin-muted);
             margin-left: auto;
+            text-align: right;
         }
 
         #cf7-submit-action-metabox .cf7-conditional-fields {

@@ -270,7 +270,16 @@ final class SP_CF7_Messages
             'form_id' => $form_id,
         ], admin_url('admin-post.php'));
 
-        return wp_nonce_url($url, 'sp_cf7_messages_editor_' . $form_id);
+        return self::add_editor_nonce($url, $form_id);
+    }
+
+    private static function add_editor_nonce(string $url, int $form_id): string
+    {
+        return add_query_arg(
+            '_wpnonce',
+            wp_create_nonce('sp_cf7_messages_editor_' . $form_id),
+            $url
+        );
     }
 
     public static function render_admin_modal(): void
@@ -361,14 +370,20 @@ final class SP_CF7_Messages
         $form_id = isset($_GET['form_id']) ? absint(wp_unslash($_GET['form_id'])) : 0;
         if (
             $form_id <= 0
-            || ! isset($_GET['_wpnonce'])
+            || get_post_type($form_id) !== 'wpcf7_contact_form'
+            || ! current_user_can('wpcf7_edit_contact_form', $form_id)
+        ) {
+            wp_die(esc_html__('You are not allowed to edit these form messages.', 'sp-cf7'));
+        }
+
+        if (
+            ! isset($_GET['_wpnonce'])
             || ! wp_verify_nonce(
                 sanitize_text_field(wp_unslash($_GET['_wpnonce'])),
                 'sp_cf7_messages_editor_' . $form_id
             )
-            || ! current_user_can('wpcf7_edit_contact_form', $form_id)
         ) {
-            wp_die(esc_html__('You are not allowed to edit these form messages.', 'sp-cf7'));
+            wp_die(esc_html__('The message editor link has expired. Close the window and open it again.', 'sp-cf7'));
         }
 
         $message_post_id = self::get_or_create_settings_post($form_id, true);
@@ -398,7 +413,7 @@ final class SP_CF7_Messages
             'form_id' => $form_id,
             'saved'   => 1,
         ], admin_url('admin-post.php'));
-        $return_url = wp_nonce_url($return_url, 'sp_cf7_messages_editor_' . $form_id);
+        $return_url = self::add_editor_nonce($return_url, $form_id);
         ?>
         <style>
             html, body { min-height: 100%; background: #fff !important; }
