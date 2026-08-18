@@ -30,6 +30,7 @@
 ACF-типы и общие ACF-хелперы загружаются до регистрации групп полей конкретной темы.
 
 - **[sp-archive-builder](../acf/sp-archive-builder/README.ru.md)** — общий runtime и ACF-поле для архивов с фильтрами, сортировкой и AJAX.
+- **[sp-background-media](../acf/sp-background-media/README.ru.md)** — адаптивный фон из изображения/видео с позиционированием и overlay.
 - **[sp-icon-links](../acf/sp-icon-links/README.ru.md)** — сортируемый список ссылок с иконками.
 - **[sp-related-content](../acf/sp-related-content/README.ru.md)** — поле выбора связанных записей и хелперы для вывода.
 - **[sp-post-selector](../acf/sp-post-selector/README.ru.md)** — расширенное relationship-поле ACF.

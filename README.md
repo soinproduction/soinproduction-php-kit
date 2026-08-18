@@ -76,6 +76,7 @@ $platform = [
 ];
 
 $acf = [
+	'sp-background-media',
 	'sp-post-selector',
 	'_sp-term-selector',
 ];

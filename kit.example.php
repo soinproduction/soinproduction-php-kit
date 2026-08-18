@@ -18,6 +18,7 @@ $platform = [
 ];
 
 $acf = [
+	'_sp-background-media',
 	'_sp-icon-links',
 	'_sp-related-content',
 	'_sp-post-selector',
