@@ -469,3 +469,42 @@ if (! function_exists('sp_cf7_messages_get_message')) {
         return SP_CF7_Messages::get_message($form_id, $message_type, $format_value);
     }
 }
+
+if (! function_exists('display_form')) {
+    /**
+     * Render a CF7 form together with its custom success and error messages.
+     */
+    function display_form(int $form_id): void
+    {
+        $form_id = absint($form_id);
+        if ($form_id <= 0) return;
+
+        $success_message = sp_cf7_messages_get_message($form_id, 'success_message');
+        $error_message = sp_cf7_messages_get_message($form_id, 'error_message');
+        ?>
+        <div class="form-box" data-cf7-message-wrapper data-cf7-form-id="<?php echo esc_attr($form_id); ?>">
+            <div data-cf7-message-form>
+                <?php echo do_shortcode('[contact-form-7 id="' . $form_id . '"]'); ?>
+            </div>
+
+            <div
+                class="form-message form-message--success"
+                data-cf7-message="success"
+                role="status"
+                aria-live="polite"
+                style="display:none;">
+                <?php echo wp_kses_post($success_message); ?>
+            </div>
+
+            <div
+                class="form-message form-message--error"
+                data-cf7-message="error"
+                role="alert"
+                aria-live="assertive"
+                style="display:none;">
+                <?php echo wp_kses_post($error_message); ?>
+            </div>
+        </div>
+        <?php
+    }
+}
