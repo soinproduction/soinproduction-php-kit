@@ -282,6 +282,7 @@ if (! function_exists('sp_archive_filter_availability')) {
             'filters'       => [],
             'filter_values' => [],
             'sort'          => 'newest',
+            'lang'          => '',
         ]);
 
         $filters = sp_archive_normalize_filters($args['filters']);
@@ -341,6 +342,7 @@ if (! function_exists('sp_archive_filter_availability')) {
                     'per_page'      => 1,
                     'paged'         => 1,
                     'sort'          => $args['sort'],
+                    'lang'          => $args['lang'],
                 ]);
 
                 $query_args['posts_per_page'] = 1;
@@ -359,7 +361,7 @@ if (! function_exists('sp_archive_filter_availability')) {
 
 if (! function_exists('sp_archive_query_args')) {
     function sp_archive_query_args(array $args = []): array {
-        $args      = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'newest', 'favorite_first' => false]);
+        $args      = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'newest', 'favorite_first' => false, 'lang' => '']);
         $post_type = sanitize_key((string) $args['post_type']);
         $post_type = post_type_exists($post_type) ? $post_type : 'post';
         $per_page  = max(1, (int) $args['per_page']);
@@ -377,6 +379,8 @@ if (! function_exists('sp_archive_query_args')) {
         if (count($tax_query) > 1) { $tax_query['relation'] = 'AND'; }
         $orderby = $order['orderby'];
         $qa = ['post_type' => $post_type, 'post_status' => 'publish', 'ignore_sticky_posts' => true, 'no_found_rows' => false, 'posts_per_page' => $per_page, 'paged' => $paged];
+        $language = sanitize_key((string) $args['lang']);
+        if ($language !== '') { $qa['lang'] = $language; }
         if (is_array($orderby)) { $qa['orderby'] = $orderby; } else { $qa['orderby'] = $orderby; $qa['order'] = $order['order']; }
         if ($tax_query) { $qa['tax_query'] = $tax_query; }
 
@@ -407,7 +411,7 @@ if (! function_exists('sp_archive_query_args')) {
 
 if (! function_exists('sp_archive_prepare_query')) {
     function sp_archive_prepare_query(array $args = []): array {
-        $args = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'newest', 'pagination_mode' => 'pagination', 'favorite_first' => false]);
+        $args = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'newest', 'pagination_mode' => 'pagination', 'favorite_first' => false, 'lang' => '']);
         $mode        = sp_archive_normalize_mode($args['pagination_mode']);
         $per_page    = max(1, (int) $args['per_page']);
         $paged       = max(1, (int) $args['paged']);
@@ -417,7 +421,7 @@ if (! function_exists('sp_archive_prepare_query')) {
             $query_page  = 1;
             $query_limit = $per_page * $paged;
         }
-        $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $args['filter_values'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first'])]);
+        $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $args['filter_values'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang']]);
         $query        = new WP_Query($qa);
         $total_found  = (int) $query->found_posts;
         $total_pages  = max(1, (int) ceil($total_found / $per_page));
@@ -430,7 +434,7 @@ if (! function_exists('sp_archive_prepare_query')) {
                 $query_page  = 1;
                 $query_limit = $per_page * $current_page;
             }
-            $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $args['filter_values'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first'])]);
+            $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $args['filter_values'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang']]);
             $query        = new WP_Query($qa);
             $total_found  = (int) $query->found_posts;
             $total_pages  = max(1, (int) ceil($total_found / $per_page));
@@ -804,6 +808,7 @@ add_action('acf/include_field_types', function (): void {
                 'disable_empty'   => 0,
                 'filters'         => [],
                 'per_page'        => 9,
+                'per_page_choices' => [],
                 'pagination_type' => 'pagination',
                 'order_mode'      => 'newest',
             ];
@@ -961,20 +966,7 @@ add_action('acf/include_field_types', function (): void {
             $value = sp_archive_builder_normalize($field['value'] ?? []);
             $name  = $field['name'];
 
-            $per_page_choices = [
-                3  => '3 ' . __('posts', 'acf'),
-                4  => '4 ' . __('posts', 'acf'),
-                6  => '6 ' . __('posts', 'acf'),
-                8  => '8 ' . __('posts', 'acf'),
-                9  => '9 ' . __('posts', 'acf'),
-                12 => '12 ' . __('posts', 'acf'),
-                15 => '15 ' . __('posts', 'acf'),
-                16 => '16 ' . __('posts', 'acf'),
-                20 => '20 ' . __('posts', 'acf'),
-                24 => '24 ' . __('posts', 'acf'),
-                30 => '30 ' . __('posts', 'acf'),
-                -1 => __('Show all', 'acf'),
-            ];
+            $per_page_choices = self::per_page_choices($field);
             $post_type = $field['post_type'] ?? 'post';
             $choices = sp_archive_builder_post_type_choices();
             $post_type_label = $choices[$post_type] ?? $post_type;
@@ -1036,10 +1028,17 @@ add_action('acf/include_field_types', function (): void {
         public function update_value($value, $post_id, array $field)
         {
             $value = is_array($value) ? $value : [];
+			$per_page = max(-1, (int) ($value['per_page'] ?? ($field['per_page'] ?? 9)));
+			$allowed  = array_keys(self::per_page_choices($field));
+
+			if (! in_array($per_page, $allowed, true)) {
+				$default  = (int) ($field['per_page'] ?? 9);
+				$per_page = in_array($default, $allowed, true) ? $default : (int) reset($allowed);
+			}
 
             // Only save the editor-level choices to post meta
             return [
-                'per_page'        => max(-1, (int) ($value['per_page'] ?? 9)),
+                'per_page'        => $per_page,
                 'pagination_type' => in_array($value['pagination_type'] ?? '', ['pagination', 'load_more', 'infinity_scroll'], true) ? $value['pagination_type'] : 'pagination',
                 'order_mode'      => in_array($value['order_mode'] ?? '', ['newest', 'oldest', 'az', 'za', 'menu_order'], true) ? $value['order_mode'] : 'newest',
             ];
@@ -1048,6 +1047,13 @@ add_action('acf/include_field_types', function (): void {
         public function format_value($value, $post_id, array $field)
         {
             $value = is_array($value) ? $value : [];
+			$allowed = array_keys(self::per_page_choices($field));
+			$current = (int) ($value['per_page'] ?? ($field['per_page'] ?? 9));
+
+			if (! in_array($current, $allowed, true)) {
+				$default           = (int) ($field['per_page'] ?? 9);
+				$value['per_page'] = in_array($default, $allowed, true) ? $default : (int) reset($allowed);
+			}
 
             // Merge field-level structure settings
             $value['post_type']       = $field['post_type'] ?? 'post';
@@ -1071,6 +1077,44 @@ add_action('acf/include_field_types', function (): void {
 
             return sp_archive_builder_normalize($value);
         }
+
+		private static function per_page_choices(array $field): array
+		{
+			$configured = isset($field['per_page_choices']) && is_array($field['per_page_choices'])
+				? $field['per_page_choices']
+				: [];
+
+			if ($configured) {
+				$choices = [];
+
+				foreach ($configured as $value) {
+					$value = (int) $value;
+
+					if ($value > 0) {
+						$choices[$value] = $value . ' ' . __('posts', 'acf');
+					}
+				}
+
+				if ($choices) {
+					return $choices;
+				}
+			}
+
+			return [
+				3  => '3 ' . __('posts', 'acf'),
+				4  => '4 ' . __('posts', 'acf'),
+				6  => '6 ' . __('posts', 'acf'),
+				8  => '8 ' . __('posts', 'acf'),
+				9  => '9 ' . __('posts', 'acf'),
+				12 => '12 ' . __('posts', 'acf'),
+				15 => '15 ' . __('posts', 'acf'),
+				16 => '16 ' . __('posts', 'acf'),
+				20 => '20 ' . __('posts', 'acf'),
+				24 => '24 ' . __('posts', 'acf'),
+				30 => '30 ' . __('posts', 'acf'),
+				-1 => __('Show all', 'acf'),
+			];
+		}
 
         public function input_admin_enqueue_scripts(): void
         {
@@ -1915,6 +1959,9 @@ if (! function_exists('sp_archive_setup')) {
         $current_per_page = isset($_GET[$per_page_arg])
             ? max(1, (int) wp_unslash($_GET[$per_page_arg]))
             : (int) $config['per_page'];
+        $language = function_exists('pll_current_language')
+            ? sanitize_key((string) pll_current_language('slug'))
+            : '';
 
         $paged = sp_archive_current_page($page_arg, $url_page_arg);
 
@@ -1927,6 +1974,7 @@ if (! function_exists('sp_archive_setup')) {
             'sort'            => $current_sort,
             'pagination_mode' => $config['pagination_type'],
             'favorite_first'   => $favorite_first,
+            'lang'             => $language,
         ]);
 
         $filter_availability = ! empty($config['disable_empty'])
@@ -1935,6 +1983,7 @@ if (! function_exists('sp_archive_setup')) {
                 'filters'       => $archive_filters,
                 'filter_values' => $current_filters,
                 'sort'          => $current_sort,
+                'lang'          => $language,
             ])
             : [];
 
@@ -1954,6 +2003,7 @@ if (! function_exists('sp_archive_setup')) {
             'sort_arg'         => $sort_arg,
             'per_page_arg'     => $per_page_arg,
             'favorite_first'   => $favorite_first,
+            'lang'             => $language,
         ]);
 
         $pagination_data = array_merge(
@@ -1995,6 +2045,7 @@ if (! function_exists('sp_archive_setup')) {
             'sort_arg'        => $sort_arg,
             'per_page_arg'    => $per_page_arg,
             'favorite_first'   => $favorite_first,
+            'lang'             => $language,
         ]);
     }
 }
@@ -2043,6 +2094,7 @@ if (! function_exists('sp_archive_config')) {
             'reset'           => $ctx['reset'],
             'disable_empty'   => $ctx['config']['disable_empty'],
             'favorite_first'  => $ctx['favorite_first'],
+            'lang'            => $ctx['lang'],
             'filter_availability' => $ctx['filter_availability'],
             'current_page'    => $ctx['current_page'],
             'total_pages'     => $ctx['total_pages'],
@@ -2372,6 +2424,36 @@ if (! function_exists('sp_archive_ajax_query')) {
             wp_send_json_error(['code' => 'config_expired', 'reload' => true]);
         }
 
+        $language = sanitize_key((string) ($config['lang'] ?? ''));
+        if ($language === '' && function_exists('pll_languages_list')) {
+            $referer_path = trim((string) wp_parse_url((string) wp_get_referer(), PHP_URL_PATH), '/');
+            $path_language = sanitize_key((string) strtok($referer_path, '/'));
+            $languages = array_map('sanitize_key', (array) pll_languages_list(['fields' => 'slug']));
+
+            $language = in_array($path_language, $languages, true)
+                ? $path_language
+                : (function_exists('pll_default_language') ? sanitize_key((string) pll_default_language('slug')) : '');
+        }
+        if ($language !== '' && function_exists('PLL')) {
+            $language_object = PLL()->model->get_language($language);
+            if ($language_object) {
+                PLL()->curlang = $language_object;
+                if (! empty($language_object->locale)) {
+                    $locale = (string) $language_object->locale;
+                    switch_to_locale($locale);
+
+                    if (defined('THEME_SLUG') && defined('THEME_DIR')) {
+                        unload_textdomain(THEME_SLUG);
+                        load_textdomain(
+                            THEME_SLUG,
+                            trailingslashit(THEME_DIR) . 'languages/' . $locale . '.mo',
+                            $locale
+                        );
+                    }
+                }
+            }
+        }
+
         // All sensitive values come from server-side config
         $post_type        = $config['post_type'];
         $card_template    = $config['card_template'];
@@ -2404,6 +2486,7 @@ if (! function_exists('sp_archive_ajax_query')) {
             'sort'            => $sort,
             'pagination_mode' => $pagination_type,
             'favorite_first'   => $favorite_first,
+            'lang'             => $language,
         ]);
 
         $query        = $query_data['query'];
@@ -2415,12 +2498,16 @@ if (! function_exists('sp_archive_ajax_query')) {
                 'filters'       => $archive_filters,
                 'filter_values' => $filter_values,
                 'sort'          => $sort,
+                'lang'          => $language,
             ])
             : [];
 
         // Render cards HTML
         $html = sp_archive_render_cards($query, $card_template, [
             'empty_template' => $empty_template,
+			'template_args'  => [
+				'archive_is_append' => $current_page > 1 && in_array($pagination_type, ['load_more', 'infinity_scroll'], true),
+			],
         ]);
 
         // Render pagination (embed token so next pagination click works too)

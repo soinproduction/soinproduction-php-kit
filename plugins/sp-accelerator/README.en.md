@@ -145,7 +145,7 @@ Page and object cache roots must first pass a non-bypassable dedicated-directory
 
 Page-cache persistence requires positive proof on every server. The normalized storage path must be outside the actual document root and the WordPress roots checked by the module, or `SP_ACCELERATOR_CACHE_WEB_PROTECTED` must explicitly assert a web-server deny that was verified independently. Without that assertion, a missing, invalid, or ambiguous actual document root makes page cache fail closed.
 
-The preferred configuration is one writable private directory outside every web-accessible root. It also becomes the default object-cache directory unless a more specific constant is set:
+By default the module selects a stable site-specific `sp-accelerator-<hash>` directory next to the actual document root, outside the web-accessible tree. Page and object cache share it. A constant is needed only for an unusual hosting layout or an explicit override:
 
 ```php
 define( 'SP_ACCELERATOR_CACHE_DIR', '/absolute/private/path/sp-accelerator-cache' );
@@ -169,13 +169,13 @@ This is a security assertion, not a deny rule. Object-cache persistence in that 
 
 ## SQLite persistent object cache
 
-By default, the optional managed `object-cache.php` stores persistent WordPress cache groups in `wp-content/cache/sp-accelerator/object-cache.sqlite` using WAL mode; the storage constants above may move it. It supports expiry, multiple operations, atomic numeric updates, global and non-persistent groups, runtime/group flushing, multisite blog scopes, and a namespace derived from `WP_CACHE_KEY_SALT` or the installation identity.
+By default, the managed `object-cache.php` stores persistent WordPress cache groups in the automatically selected private SP Accelerator directory using WAL mode; the storage constants above may override it. It supports expiry, multiple operations, atomic numeric updates, global and non-persistent groups, runtime/group flushing, multisite blog scopes, and a namespace derived from `WP_CACHE_KEY_SALT` or the installation identity.
 
 The manager checks the bundled template hash and reports missing, current, outdated, unavailable, or foreign status. Installation requires PHP `sqlite3`; a foreign object-cache drop-in is never overwritten or removed. Database, WAL, and SHM files are hardened, and storage receives server deny rules.
 
 Object-cache persistence follows the same dedicated-name, broad-root rejection, and positive-proof rule on every server. Its normalized directory must be outside the actual document root and checked WordPress roots, or `SP_ACCELERATOR_OBJECT_CACHE_WEB_PROTECTED` must assert a separately verified deny. Otherwise a new installation is refused and an installed managed drop-in leaves SQLite persistence disabled.
 
-The preferred configuration places storage in a writable private directory outside every web-accessible root. Define an absolute path in `wp-config.php` before installing/updating the drop-in:
+The preferred private directory is selected automatically. To override it before installing/updating the drop-in, define an absolute path in `wp-config.php`:
 
 ```php
 define( 'SP_ACCELERATOR_OBJECT_CACHE_DIR', '/absolute/path/outside/web-root/sp-accelerator-cache' );
@@ -260,15 +260,15 @@ On a theme switch, SP Accelerator first persists runtime disable, then disables 
 ## Deployment
 
 1. Deploy PHP Kit through one Composer-locked version. Do not merge different releases file by file.
-2. Open **Settings → Accelerator**, save settings, and test an anonymous page without drop-ins.
-3. Add `WP_CACHE` to `wp-config.php`. Use a dedicated absolute `SP_ACCELERATOR_CACHE_DIR` whose basename contains `sp-accelerator`; never point it at a broad WordPress, document, or system-temp root. Place it outside the actual document root or verify the exact cache-directory deny and set the matching assertion. Define `SP_ACCELERATOR_DOCUMENT_ROOT` when the server/CLI value is not the real public root; then install/update the managed `advanced-cache.php`.
+2. Open **Settings → Accelerator** as an administrator. The module automatically selects private storage, adds its reversible `WP_CACHE` marker to a writable `wp-config.php`, installs/updates both managed drop-ins, and adds static-rule markers on Apache/LiteSpeed.
+3. If the actual document root cannot be determined or required files are read-only, define `SP_ACCELERATOR_DOCUMENT_ROOT`/`SP_ACCELERATOR_CACHE_DIR` or fix permissions. Foreign constants, drop-ins, and broken marker blocks are never overwritten automatically.
 4. Verify a `MISS` followed by a `HIT`, including security headers and GZIP behavior.
-5. On Apache/LiteSpeed, use the separate **Static assets / compression** card to install the root `.htaccess` marker after reviewing the existing file. On Nginx, apply equivalent rules manually at the server or CDN.
-6. Install/update the SQLite object cache only after checking extension and write permissions. Its dedicated absolute path must also contain `sp-accelerator` and must not be a broad reserved root. Configure it outside the actual document root, or install and verify an explicit deny for `/wp-content/cache/sp-accelerator/` before defining `SP_ACCELERATOR_OBJECT_CACHE_WEB_PROTECTED`.
+5. On Nginx, apply equivalent static-asset rules manually at the server or CDN because `.htaccess` is ignored.
+6. Confirm that hosting PHP provides `sqlite3`; without it page cache keeps working while object cache remains unavailable.
 7. Run **Warm site**, inspect its failed URLs, then run repeated Lighthouse tests against agreed warm control pages.
 8. Purge any CDN or reverse-proxy cache after changing these layers.
 
-The installed drop-ins live in `wp-content`, outside the theme. A theme upload cannot update them. Revisit **Settings → Accelerator** after module deployment and update any card marked outdated. Never copy a development `wp-content/cache` directory to production.
+The installed drop-ins live in `wp-content`, outside the theme. Revisit **Settings → Accelerator** after module deployment; the module compares hashes and automatically updates only files it owns. Never copy a development `wp-content/cache` directory to production.
 
 ## Troubleshooting
 
@@ -278,7 +278,7 @@ The installed drop-ins live in `wp-content`, outside the theme. A theme upload c
 - **Warm URL reports “not cached”:** inspect that page for personalization, cookies, non-200 status, unsupported response headers, or a configured path exclusion.
 - **Warm URL returns a redirect, HIT, or STALE:** expected failure; redirects are not followed and only HTTP 200 plus `X-SP-Cache: MISS` is accepted. Queue the final canonical URL and inspect why the authenticated request did not rebuild it.
 - **Stale content:** clear cache, confirm the invalidating hook fired, and inspect CDN/reverse-proxy caching.
-- **Drop-in will not install:** check `WP_CACHE`, `wp-content` permissions, existing-file ownership, and whether the bundled template is current.
+- **Drop-in will not install:** check `wp-config.php` and `wp-content` permissions, an explicit `WP_CACHE=false`, existing-file ownership, and whether the bundled template is current.
 - **Page-cache storage is not proven safe:** first verify a dedicated absolute basename containing `sp-accelerator` and that the path is not a broad reserved root. Then verify `SP_ACCELERATOR_DOCUMENT_ROOT`; prefer storage outside the actual public root, or verify the exact deny before setting `SP_ACCELERATOR_CACHE_WEB_PROTECTED`.
 - **Static rules show `manual`:** the server is Nginx; configure asset TTL and Brotli/GZIP outside WordPress because `.htaccess` has no effect.
 - **Static rules show `readonly`:** grant WordPress safe write access temporarily or ask the hosting provider to install the displayed policy; do not overwrite the root file blindly.

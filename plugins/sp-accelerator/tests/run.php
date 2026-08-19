@@ -30,12 +30,14 @@ function sp_test_remove_tree( string $directory ): void {
 if ( isset( $argv[1] ) && $argv[1] === 'dropin-case' ) {
 	$case = isset( $argv[2] ) ? (string) $argv[2] : '';
 	$base = isset( $argv[3] ) ? (string) $argv[3] : '';
-	@mkdir( $base . '/wp-content/cache/sp-accelerator', 0755, true );
 
-	define( 'ABSPATH', $base . '/public/' );
+	define( 'ABSPATH', $case === 'ancestor-root-protected' ? $base . '/sp-accelerator-root/public/' : $base . '/public/' );
 	define( 'WP_CONTENT_DIR', $base . '/wp-content' );
+	@mkdir( ABSPATH, 0755, true );
 	if ( $case === 'ancestor-root-protected' ) {
-		define( 'SP_ACCELERATOR_CACHE_DIR', $base );
+		define( 'SP_ACCELERATOR_CACHE_DIR', $base . '/sp-accelerator-root' );
+	} elseif ( $case === 'unsafe-storage' ) {
+		define( 'SP_ACCELERATOR_CACHE_DIR', $base . '/wp-content/cache/sp-accelerator' );
 	}
 	if ( $case !== 'unsafe-storage' ) {
 		define( 'SP_ACCELERATOR_CACHE_WEB_PROTECTED', true );
@@ -46,6 +48,7 @@ if ( isset( $argv[1] ) && $argv[1] === 'dropin-case' ) {
 		'REQUEST_URI'    => '/hello/',
 		'HTTP_HOST'      => 'example.test',
 		'HTTPS'          => 'on',
+		'DOCUMENT_ROOT'  => $base . '/public',
 	];
 	if ( $case === 'unsafe-storage' ) {
 		$_SERVER['DOCUMENT_ROOT'] = $base;
@@ -87,7 +90,10 @@ if ( isset( $argv[1] ) && $argv[1] === 'dropin-case' ) {
 
 	$current  = in_array( $case, [ 'previous', 'expired-previous' ], true ) ? 'g2' : 'g1';
 	$previous = in_array( $case, [ 'previous', 'expired-previous' ], true ) ? 'g1' : '';
-	$cache_root = defined( 'SP_ACCELERATOR_CACHE_DIR' ) ? (string) SP_ACCELERATOR_CACHE_DIR : $base . '/wp-content/cache/sp-accelerator';
+	$cache_root = defined( 'SP_ACCELERATOR_CACHE_DIR' )
+		? (string) SP_ACCELERATOR_CACHE_DIR
+		: $base . '/sp-accelerator-' . substr( hash( 'sha256', rtrim( str_replace( '\\', '/', (string) ABSPATH ), '/' ) ), 0, 12 );
+	@mkdir( $cache_root, 0755, true );
 	$config = [
 		'signature'                => 'SP Accelerator cache config',
 		'enabled'                  => true,
@@ -369,7 +375,7 @@ $nonce_ttls = $ttl_method->invoke( $cache, '<!doctype html><html><body><input na
 unset( $GLOBALS['sp_test_nonce_life'] );
 sp_test_assert( is_array( $nonce_ttls ) && $nonce_ttls['ttl'] === 1 && $nonce_ttls['stale_ttl'] === 0, 'short nonce_life must clamp page TTL and disable stale serving' );
 
-foreach ( [ 'object-cache.php', 'control-plane.php', 'markup.php', 'cache-lock.php', 'server.php' ] as $external_suite ) {
+foreach ( [ 'object-cache.php', 'control-plane.php', 'dropin-config.php', 'markup.php', 'cache-lock.php', 'server.php' ] as $external_suite ) {
 	list( $external_output, $external_error, $external_status ) = sp_test_external_suite( __DIR__ . '/' . $external_suite );
 	$external_detail = trim( $external_error . ' ' . $external_output );
 	sp_test_assert( $external_status === 0, $external_suite . ' regression failed: ' . $external_detail );

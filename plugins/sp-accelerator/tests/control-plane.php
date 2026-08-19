@@ -173,11 +173,40 @@ if ( $sp_cp_mode !== 'run' ) {
 	}
 }
 
+if ( $sp_cp_mode === 'automatic-storage' ) {
+	@mkdir( $fixture . '/web/site', 0755, true );
+	@mkdir( $fixture . '/web/wp-content', 0755, true );
+	define( 'ABSPATH', $fixture . '/web/site/' );
+	define( 'WP_CONTENT_DIR', $fixture . '/web/wp-content' );
+	define( 'WEEK_IN_SECONDS', 604800 );
+	define( 'DAY_IN_SECONDS', 86400 );
+	define( 'HOUR_IN_SECONDS', 3600 );
+	$_SERVER['DOCUMENT_ROOT'] = $fixture . '/web';
+
+	require $sp_cp_root . '/includes/class-config.php';
+	require $sp_cp_root . '/includes/class-object-cache.php';
+	$config   = new SP_Accelerator_Config();
+	$expected = $fixture . '/sp-accelerator-' . substr( hash( 'sha256', rtrim( str_replace( '\\', '/', (string) ABSPATH ), '/' ) ), 0, 12 );
+	$object   = new SP_Accelerator_Object_Cache( $config, $sp_cp_root );
+	$checks   = [];
+	$checks['automatic cache root is deterministic'] = $config->cache_root() === $expected;
+	$checks['automatic cache root is outside document root'] = strpos( $config->cache_root() . '/', rtrim( (string) $_SERVER['DOCUMENT_ROOT'], '/' ) . '/' ) !== 0;
+	$checks['automatic cache root passes fail-closed policy'] = $config->storage_is_safe_for_server() === true;
+	$checks['automatic cache root synchronizes'] = $config->sync_dropin_config() === true;
+	$stored = json_decode( (string) file_get_contents( $config->config_file() ), true );
+	$checks['automatic config is enabled and signed'] = is_array( $stored )
+		&& ! empty( $stored['enabled'] )
+		&& (string) ( $stored['signature'] ?? '' ) === 'SP Accelerator cache config';
+	$checks['object cache shares automatic private root'] = $object->database_path() === $expected . '/object-cache.sqlite';
+	sp_cp_finish( $checks );
+}
+
 if ( $sp_cp_mode === 'storage' ) {
 	@mkdir( $fixture . '/web/site', 0755, true );
 	@mkdir( $fixture . '/web/wp-content/cache/sp-accelerator/pages/g1', 0755, true );
 	define( 'ABSPATH', $fixture . '/web/site/' );
 	define( 'WP_CONTENT_DIR', $fixture . '/web/wp-content' );
+	define( 'SP_ACCELERATOR_CACHE_DIR', $fixture . '/web/wp-content/cache/sp-accelerator' );
 	define( 'WEEK_IN_SECONDS', 604800 );
 	define( 'DAY_IN_SECONDS', 86400 );
 	define( 'HOUR_IN_SECONDS', 3600 );
@@ -332,7 +361,7 @@ if ( $sp_cp_mode === 'warmer' ) {
 	define( 'ABSPATH', $fixture . '/' );
 	if ( ! class_exists( 'SP_Accelerator_Config', false ) ) {
 		class SP_Accelerator_Config {
-			public const VERSION = '2.0.0';
+			public const VERSION = '2.1.0';
 			public function enabled( string $key = 'enabled' ): bool { return true; }
 			public function get( string $key, $default = null ) { return $key === 'generation' ? 'g1' : $default; }
 			public function warm_request_token( string $url ): string { return 'control-plane-signed:' . hash( 'sha256', $url ); }
@@ -403,7 +432,7 @@ register_shutdown_function( 'sp_cp_remove_tree', $sp_cp_fixture );
 
 $failures = [];
 $checks   = 0;
-foreach ( [ 'storage', 'migration', 'migration-unsafe-sqlite', 'runtime-disable', 'warmer' ] as $case ) {
+foreach ( [ 'automatic-storage', 'storage', 'migration', 'migration-unsafe-sqlite', 'runtime-disable', 'warmer' ] as $case ) {
 	$case_root = $sp_cp_fixture . '/' . $case;
 	@mkdir( $case_root, 0700, true );
 	$result  = sp_cp_run( [ PHP_BINARY, $sp_cp_script, $case, $case_root ] );

@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class SP_Accelerator_Config {
 	public const OPTION_KEY = 'sp_accelerator_settings';
-	public const VERSION    = '2.0.0';
+	public const VERSION    = '2.1.0';
 	public const RUNTIME_DISABLED_KEY = 'sp_accelerator_runtime_disabled';
 	private const CACHE_SIGNATURE = 'SP Accelerator cache config';
 	private const WARM_TOKEN_TTL = 300;
@@ -277,7 +277,22 @@ final class SP_Accelerator_Config {
 				return $candidate;
 			}
 		}
-		return trailingslashit( WP_CONTENT_DIR ) . 'cache/sp-accelerator';
+
+		return $this->automatic_cache_root();
+	}
+
+	private function automatic_cache_root(): string {
+		$document_root = defined( 'SP_ACCELERATOR_DOCUMENT_ROOT' )
+			? trim( (string) SP_ACCELERATOR_DOCUMENT_ROOT )
+			: trim( (string) ( $_SERVER['DOCUMENT_ROOT'] ?? '' ) );
+		$anchor = $this->is_absolute_non_root_path( $document_root )
+			? $document_root
+			: (string) ABSPATH;
+		$anchor = rtrim( str_replace( '\\', '/', $anchor ), '/' );
+		$site   = rtrim( str_replace( '\\', '/', (string) ABSPATH ), '/' );
+		$suffix = substr( hash( 'sha256', $site ), 0, 12 );
+
+		return rtrim( dirname( $anchor ), '/\\' ) . DIRECTORY_SEPARATOR . 'sp-accelerator-' . $suffix;
 	}
 
 	public function legacy_cache_root(): string {

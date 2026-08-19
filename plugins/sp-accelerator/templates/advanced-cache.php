@@ -11,7 +11,18 @@ if ( ! defined( 'ABSPATH' ) || ! defined( 'WP_CONTENT_DIR' ) ) {
 $sp_config_root = defined( 'SP_ACCELERATOR_CACHE_DIR' ) ? rtrim( trim( (string) SP_ACCELERATOR_CACHE_DIR ), '/\\' ) : '';
 $sp_config_root_is_absolute = strpos( $sp_config_root, '/' ) === 0 || preg_match( '/^[a-zA-Z]:[\\\\\/]/', $sp_config_root ) === 1;
 if ( ! $sp_config_root_is_absolute || $sp_config_root === DIRECTORY_SEPARATOR || dirname( $sp_config_root ) === $sp_config_root ) {
-	$sp_config_root = rtrim( WP_CONTENT_DIR, '/\\' ) . '/cache/sp-accelerator';
+	$sp_automatic_document_root = defined( 'SP_ACCELERATOR_DOCUMENT_ROOT' )
+		? trim( (string) SP_ACCELERATOR_DOCUMENT_ROOT )
+		: trim( (string) ( $_SERVER['DOCUMENT_ROOT'] ?? '' ) );
+	$sp_automatic_root_is_absolute = strpos( $sp_automatic_document_root, '/' ) === 0 || preg_match( '/^[a-zA-Z]:[\\\\\/]/', $sp_automatic_document_root ) === 1;
+	$sp_automatic_anchor = $sp_automatic_root_is_absolute
+		&& $sp_automatic_document_root !== DIRECTORY_SEPARATOR
+		&& dirname( rtrim( $sp_automatic_document_root, '/\\' ) ) !== rtrim( $sp_automatic_document_root, '/\\' )
+			? $sp_automatic_document_root
+			: (string) ABSPATH;
+	$sp_site_path = rtrim( str_replace( '\\', '/', (string) ABSPATH ), '/' );
+	$sp_config_root = rtrim( dirname( rtrim( $sp_automatic_anchor, '/\\' ) ), '/\\' )
+		. DIRECTORY_SEPARATOR . 'sp-accelerator-' . substr( hash( 'sha256', $sp_site_path ), 0, 12 );
 }
 $sp_config_file = $sp_config_root . '/config.json';
 if ( ! is_readable( $sp_config_file ) ) {

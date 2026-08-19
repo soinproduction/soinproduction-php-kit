@@ -137,6 +137,33 @@ if ( ! class_exists( 'SP_Accelerator_Plugin' ) ) {
 			if ( $needs_sync ) {
 				$this->config->sync_dropin_config();
 			}
+
+			if ( function_exists( 'current_user_can' ) && current_user_can( 'manage_options' ) ) {
+				$this->auto_configure();
+			}
+		}
+
+		private function auto_configure(): void {
+			if ( $this->config->has_legacy_accelerator_conflict()
+				|| $this->config->runtime_is_disabled()
+				|| ! $this->config->storage_is_safe_for_server() ) {
+				return;
+			}
+
+			$dropin_status = $this->dropin->status();
+			if ( in_array( $dropin_status['code'], [ 'missing', 'replaceable', 'outdated', 'inactive' ], true ) ) {
+				$this->dropin->install();
+			}
+
+			$object_status = $this->object_cache->status();
+			if ( in_array( $object_status['code'], [ 'missing', 'outdated' ], true ) ) {
+				$this->object_cache->install();
+			}
+
+			$server_status = $this->server->status();
+			if ( in_array( $server_status['code'], [ 'missing', 'outdated' ], true ) ) {
+				$this->server->install();
+			}
 		}
 
 		/** @param mixed ...$unused */
@@ -169,7 +196,9 @@ if ( ! class_exists( 'SP_Accelerator_Plugin' ) ) {
 			$this->config->activate_runtime();
 			if ( ! $this->config->sync_dropin_config() ) {
 				sp_accelerator_boot_failure( 'Theme activation: failed to synchronize page-cache config.' );
+				return;
 			}
+			$this->auto_configure();
 		}
 
 		/** @param true|WP_Error $result */

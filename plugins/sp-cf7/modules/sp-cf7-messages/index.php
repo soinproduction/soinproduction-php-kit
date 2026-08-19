@@ -483,12 +483,12 @@ if (! function_exists('display_form')) {
         $error_message = sp_cf7_messages_get_message($form_id, 'error_message');
         ?>
         <div class="form-box" data-cf7-message-wrapper data-cf7-form-id="<?php echo esc_attr($form_id); ?>">
-            <div data-cf7-message-form>
+            <div data-cf7-message-form class="w-[100%]">
                 <?php echo do_shortcode('[contact-form-7 id="' . $form_id . '"]'); ?>
             </div>
 
             <div
-                class="form-message form-message--success"
+                class="form-message form-message--success editor color-[var(--cl-a)]"
                 data-cf7-message="success"
                 role="status"
                 aria-live="polite"
@@ -497,7 +497,7 @@ if (! function_exists('display_form')) {
             </div>
 
             <div
-                class="form-message form-message--error"
+                class="form-message form-message--error editor color-[var(--cl-a)]"
                 data-cf7-message="error"
                 role="alert"
                 aria-live="assertive"

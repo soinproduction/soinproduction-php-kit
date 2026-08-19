@@ -6,8 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Installs conservative static-asset caching and compression rules on Apache /
- * LiteSpeed. The operation is explicit in wp-admin and uses WordPress markers,
- * so foreign .htaccess directives are never replaced.
+ * LiteSpeed. Automatic maintenance uses WordPress markers, so foreign
+ * .htaccess directives are never replaced.
  */
 final class SP_Accelerator_Server {
 	private const MARKER = 'SP Accelerator';
