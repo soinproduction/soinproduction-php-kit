@@ -198,6 +198,7 @@ if ( $sp_cp_mode === 'automatic-storage' ) {
 		&& ! empty( $stored['enabled'] )
 		&& (string) ( $stored['signature'] ?? '' ) === 'SP Accelerator cache config';
 	$checks['object cache shares automatic private root'] = $object->database_path() === $expected . '/object-cache.sqlite';
+	$checks['object cache accepts page-cache protection files'] = $object->install() === true;
 	sp_cp_finish( $checks );
 }
 

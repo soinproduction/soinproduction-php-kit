@@ -25,11 +25,13 @@ final class WP_Error {
 }
 
 final class SP_Accelerator_Config {
+	public $atomic_writes_enabled = true;
 	public function has_legacy_accelerator_conflict(): bool { return false; }
 	public function storage_is_safe_for_server(): bool { return true; }
 	public function storage_safety_message(): string { return ''; }
 	public function sync_dropin_config(): bool { return true; }
 	public function atomic_write( string $path, string $contents ): bool {
+		if ( ! $this->atomic_writes_enabled ) { return false; }
 		$temp = tempnam( dirname( $path ), '.sp-test-' );
 		return is_string( $temp )
 			&& file_put_contents( $temp, $contents ) !== false
@@ -43,7 +45,8 @@ $wp_config = ABSPATH . 'wp-config.php';
 $original  = "<?php\n// foreign configuration\n\$foreign = true;\nrequire_once ABSPATH . 'wp-settings.php';\n";
 file_put_contents( $wp_config, $original );
 
-$dropin = new SP_Accelerator_Dropin( new SP_Accelerator_Config(), dirname( __DIR__ ) );
+$config = new SP_Accelerator_Config();
+$dropin = new SP_Accelerator_Dropin( $config, dirname( __DIR__ ) );
 $checks = [];
 $checks['WP_CACHE marker is inserted automatically'] = $dropin->ensure_wp_cache_enabled() === true;
 $configured = (string) file_get_contents( $wp_config );
@@ -57,6 +60,12 @@ copy( dirname( __DIR__ ) . '/templates/advanced-cache.php', $dropin->path() );
 $checks['managed drop-in is removable'] = $dropin->remove() === true && ! is_file( $dropin->path() );
 $checks['removing managed drop-in removes owned WP_CACHE marker'] = strpos( (string) file_get_contents( $wp_config ), 'SP Accelerator WP_CACHE' ) === false;
 $checks['removal still preserves foreign wp-config bytes'] = strpos( (string) file_get_contents( $wp_config ), "// foreign configuration\n\$foreign = true;" ) !== false;
+
+file_put_contents( $wp_config, "<?php\nrequire_once( ABSPATH . '/wp-settings.php' );\n" );
+$config->atomic_writes_enabled = false;
+$checks['writable wp-config falls back when atomic rename is unavailable'] = $dropin->ensure_wp_cache_enabled() === true
+	&& strpos( (string) file_get_contents( $wp_config ), 'BEGIN SP Accelerator WP_CACHE' ) !== false;
+$config->atomic_writes_enabled = true;
 
 $broken = "<?php\n/* BEGIN SP Accelerator WP_CACHE */\nrequire_once ABSPATH . 'wp-settings.php';\n";
 file_put_contents( $wp_config, $broken );

@@ -182,7 +182,7 @@ final class SP_Accelerator_Dropin {
 				: new WP_Error( 'wp_cache_marker_broken', 'Marker SP Accelerator в wp-config.php повреждён; автоматическая запись остановлена.' );
 		}
 
-		$matched = preg_match( '~^[ \\t]*require_once\\s+ABSPATH\\s*\\.\\s*[\'\"]wp-settings\\.php[\'\"]\\s*;~m', $contents, $anchor, PREG_OFFSET_CAPTURE );
+		$matched = preg_match( '~^[ \\t]*require_once\\s*(?:\\(\\s*)?ABSPATH\\s*\\.\\s*[\'\"]/?wp-settings\\.php[\'\"]\\s*\\)?\\s*;~m', $contents, $anchor, PREG_OFFSET_CAPTURE );
 		if ( $matched !== 1 || ! isset( $anchor[0][1] ) ) {
 			return new WP_Error( 'wp_config_anchor_missing', 'В wp-config.php не найдена строка подключения wp-settings.php; автоматическая запись остановлена.' );
 		}
@@ -193,7 +193,7 @@ final class SP_Accelerator_Dropin {
 			. "}\n"
 			. self::WP_CACHE_END . "\n\n";
 		$updated = substr_replace( $contents, $block, (int) $anchor[0][1], 0 );
-		if ( ! $this->config->atomic_write( $path, $updated ) ) {
+		if ( ! $this->write_wp_config( $path, $contents, $updated ) ) {
 			return new WP_Error( 'wp_config_write_failed', 'Не удалось автоматически записать WP_CACHE в wp-config.php.' );
 		}
 
@@ -219,8 +219,32 @@ final class SP_Accelerator_Dropin {
 
 		$pattern = '~(?:\\r?\\n)?' . preg_quote( self::WP_CACHE_BEGIN, '~' ) . '.*?' . preg_quote( self::WP_CACHE_END, '~' ) . '(?:\\r?\\n){0,2}~s';
 		$updated = preg_replace( $pattern, "\n", $contents, 1, $count );
-		if ( ! is_string( $updated ) || $count !== 1 || ! $this->config->atomic_write( $path, $updated ) ) {
+		if ( ! is_string( $updated ) || $count !== 1 || ! $this->write_wp_config( $path, $contents, $updated ) ) {
 			return new WP_Error( 'wp_cache_marker_remove_failed', 'Drop-in удалён, но его WP_CACHE marker не удалось безопасно удалить из wp-config.php.' );
+		}
+
+		return true;
+	}
+
+	private function write_wp_config( string $path, string $original, string $updated ): bool {
+		if ( $this->config->atomic_write( $path, $updated ) ) {
+			return true;
+		}
+
+		// Some hosts allow changing wp-config.php but not creating a temporary
+		// sibling file. In that case an atomic rename is impossible, so use a
+		// locked in-place write and restore the original bytes if verification
+		// fails.
+		if ( ! is_writable( $path ) || file_put_contents( $path, $updated, LOCK_EX ) !== strlen( $updated ) ) {
+			@file_put_contents( $path, $original, LOCK_EX );
+			return false;
+		}
+
+		clearstatcache( true, $path );
+		$verified = file_get_contents( $path );
+		if ( ! is_string( $verified ) || ! hash_equals( hash( 'sha256', $updated ), hash( 'sha256', $verified ) ) ) {
+			@file_put_contents( $path, $original, LOCK_EX );
+			return false;
 		}
 
 		return true;
