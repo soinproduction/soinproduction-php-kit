@@ -619,7 +619,16 @@ if ( ! class_exists( 'WP_Object_Cache', false ) ) {
 				return trim( (string) SP_ACCELERATOR_CACHE_DIR );
 			}
 
-			return rtrim( WP_CONTENT_DIR, '/\\' ) . '/cache/sp-accelerator';
+			$document_root = defined( 'SP_ACCELERATOR_DOCUMENT_ROOT' )
+				? trim( (string) SP_ACCELERATOR_DOCUMENT_ROOT )
+				: trim( (string) ( $_SERVER['DOCUMENT_ROOT'] ?? '' ) );
+			$anchor = $this->is_absolute_non_root_path( $document_root )
+				? $document_root
+				: (string) ABSPATH;
+			$site   = rtrim( str_replace( '\\', '/', (string) ABSPATH ), '/' );
+
+			return rtrim( dirname( rtrim( $anchor, '/\\' ) ), '/\\' )
+				. DIRECTORY_SEPARATOR . 'sp-accelerator-' . substr( hash( 'sha256', $site ), 0, 12 );
 		}
 
 		private function storage_is_safe_for_server( string $directory ): bool {

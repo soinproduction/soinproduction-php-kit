@@ -50,7 +50,7 @@ Available editor modes:
 Initial mode for a new value.
 
 `thumb_field`:
-ACF image field name used for thumbnails. Use `none` to hide thumbnails. Empty/`featured_image` falls back to featured image.
+ACF image field name used for thumbnails. An ordered array of field names is also supported; the first image found is used. Use `none` to hide thumbnails. Empty/`featured_image` falls back to the featured image.
 
 `min`, `max`:
 Selection limits. `max => 0` means unlimited.
@@ -111,4 +111,3 @@ wp_ajax_sp_srel_search
 ```
 
 The request is protected by the `sp_srel` nonce generated in the field config.
-

@@ -5,6 +5,7 @@
 | Модуль | Назначение |
 | --- | --- |
 | `sp-admin-ui-menu-heading` | Добавляет перетаскиваемые некликабельные заголовки в «Внешний вид → Меню». |
+| `sp-admin-ui-text-column` | Добавляет редактируемые по месту колонки ACF-текста или нативного excerpt/description в списки записей и терминов. |
 | `sp-admin-ui-thumbnail-column` | Добавляет редактируемые колонки изображений в списки записей и терминов. |
 | `sp-admin-ui-taxonomy-checklist` | Выводит и сохраняет metabox таксономии с множественным выбором. |
 | `sp-admin-ui-taxonomy-radio` | Выводит и сохраняет metabox таксономии с одиночным выбором. |
@@ -15,6 +16,7 @@
 'plugins' => [
 	'sp-admin-ui' => [
 		'sp-admin-ui-menu-heading',
+		'sp-admin-ui-text-column',
 		'_sp-admin-ui-thumbnail-column',
 		'sp-admin-ui-taxonomy-checklist',
 		'_sp-admin-ui-taxonomy-radio',

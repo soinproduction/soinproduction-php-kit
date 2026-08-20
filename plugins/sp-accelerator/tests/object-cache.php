@@ -140,6 +140,7 @@ function sp_oc_test_boot( string $root, string $salt, string $dropin ): void {
 	define( 'ABSPATH', $root . '/public/' );
 	define( 'WP_CONTENT_DIR', $root . '/wp-content' );
 	define( 'WP_CACHE_KEY_SALT', $salt );
+	define( 'SP_ACCELERATOR_CACHE_DIR', $root . '/wp-content/cache/sp-accelerator' );
 	// The fixture is a CLI-only temporary directory with no web route. Production
 	// deployments must make this assertion only after checking the real path/deny.
 	define( 'SP_ACCELERATOR_OBJECT_CACHE_WEB_PROTECTED', true );

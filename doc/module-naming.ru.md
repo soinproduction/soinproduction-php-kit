@@ -41,6 +41,6 @@
 
 ## Составные модули
 
-Короткие Admin UI IDs сопоставляются с `sp-admin-ui-menu-heading`, `sp-admin-ui-thumbnail-column`, `sp-admin-ui-taxonomy-checklist` и `sp-admin-ui-taxonomy-radio`.
+Короткие Admin UI IDs сопоставляются с `sp-admin-ui-menu-heading`, `sp-admin-ui-text-column`, `sp-admin-ui-thumbnail-column`, `sp-admin-ui-taxonomy-checklist` и `sp-admin-ui-taxonomy-radio`.
 
 Короткие CF7 IDs сопоставляются с `sp-cf7-core`, `sp-cf7-mail-viewer`, `sp-cf7-mailchimp-sync`, `sp-cf7-webhook`, `sp-cf7-redirects`, `sp-cf7-select-field` и `sp-cf7-icon-generator`.

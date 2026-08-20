@@ -6,6 +6,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class SP_Accelerator_Dropin {
 	private const SIGNATURE = 'SP Accelerator Drop-in';
+	private const WP_CACHE_BEGIN = '/* BEGIN SP Accelerator WP_CACHE */';
+	private const WP_CACHE_END   = '/* END SP Accelerator WP_CACHE */';
 
 	/** @var SP_Accelerator_Config */
 	private $config;
@@ -101,6 +103,11 @@ final class SP_Accelerator_Dropin {
 			return new WP_Error( 'foreign_dropin', $status['detail'] );
 		}
 
+		$wp_cache = $this->ensure_wp_cache_enabled();
+		if ( is_wp_error( $wp_cache ) ) {
+			return $wp_cache;
+		}
+
 		$source = $this->plugin_dir . '/templates/advanced-cache.php';
 		if ( ! is_readable( $source ) ) {
 			return new WP_Error( 'missing_source', 'Не найден шаблон advanced-cache.php.' );
@@ -144,13 +151,116 @@ final class SP_Accelerator_Dropin {
 				return new WP_Error( 'restore_failed', 'Не удалось восстановить резервную копию прежнего drop-in.' );
 			}
 			@unlink( $this->backup_path() );
-			return true;
-		}
-
-		if ( ! @unlink( $this->path() ) ) {
+		} elseif ( ! @unlink( $this->path() ) ) {
 			return new WP_Error( 'remove_failed', 'Не удалось удалить advanced-cache.php.' );
 		}
 
+		return $this->remove_wp_cache_marker();
+	}
+
+	/** @return true|WP_Error */
+	public function ensure_wp_cache_enabled() {
+		if ( defined( 'WP_CACHE' ) ) {
+			return WP_CACHE
+				? true
+				: new WP_Error( 'wp_cache_forced_off', 'WP_CACHE явно задан как false. Автоматическая настройка не будет менять чужую константу.' );
+		}
+
+		$path = $this->wp_config_path();
+		if ( $path === '' || ! is_readable( $path ) || ! is_writable( $path ) ) {
+			return new WP_Error( 'wp_config_readonly', 'Не удалось автоматически включить WP_CACHE: wp-config.php не найден или недоступен для записи.' );
+		}
+
+		$contents = file_get_contents( $path );
+		if ( ! is_string( $contents ) ) {
+			return new WP_Error( 'wp_config_read_failed', 'Не удалось прочитать wp-config.php для включения WP_CACHE.' );
+		}
+		if ( strpos( $contents, self::WP_CACHE_BEGIN ) !== false || strpos( $contents, self::WP_CACHE_END ) !== false ) {
+			$complete = strpos( $contents, self::WP_CACHE_BEGIN ) !== false && strpos( $contents, self::WP_CACHE_END ) !== false;
+			return $complete
+				? true
+				: new WP_Error( 'wp_cache_marker_broken', 'Marker SP Accelerator в wp-config.php повреждён; автоматическая запись остановлена.' );
+		}
+
+		$matched = preg_match( '~^[ \\t]*require_once\\s*(?:\\(\\s*)?ABSPATH\\s*\\.\\s*[\'\"]/?wp-settings\\.php[\'\"]\\s*\\)?\\s*;~m', $contents, $anchor, PREG_OFFSET_CAPTURE );
+		if ( $matched !== 1 || ! isset( $anchor[0][1] ) ) {
+			return new WP_Error( 'wp_config_anchor_missing', 'В wp-config.php не найдена строка подключения wp-settings.php; автоматическая запись остановлена.' );
+		}
+
+		$block = self::WP_CACHE_BEGIN . "\n"
+			. "if ( ! defined( 'WP_CACHE' ) ) {\n"
+			. "\tdefine( 'WP_CACHE', true );\n"
+			. "}\n"
+			. self::WP_CACHE_END . "\n\n";
+		$updated = substr_replace( $contents, $block, (int) $anchor[0][1], 0 );
+		if ( ! $this->write_wp_config( $path, $contents, $updated ) ) {
+			return new WP_Error( 'wp_config_write_failed', 'Не удалось автоматически записать WP_CACHE в wp-config.php.' );
+		}
+
+		$verified = file_get_contents( $path );
+		return is_string( $verified ) && strpos( $verified, self::WP_CACHE_BEGIN ) !== false
+			? true
+			: new WP_Error( 'wp_config_verify_failed', 'WP_CACHE был записан, но проверка wp-config.php не прошла.' );
+	}
+
+	/** @return true|WP_Error */
+	private function remove_wp_cache_marker() {
+		$path = $this->wp_config_path();
+		if ( $path === '' || ! is_readable( $path ) ) {
+			return true;
+		}
+		$contents = file_get_contents( $path );
+		if ( ! is_string( $contents ) || strpos( $contents, self::WP_CACHE_BEGIN ) === false ) {
+			return true;
+		}
+		if ( ! is_writable( $path ) || strpos( $contents, self::WP_CACHE_END ) === false ) {
+			return new WP_Error( 'wp_cache_marker_remove_failed', 'Drop-in удалён, но его WP_CACHE marker не удалось безопасно удалить из wp-config.php.' );
+		}
+
+		$pattern = '~(?:\\r?\\n)?' . preg_quote( self::WP_CACHE_BEGIN, '~' ) . '.*?' . preg_quote( self::WP_CACHE_END, '~' ) . '(?:\\r?\\n){0,2}~s';
+		$updated = preg_replace( $pattern, "\n", $contents, 1, $count );
+		if ( ! is_string( $updated ) || $count !== 1 || ! $this->write_wp_config( $path, $contents, $updated ) ) {
+			return new WP_Error( 'wp_cache_marker_remove_failed', 'Drop-in удалён, но его WP_CACHE marker не удалось безопасно удалить из wp-config.php.' );
+		}
+
 		return true;
+	}
+
+	private function write_wp_config( string $path, string $original, string $updated ): bool {
+		if ( $this->config->atomic_write( $path, $updated ) ) {
+			return true;
+		}
+
+		// Some hosts allow changing wp-config.php but not creating a temporary
+		// sibling file. In that case an atomic rename is impossible, so use a
+		// locked in-place write and restore the original bytes if verification
+		// fails.
+		if ( ! is_writable( $path ) || file_put_contents( $path, $updated, LOCK_EX ) !== strlen( $updated ) ) {
+			@file_put_contents( $path, $original, LOCK_EX );
+			return false;
+		}
+
+		clearstatcache( true, $path );
+		$verified = file_get_contents( $path );
+		if ( ! is_string( $verified ) || ! hash_equals( hash( 'sha256', $updated ), hash( 'sha256', $verified ) ) ) {
+			@file_put_contents( $path, $original, LOCK_EX );
+			return false;
+		}
+
+		return true;
+	}
+
+	private function wp_config_path(): string {
+		$candidates = [
+			rtrim( (string) ABSPATH, '/\\' ) . DIRECTORY_SEPARATOR . 'wp-config.php',
+			dirname( rtrim( (string) ABSPATH, '/\\' ) ) . DIRECTORY_SEPARATOR . 'wp-config.php',
+		];
+		foreach ( array_unique( $candidates ) as $candidate ) {
+			if ( is_file( $candidate ) ) {
+				return $candidate;
+			}
+		}
+
+		return '';
 	}
 }

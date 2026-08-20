@@ -66,6 +66,7 @@
 		}
 
 		$requested_slug = '';
+		$requested_language = '';
 
 		if ( ! empty( $query->query['name'] ) ) {
 			$requested_slug = (string) $query->query['name'];
@@ -77,7 +78,17 @@
 			}
 
 			if ( str_contains( $requested_path, '/' ) ) {
-				return;
+				$path_parts = array_values( array_filter( explode( '/', $requested_path ) ) );
+				$languages  = function_exists( 'pll_languages_list' )
+					? array_map( 'sanitize_key', (array) pll_languages_list( [ 'fields' => 'slug' ] ) )
+					: [];
+
+				if ( count( $path_parts ) !== 2 || ! in_array( sanitize_key( $path_parts[0] ), $languages, true ) ) {
+					return;
+				}
+
+				$requested_language = sanitize_key( $path_parts[0] );
+				$requested_path     = $path_parts[1];
 			}
 
 			$requested_slug = basename( $requested_path );
@@ -104,6 +115,14 @@
 		$post = get_page_by_path( $requested_slug, OBJECT, $post_types );
 		if ( ! ( $post instanceof WP_Post ) ) {
 			return;
+		}
+
+		if ( $requested_language !== '' && function_exists( 'pll_get_post_language' ) ) {
+			if ( pll_get_post_language( $post->ID, 'slug' ) !== $requested_language ) {
+				return;
+			}
+
+			$query->set( 'lang', $requested_language );
 		}
 
 		$query->set( 'post_type', $post->post_type );

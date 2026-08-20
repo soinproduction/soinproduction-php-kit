@@ -145,7 +145,7 @@ Page и object cache roots сначала проходят обязательн�
 
 Page-cache persistence требует положительного доказательства на любом сервере. Нормализованный storage path должен находиться за пределами фактического document root и проверяемых модулем WordPress roots, либо `SP_ACCELERATOR_CACHE_WEB_PROTECTED` должен явно подтверждать независимо проверенный server deny. Без этого assertion отсутствующий, некорректный или неоднозначный фактический document root переводит page cache в fail-closed.
 
-Предпочтительно использовать один writable private-каталог за пределами всех доступных из web roots. По умолчанию он станет storage и для page cache, и для object cache:
+По умолчанию модуль сам выбирает стабильный site-specific каталог `sp-accelerator-<hash>` рядом с фактическим document root, то есть за пределами доступного из web дерева. Этот путь используется одновременно для page cache и object cache. Константа нужна только для нестандартного hosting layout или явного override:
 
 ```php
 define( 'SP_ACCELERATOR_CACHE_DIR', '/absolute/private/path/sp-accelerator-cache' );
@@ -169,13 +169,13 @@ define( 'SP_ACCELERATOR_CACHE_WEB_PROTECTED', true );
 
 ## Persistent object cache на SQLite
 
-По умолчанию опциональный управляемый `object-cache.php` хранит постоянные группы WordPress в `wp-content/cache/sp-accelerator/object-cache.sqlite` в WAL mode; описанные выше storage-константы могут перенести database. Поддерживаются expiration, multiple operations, атомарные numeric updates, global/non-persistent groups, runtime/group flush, multisite blog scopes и namespace на основе `WP_CACHE_KEY_SALT` либо идентичности установки.
+По умолчанию управляемый `object-cache.php` хранит постоянные группы WordPress в автоматически выбранном приватном каталоге SP Accelerator в WAL mode; описанные выше storage-константы могут переопределить путь. Поддерживаются expiration, multiple operations, атомарные numeric updates, global/non-persistent groups, runtime/group flush, multisite blog scopes и namespace на основе `WP_CACHE_KEY_SALT` либо идентичности установки.
 
 Менеджер сравнивает hash встроенного шаблона и различает отсутствующий, актуальный, устаревший, недоступный и чужой drop-in. Для установки нужен PHP `sqlite3`; чужой object-cache drop-in не перезаписывается и не удаляется. Права файлов database/WAL/SHM ужесточаются, каталог получает server deny rules.
 
 Object-cache persistence применяет те же проверки dedicated-name, запрет широкого root и positive-proof policy на любом сервере. Его нормализованный каталог должен находиться за пределами фактического document root и проверяемых WordPress roots, либо `SP_ACCELERATOR_OBJECT_CACHE_WEB_PROTECTED` должен подтверждать отдельно проверенный deny. Иначе новая установка отклоняется, а установленный управляемый drop-in оставляет SQLite persistence выключенным.
 
-Предпочтительный вариант — writable private-каталог за пределами всех доступных из web roots. До установки/обновления drop-in задайте абсолютный путь в `wp-config.php`:
+Предпочтительный приватный каталог выбирается автоматически. При необходимости переопределить его до установки/обновления drop-in задайте абсолютный путь в `wp-config.php`:
 
 ```php
 define( 'SP_ACCELERATOR_OBJECT_CACHE_DIR', '/absolute/path/outside/web-root/sp-accelerator-cache' );
@@ -260,15 +260,15 @@ Legacy SQLite обрабатывается отдельно от page entries. `
 ## Ввод в эксплуатацию
 
 1. Разворачивайте PHP Kit одной версией, зафиксированной Composer lock. Не смешивайте разные релизы пофайловой FTP-загрузкой.
-2. Откройте **Настройки → Accelerator**, сохраните настройки и проверьте анонимную страницу без drop-ins.
-3. Добавьте `WP_CACHE` в `wp-config.php`. Используйте отдельный абсолютный `SP_ACCELERATOR_CACHE_DIR`, basename которого содержит `sp-accelerator`; никогда не указывайте широкий WordPress, document или system-temp root. Вынесите каталог за фактический document root либо проверьте точный deny и задайте соответствующий assertion. Если server/CLI не сообщает реальный публичный root, определите `SP_ACCELERATOR_DOCUMENT_ROOT`; затем установите/обновите управляемый `advanced-cache.php`.
+2. Откройте **Настройки → Accelerator** под администратором. Модуль автоматически выберет приватный storage, добавит собственный обратимый `WP_CACHE` marker в writable `wp-config.php`, установит/обновит оба управляемых drop-in и добавит marker статических rules на Apache/LiteSpeed.
+3. Если фактический document root определить нельзя либо нужные файлы недоступны для записи, задайте `SP_ACCELERATOR_DOCUMENT_ROOT`/`SP_ACCELERATOR_CACHE_DIR` или исправьте права; чужие константы, drop-in и повреждённые marker-блоки автоматически не переписываются.
 4. Проверьте последовательность `MISS` → `HIT`, включая security headers и GZIP.
-5. На Apache/LiteSpeed через отдельную карточку **Static assets / compression** установите корневой `.htaccess` marker после просмотра существующего файла. На Nginx задайте эквивалентные rules вручную на сервере или CDN.
-6. Установите/обновите SQLite object cache только после проверки extension и прав записи. Его отдельный абсолютный путь также должен содержать `sp-accelerator` и не быть широким reserved root. Вынесите каталог за фактический document root либо установите и проверьте явный deny для `/wp-content/cache/sp-accelerator/`, а уже затем определяйте `SP_ACCELERATOR_OBJECT_CACHE_WEB_PROTECTED`.
+5. На Nginx задайте эквивалентные static asset rules вручную на сервере или CDN: `.htaccess` там не применяется.
+6. Убедитесь, что hosting PHP имеет `sqlite3`; без extension page cache продолжит работать, а object cache останется недоступным.
 7. Запустите **Warm site**, изучите failed URLs, затем проведите повторные Lighthouse-тесты согласованных прогретых страниц.
 8. После изменения слоёв очистите CDN/reverse-proxy cache.
 
-Установленные drop-ins находятся в `wp-content`, вне темы. Загрузка темы их не обновляет. После deployment модуля снова откройте **Настройки → Accelerator** и обновите карточки со статусом outdated. Никогда не переносите development-каталог `wp-content/cache` на production.
+Установленные drop-ins находятся в `wp-content`, вне темы. После deployment снова откройте **Настройки → Accelerator**: модуль сравнит hash и автоматически обновит только собственные файлы. Никогда не переносите development-каталог `wp-content/cache` на production.
 
 Для быстрой проверки дважды запросите один URL в logged-out режиме:
 
@@ -287,7 +287,7 @@ curl -I https://example.com/control-page/
 - **Warm URL сообщает «не попала в page cache»:** ищите персонализацию, cookies, non-200, запрещённые response headers или path exclusion.
 - **Warm URL вернул redirect, HIT или STALE:** это ожидаемый failure; redirects не переходятся, принимается только HTTP 200 плюс `X-SP-Cache: MISS`. Добавьте в очередь конечный канонический URL и выясните, почему authenticated request не перестроил страницу.
 - **Устаревший контент:** очистите кеш, проверьте invalidation hook и внешний CDN/reverse proxy.
-- **Drop-in не устанавливается:** проверьте `WP_CACHE`, права `wp-content`, владельца существующего файла и актуальность встроенного шаблона.
+- **Drop-in не устанавливается:** проверьте права `wp-config.php` и `wp-content`, явно заданный `WP_CACHE=false`, владельца существующего файла и актуальность встроенного шаблона.
 - **Безопасность page-cache storage не доказана:** сначала проверьте отдельный абсолютный basename с `sp-accelerator` и убедитесь, что путь не является широким reserved root. Затем проверьте `SP_ACCELERATOR_DOCUMENT_ROOT`; предпочтительно вынесите storage за фактический public root либо проверьте точный deny до определения `SP_ACCELERATOR_CACHE_WEB_PROTECTED`.
 - **Static rules показывают `manual`:** сервер работает на Nginx; настройте asset TTL и Brotli/GZIP вне WordPress, потому что `.htaccess` там не действует.
 - **Static rules показывают `readonly`:** временно дайте WordPress безопасные права записи либо попросите хостинг установить эту policy; не перезаписывайте корневой файл вслепую.

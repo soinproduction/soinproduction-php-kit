@@ -441,7 +441,13 @@ final class SP_Accelerator_Object_Cache {
 					return false;
 				}
 				$matches_current = hash_equals( hash( 'sha256', $contents ), hash( 'sha256', $current ) );
-				$matches_legacy  = isset( $legacy[ $name ] ) && hash_equals( hash( 'sha256', $legacy[ $name ] ), hash( 'sha256', $current ) );
+				$matches_legacy  = false;
+				foreach ( (array) ( $legacy[ $name ] ?? [] ) as $legacy_contents ) {
+					if ( hash_equals( hash( 'sha256', $legacy_contents ), hash( 'sha256', $current ) ) ) {
+						$matches_legacy = true;
+						break;
+					}
+				}
 				if ( $matches_current || $matches_legacy ) {
 					if ( ! @chmod( $path, 0644 ) ) {
 						return false;
@@ -480,7 +486,7 @@ final class SP_Accelerator_Object_Cache {
 
 		$known = $this->protection_files();
 		foreach ( $this->legacy_protection_files() as $name => $contents ) {
-			$known[ $name ] = isset( $known[ $name ] ) ? [ $known[ $name ], $contents ] : [ $contents ];
+			$known[ $name ] = array_merge( isset( $known[ $name ] ) ? [ $known[ $name ] ] : [], $contents );
 		}
 		foreach ( $known as $name => $contents ) {
 			$path = trailingslashit( $directory ) . $name;
@@ -510,18 +516,24 @@ final class SP_Accelerator_Object_Cache {
 	/** @return array<string,string> */
 	private function protection_files(): array {
 		return [
-			'.htaccess' => "# SP Accelerator cache protection\nOptions -Indexes\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nOrder allow,deny\nDeny from all\n</IfModule>\n",
-			'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- SP Accelerator cache protection -->\n<configuration><system.webServer><security><authorization><clear/><add accessType=\"Deny\" users=\"*\"/></authorization></security></system.webServer></configuration>\n",
+			'.htaccess' => "# SP Accelerator cache protection\nOptions -Indexes\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\n",
+			'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- SP Accelerator cache protection -->\n<configuration><system.webServer><security><authorization><remove users=\"*\" roles=\"\" verbs=\"\"/><add accessType=\"Deny\" users=\"*\"/></authorization></security></system.webServer></configuration>\n",
 			'index.php' => "<?php\n// SP Accelerator cache protection.\nhttp_response_code( 404 );\nexit;\n",
 		];
 	}
 
-	/** @return array<string,string> */
+	/** @return array<string,array<int,string>> */
 	private function legacy_protection_files(): array {
 		return [
-			'.htaccess' => "Options -Indexes\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\n",
-			'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><security><authorization><remove users=\"*\" roles=\"\" verbs=\"\"/><add accessType=\"Deny\" users=\"*\"/></authorization></security></system.webServer></configuration>\n",
-			'index.php' => "<?php\nhttp_response_code( 404 );\nexit;\n",
+			'.htaccess' => [
+				"Options -Indexes\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nDeny from all\n</IfModule>\n",
+				"# SP Accelerator cache protection\nOptions -Indexes\n<IfModule mod_authz_core.c>\nRequire all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\nOrder allow,deny\nDeny from all\n</IfModule>\n",
+			],
+			'web.config' => [
+				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><security><authorization><remove users=\"*\" roles=\"\" verbs=\"\"/><add accessType=\"Deny\" users=\"*\"/></authorization></security></system.webServer></configuration>\n",
+				"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!-- SP Accelerator cache protection -->\n<configuration><system.webServer><security><authorization><clear/><add accessType=\"Deny\" users=\"*\"/></authorization></security></system.webServer></configuration>\n",
+			],
+			'index.php' => [ "<?php\nhttp_response_code( 404 );\nexit;\n" ],
 		];
 	}
 

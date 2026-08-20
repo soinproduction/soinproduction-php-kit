@@ -9,6 +9,7 @@
 		'sp-cf7-mailchimp-sync',
 		'sp-cf7-webhook',
 		'sp-cf7-redirects',
+		'sp-cf7-messages',
 		'sp-cf7-select-field',
 		'sp-cf7-icon-generator',
 	];
@@ -18,6 +19,7 @@
 		'flowchimp'      => 'sp-cf7-mailchimp-sync',
 		'webhook'        => 'sp-cf7-webhook',
 		'redirects'      => 'sp-cf7-redirects',
+		'messages'       => 'sp-cf7-messages',
 		'ui-select'      => 'sp-cf7-select-field',
 		'icon-generator' => 'sp-cf7-icon-generator',
 	];

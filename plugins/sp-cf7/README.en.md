@@ -11,6 +11,7 @@ Each submodule follows the same structure: `modules/<name>/index.php`, `README.e
 | `sp-cf7-mailchimp-sync` | Mailchimp audience synchronization. |
 | `sp-cf7-webhook` | Per-form outgoing HTTP webhook. |
 | `sp-cf7-redirects` | Redirect/modal metadata on rendered forms. |
+| `sp-cf7-messages` | Per-form rich success/error message editor in an admin modal. |
 | `sp-cf7-select-field` | Custom Select shortcode, form tag and mail tags. |
 | `sp-cf7-icon-generator` | UI Icon generator in the CF7 editor. |
 
@@ -24,6 +25,7 @@ All submodules load by default. Configure them directly in the PHP Kit `plugins`
 		'_sp-cf7-mailchimp-sync',
 		'_sp-cf7-webhook',
 		'sp-cf7-redirects',
+		'sp-cf7-messages',
 		'sp-cf7-select-field',
 		'sp-cf7-icon-generator',
 	],

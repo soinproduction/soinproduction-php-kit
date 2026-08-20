@@ -18,6 +18,7 @@ $platform = [
 ];
 
 $acf = [
+	'_sp-background-media',
 	'_sp-icon-links',
 	'_sp-related-content',
 	'_sp-post-selector',
@@ -33,6 +34,7 @@ $plugins = [
 	'sp-svg-support',
 	'sp-admin-ui' => [
 		'sp-admin-ui-menu-heading',
+		'sp-admin-ui-text-column',
 		'sp-admin-ui-thumbnail-column',
 		'sp-admin-ui-taxonomy-checklist',
 		'sp-admin-ui-taxonomy-radio',

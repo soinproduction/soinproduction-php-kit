@@ -7,12 +7,14 @@
 
 	$sp_admin_ui_modules = [
 		'sp-admin-ui-menu-heading',
+		'sp-admin-ui-text-column',
 		'sp-admin-ui-thumbnail-column',
 		'sp-admin-ui-taxonomy-checklist',
 		'sp-admin-ui-taxonomy-radio',
 	];
 	$sp_admin_ui_aliases = [
 		'menu-title-item'   => 'sp-admin-ui-menu-heading',
+		'text-column'       => 'sp-admin-ui-text-column',
 		'preview-thumbnail' => 'sp-admin-ui-thumbnail-column',
 		'taxonomy-checkbox' => 'sp-admin-ui-taxonomy-checklist',
 		'taxonomy-radio'    => 'sp-admin-ui-taxonomy-radio',

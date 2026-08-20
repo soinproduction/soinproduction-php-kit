@@ -10,4 +10,4 @@ ACF relationship field/factory `smart_relationship()` с режимами manual
 ] ) )
 ```
 
-Поддерживаются ограничения `min`/`max`, taxonomy filters и разные источники thumbnail. Полный список опций находится в `README.en.md`.
+Поддерживаются ограничения `min`/`max`, taxonomy filters и разные источники thumbnail. `thumb_field` принимает имя ACF-поля или упорядоченный массив имён; используется первое найденное изображение. Полный список опций находится в `README.en.md`.
