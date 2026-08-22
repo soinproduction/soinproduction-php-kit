@@ -1,5 +1,7 @@
 # SP Accelerator v2
 
+When both the module and acceleration are active, the WordPress admin bar includes an **SP Cache** menu with a nonce-protected **Clear cache** action. The user returns to the originating page after the purge, and automatic warming receives the same purge event as the settings-screen action.
+
 SP Accelerator is the Targetized theme's native WordPress performance layer. Version 2 combines safe anonymous page caching, early cache delivery, bounded stale-while-revalidate, verified warming, optional SQLite object caching, and theme-aware frontend loading.
 
 It is a clean-room implementation and does not contain Seraphinite code, telemetry, license checks, cloud optimization, or a remote API.

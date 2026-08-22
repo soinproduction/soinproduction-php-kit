@@ -39,6 +39,7 @@ $sp_accelerator_files = [
 	'/includes/class-dropin.php',
 	'/includes/class-object-cache.php',
 	'/includes/class-warmer.php',
+	'/includes/class-admin-bar.php',
 	'/includes/class-admin.php',
 ];
 
@@ -86,6 +87,9 @@ if ( ! class_exists( 'SP_Accelerator_Plugin' ) ) {
 		/** @var SP_Accelerator_Warmer */
 		private $warmer;
 
+		/** @var SP_Accelerator_Admin_Bar */
+		private $admin_bar;
+
 		public static function get(): self {
 			if ( self::$instance === null ) {
 				self::$instance = new self();
@@ -104,11 +108,13 @@ if ( ! class_exists( 'SP_Accelerator_Plugin' ) ) {
 			$this->object_cache = new SP_Accelerator_Object_Cache( $this->config, __DIR__ );
 			$warmer = new SP_Accelerator_Warmer( $this->cache, $this->config );
 			$this->warmer = $warmer;
+			$this->admin_bar = new SP_Accelerator_Admin_Bar( $this->config, $this->cache );
 
 			$this->cache->register();
 			$this->assets->register();
 			$this->markup->register();
 			$warmer->register();
+			$this->admin_bar->register();
 			add_action( 'switch_theme', [ $this, 'on_theme_switch' ] );
 			add_action( 'after_switch_theme', [ $this, 'on_theme_activated' ], 1 );
 

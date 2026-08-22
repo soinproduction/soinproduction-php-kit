@@ -1,5 +1,7 @@
 # SP Debug Toolbar
 
+In `DEV_MODE`, the WordPress admin bar exposes a nonce-protected install or activation link for the official **Query Monitor** plugin when it is not active yet. Once activated, PHP Kit removes its shortcut because Query Monitor provides its own toolbar panel.
+
 Frontend diagnostic panel for administrators working on the theme. It collects the request, template, WordPress query, ACF/meta, enqueued resources, media and environment data that would otherwise require several separate developer tools.
 
 ## Exact Activation Rules

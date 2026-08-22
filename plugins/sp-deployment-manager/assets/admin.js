@@ -23,6 +23,7 @@
     var notice = root.querySelector('[data-sp-deployment-notice]');
     var pollTimer = 0;
     var busy = false;
+    var lastSnapshot = null;
 
     function request(action, data) {
         var body = new URLSearchParams(Object.assign({action: action, nonce: config.nonce}, data || {}));
@@ -60,6 +61,7 @@
     }
 
     function render(snapshot) {
+        lastSnapshot = snapshot;
         var remote = snapshot.remote || {};
         var environment = snapshot.environment || {};
         var state = snapshot.state || {};
@@ -152,7 +154,11 @@
         checkButton.disabled = true;
         load(true).finally(function () {
             busy = false;
-            checkButton.disabled = false;
+            if (lastSnapshot) {
+                render(lastSnapshot);
+            } else {
+                checkButton.disabled = false;
+            }
         });
     });
 

@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class SP_Accelerator_Config {
 	public const OPTION_KEY = 'sp_accelerator_settings';
-	public const VERSION    = '2.2.0';
+	public const VERSION    = '2.2.1';
 	public const RUNTIME_DISABLED_KEY = 'sp_accelerator_runtime_disabled';
 	private const CACHE_SIGNATURE = 'SP Accelerator cache config';
 	private const WARM_TOKEN_TTL = 300;
