@@ -54,7 +54,8 @@ final class AdminBootstrap {
 		}
 
 		self::$scheduled = true;
-		add_action('admin_print_footer_scripts', [self::class, 'print'], 19);
+		add_action('admin_print_scripts', [self::class, 'print'], 19);
+		add_action('admin_print_footer_scripts', [self::class, 'print'], 9);
 	}
 
 	public static function print(): void {

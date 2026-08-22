@@ -16,7 +16,7 @@ function is_admin(): bool {
 }
 
 function add_action( string $hook, $callback, int $priority = 10 ): void {
-	$GLOBALS['sp_admin_bootstrap_hook'] = compact( 'hook', 'callback', 'priority' );
+	$GLOBALS['sp_admin_bootstrap_hooks'][] = compact( 'hook', 'callback', 'priority' );
 }
 
 function rest_url(): string {
@@ -71,8 +71,10 @@ ob_start();
 AdminBootstrap::print();
 $second_output = (string) ob_get_clean();
 
+$scheduledHooks = array_column( $GLOBALS['sp_admin_bootstrap_hooks'], 'priority', 'hook' );
 $checks = [
-	'footer output is scheduled before footer scripts' => ( $GLOBALS['sp_admin_bootstrap_hook']['priority'] ?? 0 ) === 19,
+	'head output is scheduled before head scripts'      => ( $scheduledHooks['admin_print_scripts'] ?? 0 ) === 19,
+	'footer fallback precedes footer scripts'           => ( $scheduledHooks['admin_print_footer_scripts'] ?? 0 ) === 9,
 	'payload contains the registered feature'          => str_contains( $output, 'editorWidgets' ),
 	'invalid feature names are ignored'                => ! str_contains( $output, 'invalid key' ),
 	'legacy global mapping is emitted'                 => str_contains( $output, 'SP_WIDGETS_NONCE' ),

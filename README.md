@@ -39,7 +39,7 @@
 
 ### Единый JSON bootstrap для админки
 
-`SoinProduction\Kit\AdminBootstrap` собирает небольшие данные нескольких admin-компонентов и выводит их один раз перед footer scripts. Данные добавляются только на нужном экране:
+`SoinProduction\Kit\AdminBootstrap` собирает небольшие данные нескольких admin-компонентов и выводит их один раз перед WordPress scripts. Регистрируйте данные на `admin_enqueue_scripts` только для нужного экрана; тогда bootstrap гарантированно доступен и head-, и footer-скриптам:
 
 ```php
 use SoinProduction\Kit\AdminBootstrap;
