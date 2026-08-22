@@ -38,6 +38,7 @@ Composer согласованно обновляет `composer.lock`, checkout �
 	'composer_command'      => [ '/usr/local/bin/composer' ],
 	'php_binary'            => '',
 	'composer_home'         => '',
+	'git_binary'            => 'git',
 	'timeout'               => 300,
 	'no_dev'                => true,
 	'capability'            => 'update_plugins',
@@ -60,7 +61,9 @@ Read-only GitHub token для проверки commit храните вне ба
 define( 'SP_DEPLOYMENT_GITHUB_TOKEN', 'github-token-here' );
 ```
 
-Composer также должен иметь настроенный доступ через `auth.json`, `COMPOSER_AUTH`, SSH agent или deploy key. Менеджер никогда не добавляет token в аргументы процесса или журнал.
+Если отдельный token не задан, менеджер автоматически использует `github-oauth.github.com` из `COMPOSER_AUTH` или Composer `auth.json`. При недоступности GitHub API (включая исчерпанный rate limit) commit ветки определяется через `git ls-remote`; сначала используется source URL установленного Composer-пакета. Для нестандартного пути Git задайте `git_binary`.
+
+Composer также должен иметь настроенный доступ через `auth.json`, `COMPOSER_AUTH`, SSH agent или deploy key. Менеджер никогда не добавляет token в аргументы процесса, HTML или журнал.
 
 ## Обновление и откат
 

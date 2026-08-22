@@ -23,6 +23,7 @@ final class RepositoryUpdater
 			'composer_command'      => [],
 			'php_binary'            => '',
 			'composer_home'         => '',
+			'git_binary'            => 'git',
 			'timeout'               => 300,
 			'no_dev'                => false,
 			'capability'            => 'update_plugins',
@@ -53,6 +54,10 @@ final class RepositoryUpdater
 			: [];
 		$phpBinary = isset($config['php_binary']) ? trim((string) $config['php_binary']) : '';
 		$composerHome = isset($config['composer_home']) ? trim((string) $config['composer_home']) : '';
+		$gitBinary = isset($config['git_binary']) ? trim((string) $config['git_binary']) : '';
+		if ($gitBinary === '' || str_contains($gitBinary, "\0")) {
+			$gitBinary = $defaults['git_binary'];
+		}
 
 		$capability = isset($config['capability']) ? trim((string) $config['capability']) : '';
 		if (preg_match('/^[a-z0-9_-]+$/i', $capability) !== 1) {
@@ -71,6 +76,7 @@ final class RepositoryUpdater
 		$config['composer_command']      = $composerCommand;
 		$config['php_binary']            = $phpBinary;
 		$config['composer_home']         = $composerHome;
+		$config['git_binary']            = $gitBinary;
 		$config['timeout']               = max(30, min(1800, (int) $config['timeout']));
 		$config['no_dev']                = ! empty($config['no_dev']);
 		$config['capability']            = $capability;
@@ -157,6 +163,104 @@ final class RepositoryUpdater
 				: '';
 
 			return self::normalizeReference($reference);
+		}
+
+		return '';
+	}
+
+	public static function installedSourceUrl(string $projectRoot, string $package): string
+	{
+		$root = rtrim($projectRoot, '/\\');
+		$files = [
+			$root . '/vendor/composer/installed.json',
+			$root . '/composer.lock',
+		];
+
+		foreach ($files as $file) {
+			$data = self::readJsonFile($file);
+			$packages = isset($data['packages']) && is_array($data['packages']) ? $data['packages'] : $data;
+			foreach ($packages as $item) {
+				if (! is_array($item) || ($item['name'] ?? '') !== $package) {
+					continue;
+				}
+
+				$url = trim((string) ($item['source']['url'] ?? ''));
+				if ($url !== '' && ! str_contains($url, "\0")) {
+					return $url;
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Resolves a branch through Git when GitHub API metadata is unavailable.
+	 *
+	 * @return array{sha: string, short: string, error: string}
+	 */
+	public static function remoteReference(array $config, string $projectRoot): array
+	{
+		$config = self::normalizeConfig($config);
+		$sourceUrl = self::installedSourceUrl($projectRoot, (string) $config['package']);
+		$urls = array_values(array_unique(array_filter([
+			$sourceUrl,
+			'https://github.com/' . (string) $config['repository'] . '.git',
+		])));
+
+		foreach ($urls as $url) {
+			$result = self::runProcess([
+				(string) $config['git_binary'],
+				'ls-remote',
+				'--exit-code',
+				'--refs',
+				$url,
+				'refs/heads/' . (string) $config['branch'],
+			], $projectRoot, min(30, (int) $config['timeout']), (string) $config['composer_home']);
+
+			if ($result['exit_code'] !== 0) {
+				continue;
+			}
+
+			$line = trim(strtok($result['stdout'], "\r\n") ?: '');
+			$sha = strtolower((string) preg_replace('/\s.*$/', '', $line));
+			if (preg_match('/^[a-f0-9]{40}$/', $sha) === 1) {
+				return ['sha' => $sha, 'short' => self::shortReference($sha), 'error' => ''];
+			}
+		}
+
+		return ['sha' => '', 'short' => '', 'error' => 'Git remote reference is unavailable.'];
+	}
+
+	/** @param array<string, mixed> $config */
+	public static function composerGithubToken(array $config, string $projectRoot): string
+	{
+		$config = self::normalizeConfig($config);
+		$composerAuth = getenv('COMPOSER_AUTH');
+		if (is_string($composerAuth) && $composerAuth !== '') {
+			$token = self::githubTokenFromAuth(json_decode($composerAuth, true));
+			if ($token !== '') {
+				return $token;
+			}
+		}
+
+		$environment = self::processEnvironment($projectRoot, (string) $config['composer_home']);
+		$homes = [];
+		if (! empty($environment['COMPOSER_HOME'])) {
+			$homes[] = (string) $environment['COMPOSER_HOME'];
+		}
+		if (! empty($environment['XDG_CONFIG_HOME'])) {
+			$homes[] = rtrim((string) $environment['XDG_CONFIG_HOME'], '/\\') . '/composer';
+		}
+		if (! empty($environment['HOME'])) {
+			$homes[] = rtrim((string) $environment['HOME'], '/\\') . '/.composer';
+		}
+
+		foreach (array_unique($homes) as $home) {
+			$token = self::githubTokenFromAuth(self::readJsonFile(rtrim($home, '/\\') . '/auth.json'));
+			if ($token !== '') {
+				return $token;
+			}
 		}
 
 		return '';
@@ -265,7 +369,7 @@ final class RepositoryUpdater
 		$environment = self::processEnvironment($cwd, $composerHome);
 		$process = @proc_open($command, $descriptors, $pipes, $cwd, $environment, ['bypass_shell' => true]);
 		if (! is_resource($process)) {
-			$result['stderr'] = 'Unable to start Composer.';
+			$result['stderr'] = 'Unable to start process.';
 			return $result;
 		}
 
@@ -381,6 +485,15 @@ final class RepositoryUpdater
 		return is_array($decoded) ? $decoded : [];
 	}
 
+	/** @param mixed $auth */
+	private static function githubTokenFromAuth($auth): string
+	{
+		$token = is_array($auth) ? ($auth['github-oauth']['github.com'] ?? '') : '';
+		$token = is_string($token) ? trim($token) : '';
+
+		return $token !== '' && preg_match('/[\x00-\x1F\x7F]/', $token) !== 1 ? $token : '';
+	}
+
 	private static function functionAvailable(string $function): bool
 	{
 		if (! function_exists($function)) {
@@ -404,6 +517,9 @@ final class RepositoryUpdater
 			$inherited['PATH'] = is_string($path) && $path !== ''
 				? $path
 				: '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+		}
+		if (empty($inherited['GIT_TERMINAL_PROMPT'])) {
+			$inherited['GIT_TERMINAL_PROMPT'] = '0';
 		}
 
 		$home = $configuredHome;

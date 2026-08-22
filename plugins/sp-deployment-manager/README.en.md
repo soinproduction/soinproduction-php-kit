@@ -38,6 +38,7 @@ Defaults target the `main` branch of `soinproduction/soinproduction-php-kit`:
 	'composer_command'      => [ '/usr/local/bin/composer' ],
 	'php_binary'            => '',
 	'composer_home'         => '',
+	'git_binary'            => 'git',
 	'timeout'               => 300,
 	'no_dev'                => true,
 	'capability'            => 'update_plugins',
@@ -60,7 +61,9 @@ Define a read-only GitHub token outside the database for GitHub API status check
 define( 'SP_DEPLOYMENT_GITHUB_TOKEN', 'github-token-here' );
 ```
 
-Composer must also already be able to read the repository through its normal `auth.json`, `COMPOSER_AUTH`, SSH agent or deploy-key configuration. The manager never places tokens in process arguments or logs.
+When no dedicated token is configured, the manager automatically reuses `github-oauth.github.com` from `COMPOSER_AUTH` or Composer's `auth.json`. If the GitHub API is unavailable (including an exhausted rate limit), it resolves the branch commit through `git ls-remote`, preferring the installed Composer package's source URL. Set `git_binary` when Git has a non-standard path.
+
+Composer must also already be able to read the repository through its normal `auth.json`, `COMPOSER_AUTH`, SSH agent or deploy-key configuration. The manager never places tokens in process arguments, HTML or logs.
 
 ## Job and Rollback Flow
 

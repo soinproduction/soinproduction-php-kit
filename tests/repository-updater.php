@@ -43,7 +43,10 @@ chmod($composerFixture, 0755);
 file_put_contents($composerDir . '/installed.json', json_encode([
 	'packages' => [[
 		'name'   => 'soinproduction/php-kit',
-		'source' => ['reference' => '1234567890abcdef1234567890abcdef12345678'],
+		'source' => [
+			'reference' => '1234567890abcdef1234567890abcdef12345678',
+			'url'       => 'git@github.com:soinproduction/soinproduction-php-kit.git',
+		],
 	]],
 ], JSON_PRETTY_PRINT));
 
@@ -74,6 +77,12 @@ $explicitInterpreterCommand = RepositoryUpdater::composerCommand([
 $processEnvironment = new ReflectionMethod(RepositoryUpdater::class, 'processEnvironment');
 $processEnvironment->setAccessible(true);
 $isolatedEnvironment = $processEnvironment->invoke(null, $projectRoot, $testRoot . '/composer-home', []);
+file_put_contents($testRoot . '/composer-home/auth.json', json_encode([
+	'github-oauth' => ['github.com' => 'test-read-only-token'],
+]));
+$composerToken = RepositoryUpdater::composerGithubToken([
+	'composer_home' => $testRoot . '/composer-home',
+], $projectRoot);
 $process = RepositoryUpdater::runProcess([
 	PHP_BINARY,
 	'-r',
@@ -109,11 +118,14 @@ $checks = [
 	'project package requirement is validated'         => RepositoryUpdater::projectRequiresPackage($projectRoot, 'soinproduction/php-kit'),
 	'unrelated package requirement is rejected'        => ! RepositoryUpdater::projectRequiresPackage($projectRoot, 'vendor/missing'),
 	'installed Composer reference is read'             => RepositoryUpdater::installedReference($projectRoot, 'soinproduction/php-kit') === '1234567890abcdef1234567890abcdef12345678',
+	'installed Composer source URL is read'             => RepositoryUpdater::installedSourceUrl($projectRoot, 'soinproduction/php-kit') === 'git@github.com:soinproduction/soinproduction-php-kit.git',
+	'Composer GitHub OAuth token is reused'             => $composerToken === 'test-read-only-token',
 	'update command targets only the configured package' => array_slice($command, 0, 4) === ['sp-composer-command', 'update', 'vendor/package', '--with-dependencies'],
 	'PHP Composer scripts receive a CLI interpreter'    => array_slice($interpretedCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'explicit PHP interpreter is not duplicated'        => array_slice($explicitInterpreterCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'missing HOME receives a private Composer home'     => ($isolatedEnvironment['HOME'] ?? '') === $testRoot
 		&& ($isolatedEnvironment['COMPOSER_HOME'] ?? '') === $testRoot . '/composer-home'
+		&& ($isolatedEnvironment['GIT_TERMINAL_PROMPT'] ?? '') === '0'
 		&& is_dir($testRoot . '/composer-home'),
 	'non-interactive Composer flags are present'        => in_array('--no-interaction', $command, true) && in_array('--prefer-dist', $command, true),
 	'production no-dev mode is supported'              => in_array('--no-dev', $command, true),

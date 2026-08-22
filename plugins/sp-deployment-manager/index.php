@@ -3,7 +3,7 @@
 /**
  * Plugin Name: SP Deployment Manager
  * Description: Composer-backed repository updates, status checks and rollback from WordPress admin.
- * Version: 1.0.5
+ * Version: 1.0.6
  */
 
 if (! defined('ABSPATH')) {
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 if (! class_exists('SP_Deployment_Manager', false)) {
 	final class SP_Deployment_Manager
 	{
-		private const VERSION = '1.0.5';
+		private const VERSION = '1.0.6';
 		private const PAGE_SLUG = 'sp-deployment-manager';
 		private const NONCE_ACTION = 'sp_deployment_manager';
 		private const CRON_HOOK = 'sp_deployment_manager_run_job';
@@ -355,7 +355,7 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 			$installed = $projectRoot !== ''
 				? \SoinProduction\Kit\RepositoryUpdater::installedReference($projectRoot, (string) $config['package'])
 				: '';
-			$remote = self::remoteInfo($forceRemote);
+			$remote = self::remoteInfo($forceRemote, $projectRoot);
 			$environment = self::environment($forceRemote, $projectRoot);
 			$state = self::state();
 
@@ -374,7 +374,7 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 		}
 
 		/** @return array<string, mixed> */
-		private static function remoteInfo(bool $force): array
+		private static function remoteInfo(bool $force, string $projectRoot): array
 		{
 			$config = self::config();
 			$cacheKey = 'sp_deployment_remote_' . md5((string) $config['repository'] . '|' . (string) $config['branch']);
@@ -398,19 +398,19 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 
 			$response = wp_remote_get($url, ['timeout' => 15, 'redirection' => 2, 'headers' => $headers]);
 			if (is_wp_error($response)) {
-				return ['sha' => '', 'short' => '', 'error' => $response->get_error_message()];
+				return self::remoteFallback($projectRoot, $response->get_error_message());
 			}
 
 			$code = (int) wp_remote_retrieve_response_code($response);
 			$body = json_decode((string) wp_remote_retrieve_body($response), true);
 			if ($code !== 200 || ! is_array($body)) {
 				$message = is_array($body) ? (string) ($body['message'] ?? '') : '';
-				return ['sha' => '', 'short' => '', 'error' => $message !== '' ? $message : 'GitHub returned HTTP ' . $code . '.'];
+				return self::remoteFallback($projectRoot, $message !== '' ? $message : 'GitHub returned HTTP ' . $code . '.');
 			}
 
 			$sha = isset($body['sha']) ? strtolower((string) $body['sha']) : '';
 			if (preg_match('/^[a-f0-9]{40}$/', $sha) !== 1) {
-				return ['sha' => '', 'short' => '', 'error' => 'GitHub returned an invalid commit reference.'];
+				return self::remoteFallback($projectRoot, 'GitHub returned an invalid commit reference.');
 			}
 
 			$message = trim((string) ($body['commit']['message'] ?? ''));
@@ -423,6 +423,30 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 				'url'     => (string) ($body['html_url'] ?? ''),
 				'error'   => '',
 			];
+			set_transient($cacheKey, $info, self::REMOTE_CACHE_TTL);
+
+			return $info;
+		}
+
+		/** @return array<string, string> */
+		private static function remoteFallback(string $projectRoot, string $apiError): array
+		{
+			$reference = \SoinProduction\Kit\RepositoryUpdater::remoteReference(self::config(), $projectRoot);
+			if ($reference['sha'] === '') {
+				$reference['error'] = $apiError;
+				return $reference;
+			}
+
+			$info = [
+				'sha'     => $reference['sha'],
+				'short'   => $reference['short'],
+				'message' => '',
+				'date'    => '',
+				'url'     => '',
+				'error'   => '',
+			];
+			$config = self::config();
+			$cacheKey = 'sp_deployment_remote_' . md5((string) $config['repository'] . '|' . (string) $config['branch']);
 			set_transient($cacheKey, $info, self::REMOTE_CACHE_TTL);
 
 			return $info;
@@ -565,11 +589,17 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 			$constant = (string) self::config()['github_token_constant'];
 			if ($constant !== '' && defined($constant)) {
 				$value = constant($constant);
-				return is_string($value) ? trim($value) : '';
+				if (is_string($value) && trim($value) !== '') {
+					return trim($value);
+				}
 			}
 
 			$value = getenv('SP_DEPLOYMENT_GITHUB_TOKEN');
-			return is_string($value) ? trim($value) : '';
+			if (is_string($value) && trim($value) !== '') {
+				return trim($value);
+			}
+
+			return \SoinProduction\Kit\RepositoryUpdater::composerGithubToken(self::config(), self::projectRoot());
 		}
 
 		private static function truncate(string $value): string
