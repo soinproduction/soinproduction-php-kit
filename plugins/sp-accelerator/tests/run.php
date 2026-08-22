@@ -314,9 +314,20 @@ function apply_filters( $hook, $value ) {
 }
 
 require_once $root . '/includes/class-config.php';
+require_once $root . '/includes/class-assets.php';
 require_once $root . '/includes/class-request.php';
 require_once $root . '/includes/class-cache.php';
 $request = new SP_Accelerator_Request( new SP_Accelerator_Config() );
+
+$assets = new SP_Accelerator_Assets( new SP_Accelerator_Config() );
+$font_preloads = $assets->limit_font_preloads( [
+	'fonts/Jost-Bold.woff2',
+	'fonts/Jost-Regular.woff2',
+	'fonts/Jost-Italic.woff2',
+	'fonts/Literata-Regular.woff2',
+	'fonts/icomoon.woff2',
+] );
+sp_test_assert( $font_preloads === [ 'fonts/Jost-Regular.woff2', 'fonts/Literata-Regular.woff2' ], 'font preload selection should prefer regular faces from distinct text families' );
 
 function sp_test_request( SP_Accelerator_Request $request, string $uri = '/hello/', array $server = [] ): bool {
 	$_GET = [];

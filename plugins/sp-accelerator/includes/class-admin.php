@@ -338,7 +338,8 @@ final class SP_Accelerator_Admin {
 						<section class="sp-panel sp-admin-card">
 							<div class="sp-panel__heading sp-admin-card__header"><div class="sp-admin-card__copy"><h2>Assets темы</h2><p>Оптимизация знает manifest и ACF-секции, поэтому не переписывает готовый HTML вслепую.</p></div><span class="sp-chip">CWV</span></div>
 							<?php $this->switch_row( 'preload_main_script', 'Preload main.js', 'Необязательный приоритет main entry; включайте только если замер подтверждает пользу.', $settings ); ?>
-							<?php $this->switch_row( 'limit_font_preloads', 'Только критические шрифты', 'DMSans Regular и Bold для навигации и hero heading; остальные не конкурируют с LCP.', $settings ); ?>
+							<?php $this->switch_row( 'limit_font_preloads', 'Только критические шрифты', 'Автоматически выбирает обычные начертания существующих текстовых семейств; icon fonts и лишние веса не конкурируют с LCP.', $settings ); ?>
+							<label class="sp-inline-field"><span>Максимум font preload</span><input type="number" min="1" max="6" step="1" name="sp_accelerator[font_preload_limit]" value="<?php echo esc_attr( (string) $settings['font_preload_limit'] ); ?>"><em>файла</em></label>
 							<?php $this->switch_row( 'resource_hints', 'Resource hints', 'До четырёх внешних origins получают preconnect/dns-prefetch из реальной очереди assets.', $settings ); ?>
 							<?php $this->switch_row( 'async_main_style', 'Асинхронный main.css', 'Inline critical.css формирует первый экран, полный style.css догружается без блокировки рендера.', $settings ); ?>
 							<?php $this->switch_row( 'async_section_styles', 'Асинхронный CSS нижних секций', 'Hero остаётся критическим, остальные section-*.css загружаются через preload-on-load.', $settings ); ?>

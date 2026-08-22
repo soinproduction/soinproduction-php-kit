@@ -6,7 +6,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 final class SP_Accelerator_Config {
 	public const OPTION_KEY = 'sp_accelerator_settings';
-	public const VERSION    = '2.1.0';
+	public const VERSION    = '2.2.0';
 	public const RUNTIME_DISABLED_KEY = 'sp_accelerator_runtime_disabled';
 	private const CACHE_SIGNATURE = 'SP Accelerator cache config';
 	private const WARM_TOKEN_TTL = 300;
@@ -28,6 +28,7 @@ final class SP_Accelerator_Config {
 			'minify_html'            => 1,
 			'preload_main_script'    => 0,
 			'limit_font_preloads'    => 1,
+			'font_preload_limit'     => 2,
 			'async_main_style'       => 1,
 			'async_section_styles'   => 1,
 			'delay_section_scripts'  => 1,
@@ -189,6 +190,7 @@ final class SP_Accelerator_Config {
 		$clean['stale_ttl']             = min( DAY_IN_SECONDS, max( 0, absint( $input['stale_ttl'] ?? 21600 ) ) );
 		$clean['generation_stale_ttl']  = min( DAY_IN_SECONDS, max( 0, absint( $input['generation_stale_ttl'] ?? 3600 ) ) );
 		$clean['browser_cache_ttl']     = min( HOUR_IN_SECONDS, max( 0, absint( $input['browser_cache_ttl'] ?? 0 ) ) );
+		$clean['font_preload_limit']    = min( 6, max( 1, absint( $input['font_preload_limit'] ?? 2 ) ) );
 		$clean['script_delay_ms']       = min( 30000, max( 0, absint( $input['script_delay_ms'] ?? 12000 ) ) );
 		$clean['generation']            = preg_replace( '/[^a-zA-Z0-9_-]/', '', (string) ( $current['generation'] ?? '1' ) ) ?: '1';
 		$clean['previous_generation']   = preg_replace( '/[^a-zA-Z0-9_-]/', '', (string) ( $current['previous_generation'] ?? '' ) ) ?: '';

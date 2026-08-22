@@ -44,15 +44,106 @@ final class SP_Accelerator_Assets {
 			return $fonts;
 		}
 
-		$critical  = apply_filters( 'sp_accelerator_preload_fonts', [ 'DMSans-Regular.woff2', 'DMSans-Bold.woff2' ], $fonts );
-		$critical  = is_array( $critical ) ? $critical : [];
-		$available = array_flip( array_map( static function ( $font ): string {
-			return ltrim( str_replace( '\\', '/', (string) $font ), '/' );
-		}, $fonts ) );
+		$limit     = min( 6, max( 1, (int) $this->config->get( 'font_preload_limit', 2 ) ) );
+		$available = [];
+		foreach ( $fonts as $font ) {
+			$font = ltrim( str_replace( '\\', '/', (string) $font ), '/' );
+			if ( $font !== '' && preg_match( '/\.woff2$/i', $font ) ) {
+				$available[ $font ] = $font;
+			}
+		}
+		$available = array_values( $available );
 
-		return array_values( array_filter( $critical, static function ( string $font ) use ( $available ): bool {
-			return isset( $available[ $font ] );
-		} ) );
+		$automatic = $this->automatic_font_preloads( $available, $limit );
+		$critical  = apply_filters( 'sp_accelerator_preload_fonts', $automatic, $available, $limit );
+		$critical  = is_array( $critical ) ? $critical : [];
+		$available = array_flip( $available );
+
+		$selected = [];
+		foreach ( $critical as $font ) {
+			$font = ltrim( str_replace( '\\', '/', (string) $font ), '/' );
+			if ( isset( $available[ $font ] ) ) {
+				$selected[ $font ] = $font;
+			}
+		}
+
+		return array_slice( array_values( $selected ), 0, $limit );
+	}
+
+	/**
+	 * Pick regular, non-italic text faces from different families before using
+	 * secondary weights from the same family. Icon fonts are never preloaded.
+	 *
+	 * @param string[] $fonts
+	 * @return string[]
+	 */
+	private function automatic_font_preloads( array $fonts, int $limit ): array {
+		$candidates = [];
+		foreach ( $fonts as $font ) {
+			$filename = pathinfo( $font, PATHINFO_FILENAME );
+			if ( preg_match( '/(?:^|[-_.\s])(?:icon|icons|icomoon|symbol|glyph)(?:$|[-_.\s])/i', $filename ) ) {
+				continue;
+			}
+
+			$italic   = (bool) preg_match( '/(?:italic|oblique)/i', $filename );
+			$regular  = (bool) preg_match( '/(?:^|[-_.\s])(?:regular|book|roman|normal|400)(?:$|[-_.\s])/i', $filename );
+			$variable = (bool) preg_match( '/(?:variable|\[[^\]]*wght)/i', $filename );
+			$medium   = (bool) preg_match( '/(?:^|[-_.\s])(?:medium|500)(?:$|[-_.\s])/i', $filename );
+			$bold     = (bool) preg_match( '/(?:^|[-_.\s])(?:semibold|demibold|bold|600|700)(?:$|[-_.\s])/i', $filename );
+			$light    = (bool) preg_match( '/(?:^|[-_.\s])(?:thin|extralight|ultralight|light|100|200|300)(?:$|[-_.\s])/i', $filename );
+
+			$rank = $regular ? 0 : ( $variable ? 10 : ( $medium ? 20 : ( $bold ? 30 : ( $light ? 40 : 25 ) ) ) );
+			if ( $italic ) {
+				$rank += 50;
+			}
+
+			$tokens = preg_split( '/[-_.\s]+/', strtolower( $filename ) ) ?: [];
+			$style_tokens = [
+				'thin', 'extralight', 'ultralight', 'light', 'regular', 'book', 'roman', 'normal',
+				'medium', 'semibold', 'demibold', 'bold', 'extrabold', 'ultrabold', 'black', 'heavy',
+				'italic', 'oblique', 'variable', '100', '200', '300', '400', '500', '600', '700', '800', '900',
+			];
+			$family_tokens = array_values( array_filter( $tokens, static function ( string $token ) use ( $style_tokens ): bool {
+				return $token !== '' && ! in_array( $token, $style_tokens, true ) && strpos( $token, 'wght' ) === false;
+			} ) );
+			$family = implode( '-', $family_tokens );
+			if ( $family === '' ) {
+				$family = strtolower( $filename );
+			}
+
+			$candidates[] = [ 'font' => $font, 'family' => $family, 'rank' => $rank ];
+		}
+
+		usort( $candidates, static function ( array $left, array $right ): int {
+			$rank = (int) $left['rank'] <=> (int) $right['rank'];
+			return $rank !== 0 ? $rank : strnatcasecmp( (string) $left['font'], (string) $right['font'] );
+		} );
+
+		$selected = [];
+		$families = [];
+		foreach ( $candidates as $candidate ) {
+			$family = (string) $candidate['family'];
+			if ( isset( $families[ $family ] ) ) {
+				continue;
+			}
+			$families[ $family ] = true;
+			$selected[] = (string) $candidate['font'];
+			if ( count( $selected ) >= $limit ) {
+				return $selected;
+			}
+		}
+
+		foreach ( $candidates as $candidate ) {
+			$font = (string) $candidate['font'];
+			if ( ! in_array( $font, $selected, true ) ) {
+				$selected[] = $font;
+			}
+			if ( count( $selected ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $selected;
 	}
 
 	/**

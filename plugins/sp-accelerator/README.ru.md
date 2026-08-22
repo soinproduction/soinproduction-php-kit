@@ -202,7 +202,7 @@ WordPress загружает `object-cache.php` очень рано, поэто�
 SP Accelerator работает с зарегистрированными handles темы: он не объединяет сгенерированные CSS/JS и не запускает универсальный Critical CSS scraper.
 
 - Main CSS и некритичные `section-*` styles могут передаваться в async CSS pipeline темы. Критические handles, включая hero, остаются синхронными.
-- Critical font preload ограничивается `DMSans-Regular.woff2` и `DMSans-Bold.woff2`; Bold соответствует hero heading с весом 700 в critical CSS. Список меняется фильтром `sp_accelerator_preload_fonts`.
+- Critical font preload автоматически предпочитает обычные non-italic WOFF2-начертания разных текстовых семейств и пропускает icon fonts. Максимум настраивается (по умолчанию два файла), итоговый список меняется фильтром `sp_accelerator_preload_fonts`.
 - `preconnect`/`dns-prefetch` формируются по внешним origins поставленных в очередь scripts/styles и ограничиваются четырьмя.
 - Preload главного script является явной опцией, а не безусловным поведением.
 - Подходящие theme module/npm scripts можно отложить. WordPress печатает их в dependency-resolved порядке, loader выполняет placeholders последовательно. Hero module, `async` scripts и handles с inline before/after не откладываются. Дополнительный handle исключается фильтром `sp_accelerator_delay_script`.
