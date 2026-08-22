@@ -3,7 +3,7 @@
 /**
  * Plugin Name: SP Deployment Manager
  * Description: Composer-backed repository updates, status checks and rollback from WordPress admin.
- * Version: 1.0.1
+ * Version: 1.0.2
  */
 
 if (! defined('ABSPATH')) {
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 if (! class_exists('SP_Deployment_Manager', false)) {
 	final class SP_Deployment_Manager
 	{
-		private const VERSION = '1.0.1';
+		private const VERSION = '1.0.2';
 		private const PAGE_SLUG = 'sp-deployment-manager';
 		private const NONCE_ACTION = 'sp_deployment_manager';
 		private const CRON_HOOK = 'sp_deployment_manager_run_job';
@@ -426,7 +426,10 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 		private static function environment(bool $force, string $projectRoot): array
 		{
 			$config = self::config();
-			$cacheKey = 'sp_deployment_environment_' . md5($projectRoot . '|' . wp_json_encode($config['composer_command']));
+			$cacheKey = 'sp_deployment_environment_' . md5(self::VERSION . '|' . $projectRoot . '|' . wp_json_encode([
+				$config['composer_command'],
+				$config['php_binary'],
+			]));
 			if (! $force) {
 				$cached = get_transient($cacheKey);
 				if (is_array($cached)) {

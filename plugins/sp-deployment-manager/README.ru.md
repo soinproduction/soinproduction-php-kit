@@ -36,6 +36,7 @@ Composer согласованно обновляет `composer.lock`, checkout �
 	'repository'            => 'soinproduction/soinproduction-php-kit',
 	'branch'                => 'main',
 	'composer_command'      => [ '/usr/local/bin/composer' ],
+	'php_binary'            => '',
 	'timeout'               => 300,
 	'no_dev'                => true,
 	'capability'            => 'update_plugins',
@@ -46,7 +47,7 @@ Composer согласованно обновляет `composer.lock`, checkout �
 
 `project_root` обычно определяется автоматически через Composer metadata установленного пакета. Указывайте его только при нестандартной структуре проекта.
 
-`composer_command` — массив аргументов, а не shell-строка. Пустое значение последовательно ищет локальный `composer.phar`, константу `SP_DEPLOYMENT_COMPOSER_BINARY` и команду `composer` в `PATH`.
+`composer_command` — массив аргументов, а не shell-строка. Пустое значение последовательно ищет локальный `composer.phar`, константу `SP_DEPLOYMENT_COMPOSER_BINARY` и команду `composer` в `PATH`. Если указанный Composer является PHP-скриптом с shebang, менеджер автоматически запускает его через CLI из `PHP_BINDIR`, не полагаясь на `PATH` веб-сервера. Для нестандартной установки задайте `php_binary` или константу `SP_DEPLOYMENT_PHP_BINARY`.
 
 ## Приватные репозитории
 

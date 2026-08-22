@@ -21,6 +21,7 @@ final class RepositoryUpdater
 			'branch'                => 'main',
 			'project_root'          => '',
 			'composer_command'      => [],
+			'php_binary'            => '',
 			'timeout'               => 300,
 			'no_dev'                => false,
 			'capability'            => 'update_plugins',
@@ -49,6 +50,7 @@ final class RepositoryUpdater
 		$composerCommand = isset($config['composer_command']) && is_array($config['composer_command'])
 			? array_values(array_filter(array_map('strval', $config['composer_command']), static fn (string $part): bool => $part !== ''))
 			: [];
+		$phpBinary = isset($config['php_binary']) ? trim((string) $config['php_binary']) : '';
 
 		$capability = isset($config['capability']) ? trim((string) $config['capability']) : '';
 		if (preg_match('/^[a-z0-9_-]+$/i', $capability) !== 1) {
@@ -65,6 +67,7 @@ final class RepositoryUpdater
 		$config['branch']                = $branch;
 		$config['project_root']          = $projectRoot;
 		$config['composer_command']      = $composerCommand;
+		$config['php_binary']            = $phpBinary;
 		$config['timeout']               = max(30, min(1800, (int) $config['timeout']));
 		$config['no_dev']                = ! empty($config['no_dev']);
 		$config['capability']            = $capability;
@@ -164,14 +167,16 @@ final class RepositoryUpdater
 
 		if ($command === []) {
 			$localPhar = rtrim($projectRoot, '/\\') . '/composer.phar';
-			if (is_file($localPhar) && defined('PHP_BINARY') && PHP_BINARY !== '') {
-				$command = [PHP_BINARY, $localPhar];
+			if (is_file($localPhar)) {
+				$command = [$localPhar];
 			} elseif (defined('SP_DEPLOYMENT_COMPOSER_BINARY') && is_string(SP_DEPLOYMENT_COMPOSER_BINARY) && SP_DEPLOYMENT_COMPOSER_BINARY !== '') {
 				$command = [SP_DEPLOYMENT_COMPOSER_BINARY];
 			} else {
 				$command = ['composer'];
 			}
 		}
+
+		$command = self::withPhpInterpreter($command, (string) $config['php_binary']);
 
 		if ($operation === 'install') {
 			$command[] = 'install';
@@ -376,8 +381,55 @@ final class RepositoryUpdater
 	}
 
 	/** @param array<int, string> $command */
+	private static function withPhpInterpreter(array $command, string $configuredBinary): array
+	{
+		if ($command === [] || ! self::isPhpScript($command[0])) {
+			return $command;
+		}
+
+		$candidates = [];
+		if ($configuredBinary !== '') {
+			$candidates[] = $configuredBinary;
+		}
+		if (defined('SP_DEPLOYMENT_PHP_BINARY') && is_string(SP_DEPLOYMENT_PHP_BINARY) && SP_DEPLOYMENT_PHP_BINARY !== '') {
+			$candidates[] = SP_DEPLOYMENT_PHP_BINARY;
+		}
+		if (defined('PHP_BINDIR') && PHP_BINDIR !== '') {
+			$candidates[] = rtrim(PHP_BINDIR, '/\\') . DIRECTORY_SEPARATOR . (PHP_OS_FAMILY === 'Windows' ? 'php.exe' : 'php');
+		}
+		if (defined('PHP_BINARY') && PHP_BINARY !== '') {
+			$candidates[] = PHP_BINARY;
+		}
+
+		foreach (array_unique($candidates) as $candidate) {
+			if (is_file($candidate) && is_executable($candidate)) {
+				array_unshift($command, $candidate);
+				break;
+			}
+		}
+
+		return $command;
+	}
+
+	private static function isPhpScript(string $path): bool
+	{
+		if (! is_file($path) || ! is_readable($path)) {
+			return false;
+		}
+
+		$head = @file_get_contents($path, false, null, 0, 256);
+		if (! is_string($head)) {
+			return false;
+		}
+
+		$head = ltrim($head, "\xEF\xBB\xBF \t\r\n");
+		return str_starts_with($head, '<?php')
+			|| (str_starts_with($head, '#!') && preg_match('/^#![^\r\n]*\bphp(?:\s|$)/i', $head) === 1);
+	}
+
+	/** @param array<int, string> $command */
 	private static function binaryPrefixLength(array $command): int
 	{
-		return isset($command[1]) && str_ends_with(strtolower($command[1]), '.phar') ? 2 : 1;
+		return isset($command[1]) && self::isPhpScript($command[1]) ? 2 : 1;
 	}
 }

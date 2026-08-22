@@ -30,6 +30,7 @@ $projectRoot = $testRoot . '/project';
 $packagePath = $projectRoot . '/vendor/soinproduction/php-kit';
 $composerDir = $projectRoot . '/vendor/composer';
 $backupDir = $testRoot . '/backups';
+$composerFixture = $testRoot . '/composer';
 
 mkdir($packagePath, 0755, true);
 mkdir($composerDir, 0755, true);
@@ -37,6 +38,8 @@ file_put_contents($projectRoot . '/composer.json', json_encode([
 	'require' => ['soinproduction/php-kit' => 'dev-main'],
 ], JSON_PRETTY_PRINT));
 file_put_contents($projectRoot . '/composer.lock', "original-lock\n");
+file_put_contents($composerFixture, "#!/usr/bin/env php\n<?php\n");
+chmod($composerFixture, 0755);
 file_put_contents($composerDir . '/installed.json', json_encode([
 	'packages' => [[
 		'name'   => 'soinproduction/php-kit',
@@ -54,8 +57,18 @@ $normalized = RepositoryUpdater::normalizeConfig([
 ]);
 $command = RepositoryUpdater::composerCommand([
 	'package'          => 'vendor/package',
-	'composer_command' => ['/usr/local/bin/composer'],
+	'composer_command' => ['sp-composer-command'],
 	'no_dev'           => true,
+], 'update', $projectRoot);
+$interpretedCommand = RepositoryUpdater::composerCommand([
+	'package'          => 'vendor/package',
+	'composer_command' => [$composerFixture],
+	'php_binary'       => PHP_BINARY,
+], 'update', $projectRoot);
+$explicitInterpreterCommand = RepositoryUpdater::composerCommand([
+	'package'          => 'vendor/package',
+	'composer_command' => [PHP_BINARY, $composerFixture],
+	'php_binary'       => PHP_BINARY,
 ], 'update', $projectRoot);
 $process = RepositoryUpdater::runProcess([
 	PHP_BINARY,
@@ -91,7 +104,9 @@ $checks = [
 	'project package requirement is validated'         => RepositoryUpdater::projectRequiresPackage($projectRoot, 'soinproduction/php-kit'),
 	'unrelated package requirement is rejected'        => ! RepositoryUpdater::projectRequiresPackage($projectRoot, 'vendor/missing'),
 	'installed Composer reference is read'             => RepositoryUpdater::installedReference($projectRoot, 'soinproduction/php-kit') === '1234567890abcdef1234567890abcdef12345678',
-	'update command targets only the configured package' => array_slice($command, 0, 4) === ['/usr/local/bin/composer', 'update', 'vendor/package', '--with-dependencies'],
+	'update command targets only the configured package' => array_slice($command, 0, 4) === ['sp-composer-command', 'update', 'vendor/package', '--with-dependencies'],
+	'PHP Composer scripts receive a CLI interpreter'    => array_slice($interpretedCommand, 0, 2) === [PHP_BINARY, $composerFixture],
+	'explicit PHP interpreter is not duplicated'        => array_slice($explicitInterpreterCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'non-interactive Composer flags are present'        => in_array('--no-interaction', $command, true) && in_array('--prefer-dist', $command, true),
 	'production no-dev mode is supported'              => in_array('--no-dev', $command, true),
 	'process output and exit code are captured'        => $process['exit_code'] === 0 && $process['stdout'] === 'ok' && $process['stderr'] === 'warn',
