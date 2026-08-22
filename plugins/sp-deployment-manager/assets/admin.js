@@ -1,11 +1,20 @@
 (function () {
     'use strict';
 
-    var root = document.querySelector('[data-sp-deployment-manager]');
-    var config = window.SPAdminData ? window.SPAdminData.get('deploymentManager', {}) : {};
-    if (!root || !config.ajaxUrl || !config.nonce) {
-        return;
-    }
+    var initialized = false;
+
+    function initialize() {
+        if (initialized) {
+            return true;
+        }
+
+        var root = document.querySelector('[data-sp-deployment-manager]');
+        var config = window.SPAdminData ? window.SPAdminData.get('deploymentManager', {}) : {};
+        if (!root || !config.ajaxUrl || !config.nonce) {
+            return false;
+        }
+
+        initialized = true;
 
     var copy = config.copy || {};
     var checkButton = root.querySelector('[data-sp-deployment-check]');
@@ -181,5 +190,11 @@
         });
     });
 
-    load(false);
+        load(false);
+        return true;
+    }
+
+    if (!initialize()) {
+        document.addEventListener('sp-admin-bootstrap-ready', initialize, {once: true});
+    }
 }());

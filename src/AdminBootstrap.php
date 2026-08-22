@@ -97,6 +97,6 @@ final class AdminBootstrap {
 		}
 
 		echo '<script type="application/json" id="' . esc_attr(self::ELEMENT_ID) . '">' . $json . '</script>';
-		echo '<script>(function(){var n=document.getElementById(' . wp_json_encode(self::ELEMENT_ID) . '),d={};try{d=n?JSON.parse(n.textContent||"{}"):{};}catch(e){}window.SPAdminBootstrap=d;window.SPAdminData={get:function(k,f){return d.features&&Object.prototype.hasOwnProperty.call(d.features,k)?d.features[k]:f;}};var m=' . $legacy . ';Object.keys(m).forEach(function(g){var x=m[g],v=d.features?d.features[x.feature]:undefined;if(x.key&&v!==undefined){v=v[x.key];}if(v!==undefined){window[g]=v;}});}());</script>';
+		echo '<script>(function(){var n=document.getElementById(' . wp_json_encode(self::ELEMENT_ID) . '),d={};try{d=n?JSON.parse(n.textContent||"{}"):{};}catch(e){}window.SPAdminBootstrap=d;window.SPAdminData={get:function(k,f){return d.features&&Object.prototype.hasOwnProperty.call(d.features,k)?d.features[k]:f;}};var m=' . $legacy . ';Object.keys(m).forEach(function(g){var x=m[g],v=d.features?d.features[x.feature]:undefined;if(x.key&&v!==undefined){v=v[x.key];}if(v!==undefined){window[g]=v;}});document.dispatchEvent(new CustomEvent("sp-admin-bootstrap-ready",{detail:d}));}());</script>';
 	}
 }

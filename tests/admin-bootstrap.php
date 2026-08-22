@@ -76,6 +76,7 @@ $checks = [
 	'payload contains the registered feature'          => str_contains( $output, 'editorWidgets' ),
 	'invalid feature names are ignored'                => ! str_contains( $output, 'invalid key' ),
 	'legacy global mapping is emitted'                 => str_contains( $output, 'SP_WIDGETS_NONCE' ),
+	'ready event is dispatched for deferred consumers' => str_contains( $output, 'sp-admin-bootstrap-ready' ),
 	'embedded closing script tags are hex escaped'     => ! str_contains( $output, '</script><script>alert(1)' ),
 	'bootstrap is emitted once'                        => $second_output === '',
 ];
