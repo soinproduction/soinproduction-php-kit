@@ -968,6 +968,29 @@ CSS;
 			return <<<'JS'
 jQuery(function($){
 
+var sharedRequests = window.SPAdminRequestCache = window.SPAdminRequestCache || {};
+function sharedTermRequest(data){
+	var key='stax:'+JSON.stringify(data);
+	var now=Date.now();
+	var cached=sharedRequests[key];
+	if(cached&&cached.data&&cached.expires>now){
+		return $.Deferred().resolve(cached.data).promise();
+	}
+	if(cached&&cached.request){
+		return cached.request;
+	}
+	var request=$.post(ajaxurl,data,null,'json');
+	sharedRequests[key]={request:request,expires:0};
+	request.done(function(response){
+		if(response&&response.success){
+			sharedRequests[key]={data:response,expires:Date.now()+60000};
+		}else{
+			delete sharedRequests[key];
+		}
+	}).fail(function(){ delete sharedRequests[key]; });
+	return request;
+}
+
 /* ── Tab switching ──────────────────────────────────── */
 $(document).on('click', '.sp-stax__tab', function(){
 	var $btn=$(this), $root=$btn.closest('.sp-stax'), mode=$btn.data('mode');
@@ -980,6 +1003,7 @@ $(document).on('click', '.sp-stax__tab', function(){
 
 /* ── Init each widget ──────────────────────────────── */
 function initWidget($root) {
+	if(!$root.length||$root.closest('.acf-clone').length) return;
 	if ($root.data('sp-stax-initialized')) return;
 	$root.data('sp-stax-initialized', true);
 
@@ -997,6 +1021,7 @@ function initWidget($root) {
 	var timer  = null;
 	var xhr    = null;
 	var requestId = 0;
+	var initialLoaded = false;
 	var fieldName = $root.find('.sp-stax__mode-input').attr('name').replace('[mode]','');
 
 	function escapeAttr(value){
@@ -1048,12 +1073,12 @@ function initWidget($root) {
 
 	function loadTerms(append){
 		var currentRequest=++requestId;
-		if(xhr && xhr.readyState!==4) xhr.abort();
+		initialLoaded=true;
 		if(!append){ $avail.empty(); page=1; hasMore=true; }
 		setBusy(true);
 		setStatus('loading', i18n.loading || 'Loading terms…');
 
-		xhr=$.post(ajaxurl,{
+		xhr=sharedTermRequest({
 			action:'sp_stax_search',
 			s: $search.val()||'',
 			taxonomy: config.taxonomy||[],
@@ -1061,7 +1086,7 @@ function initWidget($root) {
 			thumb_field: config.thumb_field||'',
 			page: page,
 			_wpnonce: config.nonce
-		}, null, 'json').done(function(r){
+		}).done(function(r){
 			if(currentRequest!==requestId) return;
 			if(!r||!r.success){
 				setStatus('error', i18n.load_error || 'Could not load terms. Please try again.');
@@ -1084,8 +1109,25 @@ function initWidget($root) {
 		});
 	}
 
-	/* Initial load */
-	if($avail.length) loadTerms(false);
+	/* Load only when the real field becomes visible or receives interaction. */
+	function ensureInitialLoad(){
+		if(initialLoaded||!$avail.length||$root.closest('.acf-clone').length||!$avail.is(':visible')) return;
+		loadTerms(false);
+	}
+	$root.on('focusin.spStaxLazy click.spStaxLazy', function(){
+		window.setTimeout(ensureInitialLoad,0);
+	});
+	if('IntersectionObserver' in window&&!$root.closest('.acf-clone').length){
+		var observer=new IntersectionObserver(function(entries){
+			if(entries.some(function(entry){return entry.isIntersecting;})){
+				ensureInitialLoad();
+				if(initialLoaded) observer.disconnect();
+			}
+		},{rootMargin:'240px'});
+		observer.observe($root.get(0));
+	}else{
+		window.setTimeout(ensureInitialLoad,0);
+	}
 
 	/* Search */
 	$search.on('input', function(){
@@ -1178,11 +1220,12 @@ function initWidget($root) {
 }
 
 /* Run on existing widgets and dynamic ones (e.g. ACF block/repeater) */
-$('.sp-stax').each(function(){ initWidget($(this)); });
+$('.sp-stax').not('.acf-clone .sp-stax').each(function(){ initWidget($(this)); });
 if (typeof acf !== 'undefined') {
 	acf.add_action('ready append', function($el){
 		acf.get_fields({type: 'smart_taxonomy'}, $el).each(function(){
-			initWidget($(this).find('.sp-stax'));
+			var $widget=$(this).find('.sp-stax');
+			if(!$widget.closest('.acf-clone').length) initWidget($widget);
 		});
 	});
 }
@@ -1202,6 +1245,9 @@ add_action( 'wp_ajax_sp_stax_search', function (): void {
 	if ( ! check_ajax_referer( 'sp_stax', '_wpnonce', false ) ) {
 		wp_send_json_error( 'Nonce' );
 	}
+	if ( ! is_user_logged_in() ) {
+		wp_send_json_error( 'Permission denied', 403 );
+	}
 
 	$search      = sanitize_text_field( $_POST['s'] ?? '' );
 	$taxonomies  = ! empty( $_POST['taxonomy'] ) && is_array( $_POST['taxonomy'] )
@@ -1210,6 +1256,13 @@ add_action( 'wp_ajax_sp_stax_search', function (): void {
 
 	if ( empty( $taxonomies ) ) {
 		$taxonomies = get_taxonomies( [ 'public' => true ] );
+	}
+	$taxonomies = array_values( array_filter( $taxonomies, static function ( string $taxonomy ): bool {
+		$object = get_taxonomy( $taxonomy );
+		return $object && ! empty( $object->cap->assign_terms ) && current_user_can( (string) $object->cap->assign_terms );
+	} ) );
+	if ( empty( $taxonomies ) ) {
+		wp_send_json_error( 'Permission denied', 403 );
 	}
 
 	$filter_taxonomy = sanitize_key( $_POST['filter_taxonomy'] ?? '' );

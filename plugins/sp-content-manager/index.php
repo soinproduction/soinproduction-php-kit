@@ -1401,7 +1401,7 @@
 				$position = 0;
 				foreach ( $order_ids as $term_id ) {
 					$term = get_term( $term_id, $taxonomy );
-					if ( ! $term || is_wp_error( $term ) ) {
+					if ( ! $term || is_wp_error( $term ) || ! current_user_can( 'edit_term', $term_id ) ) {
 						continue;
 					}
 

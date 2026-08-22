@@ -87,5 +87,4 @@ Rows are refreshed through:
 wp_ajax_sp_tax_urls_get_rows
 ```
 
-The AJAX response returns rendered row HTML for the currently checked term IDs.
-
+The AJAX response returns rendered row HTML for the currently checked term IDs. The taxonomy is validated and requires its `assign_terms` capability.

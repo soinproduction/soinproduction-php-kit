@@ -210,10 +210,6 @@
         add_action( "wp_ajax_sp_save_thumb_{$object}", function () use ( $object, $type, $acf_field, $nonce_key, $get_acf_key ) {
             check_ajax_referer( $nonce_key, 'nonce' );
 
-            if ( ! current_user_can( 'manage_categories' ) ) {
-                wp_send_json_error( [ 'message' => 'Insufficient permissions' ] );
-            }
-
             $id     = (int) ( $_POST['id'] ?? 0 );
             $img_id = (int) ( $_POST['img_id'] ?? 0 );
 
@@ -221,7 +217,25 @@
                 wp_send_json_error( [ 'message' => 'Invalid ID' ] );
             }
 
+			if ( $type === 'post' ) {
+				if ( get_post_type( $id ) !== $object || ! current_user_can( 'edit_post', $id ) ) {
+					wp_send_json_error( [ 'message' => 'Insufficient permissions' ], 403 );
+				}
+			} else {
+				$term = get_term( $id, $object );
+				if ( ! $term || is_wp_error( $term ) || ! current_user_can( 'edit_term', $id ) ) {
+					wp_send_json_error( [ 'message' => 'Insufficient permissions' ], 403 );
+				}
+			}
+
+			if ( $img_id > 0 && get_post_type( $img_id ) !== 'attachment' ) {
+				wp_send_json_error( [ 'message' => 'Invalid attachment' ], 400 );
+			}
+
             if ( $acf_field === '' ) {
+				if ( $type !== 'post' ) {
+					wp_send_json_error( [ 'message' => 'Thumbnail fields require a post object' ], 400 );
+				}
                 $img_id ? set_post_thumbnail( $id, $img_id ) : delete_post_thumbnail( $id );
             } else {
                 update_field( $acf_field, $img_id ?: null, $get_acf_key( $id ) );

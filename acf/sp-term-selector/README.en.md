@@ -102,5 +102,4 @@ The admin picker searches terms through:
 wp_ajax_sp_stax_search
 ```
 
-The request is protected by the `sp_stax` nonce generated in the field config.
-
+The request is protected by the `sp_stax` nonce generated in the field config. Every requested taxonomy is validated and requires its `assign_terms` capability. Pickers initialize lazily near the viewport, skip ACF clone templates, and share identical successful responses for 60 seconds.

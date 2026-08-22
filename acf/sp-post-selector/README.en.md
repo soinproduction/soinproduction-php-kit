@@ -110,4 +110,4 @@ The admin picker searches posts through:
 wp_ajax_sp_srel_search
 ```
 
-The request is protected by the `sp_srel` nonce generated in the field config.
+The request is protected by the `sp_srel` nonce generated in the field config. Every requested post type is validated and requires its `edit_posts` capability. Pickers initialize lazily near the viewport, skip ACF clone templates, and share identical successful responses for 60 seconds.

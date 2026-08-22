@@ -17,7 +17,7 @@
 
         public static function init(): void {
             if ( is_admin() ) {
-                add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_admin_assets' ] );
+				add_action( 'admin_enqueue_scripts', [ __CLASS__, 'enqueue_admin_assets' ], 100 );
                 add_filter( 'attachment_fields_to_edit', [ __CLASS__, 'attachment_fields_to_edit' ], 10, 2 );
                 add_filter( 'attachment_fields_to_save', [ __CLASS__, 'attachment_fields_to_save' ], 10, 2 );
 
@@ -59,7 +59,13 @@
         }
 
         public static function enqueue_admin_assets(): void {
-            wp_enqueue_media();
+			if (
+				! wp_script_is( 'media-views', 'enqueued' )
+				&& ! wp_script_is( 'media-editor', 'enqueued' )
+				&& ! wp_script_is( 'media-grid', 'enqueued' )
+			) {
+				return;
+			}
 
             wp_register_style( 'sp-video-preview-admin-inline', false );
             wp_enqueue_style( 'sp-video-preview-admin-inline' );

@@ -967,6 +967,9 @@ add_action( 'wp_ajax_sp_tax_urls_get_rows', function (): void {
     if ( ! check_ajax_referer( 'sp_tax_urls', '_wpnonce', false ) ) {
         wp_send_json_error( 'Invalid nonce' );
     }
+	if ( ! is_user_logged_in() ) {
+		wp_send_json_error( 'Permission denied', 403 );
+	}
 
     $taxonomy   = sanitize_key( $_POST['taxonomy'] ?? '' );
     $icon_field = sanitize_key( $_POST['icon_field'] ?? '' );
@@ -979,6 +982,15 @@ add_action( 'wp_ajax_sp_tax_urls_get_rows', function (): void {
     if ( $taxonomy === '' || empty( $term_ids ) ) {
         wp_send_json_error( 'Missing data' );
     }
+
+	$taxonomy_object = get_taxonomy( $taxonomy );
+	if (
+		! $taxonomy_object
+		|| empty( $taxonomy_object->cap->assign_terms )
+		|| ! current_user_can( (string) $taxonomy_object->cap->assign_terms )
+	) {
+		wp_send_json_error( 'Permission denied', 403 );
+	}
 
     $terms = get_terms( [
         'taxonomy'   => $taxonomy,

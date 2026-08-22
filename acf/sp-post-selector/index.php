@@ -1081,6 +1081,29 @@ CSS;
 				return <<<'JS'
 jQuery(function($){
 
+var sharedRequests = window.SPAdminRequestCache = window.SPAdminRequestCache || {};
+function sharedPostRequest(data){
+	var key='srel:'+JSON.stringify(data);
+	var now=Date.now();
+	var cached=sharedRequests[key];
+	if(cached&&cached.data&&cached.expires>now){
+		return $.Deferred().resolve(cached.data).promise();
+	}
+	if(cached&&cached.request){
+		return cached.request;
+	}
+	var request=$.post(ajaxurl,data,null,'json');
+	sharedRequests[key]={request:request,expires:0};
+	request.done(function(response){
+		if(response&&response.success){
+			sharedRequests[key]={data:response,expires:Date.now()+60000};
+		}else{
+			delete sharedRequests[key];
+		}
+	}).fail(function(){ delete sharedRequests[key]; });
+	return request;
+}
+
 /* ── Tab switching ──────────────────────────────────── */
 $(document).on('click', '.sp-srel__tab', function(){
 	var $btn=$(this), $root=$btn.closest('.sp-srel'), mode=$btn.data('mode');
@@ -1094,6 +1117,7 @@ $(document).on('click', '.sp-srel__tab', function(){
 /* ── Init each widget ──────────────────────────────── */
 function initSmartRelationship(root){
 	var $root  = $(root);
+	if(!$root.length||$root.closest('.acf-clone').length) return;
 	if($root.data('spSrelReady')) return;
 	$root.data('spSrelReady', true);
 
@@ -1111,6 +1135,7 @@ function initSmartRelationship(root){
 	var timer  = null;
 	var xhr    = null;
 	var requestId = 0;
+	var initialLoaded = false;
 	var fieldName = $root.find('.sp-srel__mode-input').attr('name').replace('[mode]','');
 
 	function escapeAttr(value){
@@ -1162,7 +1187,7 @@ function initSmartRelationship(root){
 
 	function loadPosts(append){
 		var currentRequest=++requestId;
-		if(xhr && xhr.readyState!==4) xhr.abort();
+		initialLoaded=true;
 		if(!append){ $avail.empty(); page=1; hasMore=true; }
 		setBusy(true);
 		setStatus('loading', i18n.loading || 'Loading posts…');
@@ -1170,7 +1195,7 @@ function initSmartRelationship(root){
 		var taxVal=$tax.length?$tax.val():'';
 		var taxParts=taxVal?taxVal.split(':'):[];
 
-		xhr=$.post(ajaxurl,{
+		xhr=sharedPostRequest({
 			action:'sp_srel_search',
 			s: $search.val()||'',
 			post_type: config.post_type||[],
@@ -1179,7 +1204,7 @@ function initSmartRelationship(root){
 			thumb_field: config.thumb_field||'',
 			page: page,
 			_wpnonce: config.nonce
-		}, null, 'json').done(function(r){
+		}).done(function(r){
 			if(currentRequest!==requestId) return;
 			if(!r||!r.success){
 				setStatus('error', i18n.load_error || 'Could not load posts. Please try again.');
@@ -1202,8 +1227,25 @@ function initSmartRelationship(root){
 		});
 	}
 
-	/* Initial load */
-	if($avail.length) loadPosts(false);
+	/* Load only when the real field becomes visible or receives interaction. */
+	function ensureInitialLoad(){
+		if(initialLoaded||!$avail.length||$root.closest('.acf-clone').length||!$avail.is(':visible')) return;
+		loadPosts(false);
+	}
+	$root.on('focusin.spSrelLazy click.spSrelLazy', function(){
+		window.setTimeout(ensureInitialLoad,0);
+	});
+	if('IntersectionObserver' in window&&!$root.closest('.acf-clone').length){
+		var observer=new IntersectionObserver(function(entries){
+			if(entries.some(function(entry){return entry.isIntersecting;})){
+				ensureInitialLoad();
+				if(initialLoaded) observer.disconnect();
+			}
+		},{rootMargin:'240px'});
+		observer.observe($root.get(0));
+	}else{
+		window.setTimeout(ensureInitialLoad,0);
+	}
 
 	/* Search */
 	$search.on('input', function(){
@@ -1302,7 +1344,7 @@ function initSmartRelationship(root){
 
 function initSmartRelationships(context){
 	var $context = $(context || document);
-	$context.find('.sp-srel').addBack('.sp-srel').each(function(){
+	$context.find('.sp-srel').addBack('.sp-srel').not('.acf-clone .sp-srel').each(function(){
 		initSmartRelationship(this);
 	});
 }
@@ -1330,13 +1372,38 @@ JS;
 		if ( ! check_ajax_referer( 'sp_srel', '_wpnonce', false ) ) {
 			wp_send_json_error( 'Nonce' );
 		}
+		if ( ! is_user_logged_in() ) {
+			wp_send_json_error( 'Permission denied', 403 );
+		}
 
 		$search      = sanitize_text_field( $_POST['s'] ?? '' );
 		$post_types  = ! empty( $_POST['post_type'] ) && is_array( $_POST['post_type'] )
 			? array_map( 'sanitize_key', $_POST['post_type'] )
 			: [ 'any' ];
+		if ( in_array( 'any', $post_types, true ) ) {
+			$post_types = get_post_types( [ 'show_ui' => true ] );
+		}
+		$post_types = array_values( array_filter( $post_types, static function ( string $post_type ): bool {
+			$object = get_post_type_object( $post_type );
+			return $object && ! empty( $object->cap->edit_posts ) && current_user_can( (string) $object->cap->edit_posts );
+		} ) );
+		if ( empty( $post_types ) ) {
+			wp_send_json_error( 'Permission denied', 403 );
+		}
 		$taxonomy    = sanitize_key( $_POST['taxonomy'] ?? '' );
 		$term_id     = absint( $_POST['term_id'] ?? 0 );
+		if ( $taxonomy !== '' ) {
+			$taxonomy_object = get_taxonomy( $taxonomy );
+			$allowed_taxonomies = get_object_taxonomies( $post_types );
+			if (
+				! $taxonomy_object
+				|| ! in_array( $taxonomy, $allowed_taxonomies, true )
+				|| empty( $taxonomy_object->cap->assign_terms )
+				|| ! current_user_can( (string) $taxonomy_object->cap->assign_terms )
+			) {
+				wp_send_json_error( 'Permission denied', 403 );
+			}
+		}
 		$page        = max( 1, absint( $_POST['page'] ?? 1 ) );
 		$raw_thumb_field = wp_unslash( $_POST['thumb_field'] ?? '' );
 		$thumb_field     = is_array( $raw_thumb_field )

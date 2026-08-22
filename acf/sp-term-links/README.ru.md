@@ -10,3 +10,5 @@ ACF field `taxonomy_urls`, который выводит отдельный URL 
 ```
 
 `taxonomy` задаёт источник terms, `icon_field` — необязательное ACF image field термина. Значение хранится как соответствие term ID → URL. Полный контракт описан в `README.en.md`.
+
+AJAX проверяет taxonomy и требует её capability `assign_terms`.
