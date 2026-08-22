@@ -15,6 +15,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 			'sp-cf7'                  => 'email-alt',
 			'sp-admin-ui'             => 'admin-customizer',
 			'sp-content-manager'      => 'admin-users',
+			'sp-deployment-manager'   => 'update',
 			'sp-archive-pages'        => 'archive',
 			'sp-debug-toolbar'        => 'editor-code',
 			'sp-content-favorites'    => 'star-filled',

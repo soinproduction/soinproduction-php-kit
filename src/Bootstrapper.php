@@ -48,6 +48,7 @@ class Bootstrapper {
 
 	private const DEFAULT_FRONTEND_SKIP_PATHS = [
 		'plugins/sp-content-manager/',
+		'plugins/sp-deployment-manager/',
 		'plugins/sp-video-posters/',
 		'plugins/sp-google-reviews/includes/stars-column.php',
 	];
@@ -228,7 +229,7 @@ class Bootstrapper {
 
 		foreach ($modules as $key => $value) {
 			$module        = is_string($key) ? $key : $value;
-			$module_config = is_string($key) && is_array($value) ? array_values($value) : null;
+			$module_config = is_string($key) && is_array($value) ? $value : null;
 
 			if (!is_string($module)) {
 				continue;

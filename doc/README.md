@@ -48,6 +48,7 @@ ACF-типы и общие ACF-хелперы загружаются до рег
 - **[sp-cf7](../plugins/sp-cf7/README.ru.md)** — единая структурированная коллекция CF7-интеграций с отдельной документацией каждого подмодуля.
 - **[sp-content-favorites](../plugins/sp-content-favorites/README.ru.md)** — favorites settings, metadata/admin controls и REST/filter behavior.
 - **[sp-content-manager](../plugins/sp-content-manager/README.ru.md)** — (SP Content Manager) дублирование записей/страниц/CPT и изменение порядка (drag-and-drop) для записей, таксономий и пунктов меню админки.
+- **[sp-deployment-manager](../plugins/sp-deployment-manager/README.ru.md)** — безопасная проверка, Composer-обновление и откат php-kit из GitHub прямо в админке WordPress.
 - **[sp-debug-toolbar](../plugins/sp-debug-toolbar/README.ru.md)** — панель отладки на фронтенде, отображающая потребление памяти, количество запросов к БД и время генерации страницы.
 - **[sp-documentation](../plugins/sp-documentation/README.ru.md)** — встроенная Wiki для документации темы и подключённых модулей кита.
 - **[sp-google-reviews](../plugins/sp-google-reviews/README.ru.md)** — импорт и администрирование отзывов Google.

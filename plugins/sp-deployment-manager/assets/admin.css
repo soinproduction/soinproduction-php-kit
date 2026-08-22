@@ -1,0 +1,174 @@
+.sp-deployment {
+    max-width: 1180px;
+}
+
+.sp-deployment .sp-admin-card {
+    overflow: hidden;
+    border: 1px solid #dcdcde;
+    border-radius: 4px;
+    background: #fff;
+    box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+}
+
+.sp-deployment .sp-admin-card__header {
+    padding: 18px 24px;
+    border-bottom: 1px solid #dcdcde;
+}
+
+.sp-deployment__package {
+    margin-top: 20px;
+}
+
+.sp-deployment__package .sp-admin-card__header,
+.sp-deployment__grid .sp-admin-card__header,
+.sp-deployment__log .sp-admin-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+}
+
+.sp-deployment__package h2,
+.sp-deployment__grid h2,
+.sp-deployment__log h2 {
+    margin: 0;
+}
+
+.sp-deployment__package p {
+    margin: 6px 0 0;
+}
+
+.sp-deployment__badge {
+    display: inline-flex;
+    align-items: center;
+    min-height: 28px;
+    padding: 0 12px;
+    border-radius: 999px;
+    background: #f0f0f1;
+    color: #50575e;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.sp-deployment__badge.is-current {
+    background: #edfaef;
+    color: #116329;
+}
+
+.sp-deployment__badge.is-update {
+    background: #fff4d5;
+    color: #7a5100;
+}
+
+.sp-deployment__badge.is-error {
+    background: #fcf0f1;
+    color: #8a2424;
+}
+
+.sp-deployment__versions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 24px;
+    padding: 28px;
+}
+
+.sp-deployment__versions > div {
+    display: grid;
+    gap: 8px;
+}
+
+.sp-deployment__versions span {
+    color: #646970;
+}
+
+.sp-deployment__versions strong {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 24px;
+}
+
+.sp-deployment__commit {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 14px 28px;
+    border-top: 1px solid #dcdcde;
+    background: #f6f7f7;
+}
+
+.sp-deployment__commit[hidden] {
+    display: none;
+}
+
+.sp-deployment__commit span {
+    color: #646970;
+    white-space: nowrap;
+}
+
+.sp-deployment__grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+.sp-deployment__details {
+    margin: 0;
+    padding: 8px 24px 20px;
+}
+
+.sp-deployment__details > div {
+    display: grid;
+    grid-template-columns: 130px minmax(0, 1fr);
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #f0f0f1;
+}
+
+.sp-deployment__details dt {
+    color: #646970;
+}
+
+.sp-deployment__details dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+.sp-deployment__rollback-copy {
+    padding: 4px 24px 20px;
+    color: #646970;
+}
+
+.sp-deployment__log {
+    margin-top: 20px;
+}
+
+.sp-deployment__log pre {
+    max-height: 420px;
+    margin: 0;
+    padding: 20px 24px;
+    overflow: auto;
+    background: #1d2327;
+    color: #f0f0f1;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+}
+
+@media (max-width: 782px) {
+    .sp-deployment__grid {
+        grid-template-columns: 1fr;
+    }
+
+    .sp-deployment__versions {
+        grid-template-columns: 1fr;
+    }
+
+    .sp-deployment__versions > .dashicons {
+        transform: rotate(90deg);
+    }
+
+    .sp-deployment__commit {
+        flex-direction: column;
+    }
+}

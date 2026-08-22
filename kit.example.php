@@ -49,6 +49,7 @@ $plugins = [
 		'sp-cf7-icon-generator',
 	],
 	'sp-content-manager',
+	'sp-deployment-manager',
 	'sp-archive-pages',
 	'sp-debug-toolbar',
 	'sp-content-favorites',
