@@ -961,6 +961,13 @@ if ( ! class_exists( 'WP_Object_Cache', false ) ) {
 if ( ! function_exists( 'wp_cache_init' ) ) {
 function wp_cache_init() {
 	$GLOBALS['wp_object_cache'] = new WP_Object_Cache();
+
+	// WordPress treats any loaded object-cache.php as persistent and routes
+	// transients exclusively through it. If SQLite failed to initialize, keep
+	// the request-local cache API but let transients fall back to the database.
+	if ( function_exists( 'wp_using_ext_object_cache' ) ) {
+		wp_using_ext_object_cache( $GLOBALS['wp_object_cache']->is_persistent() );
+	}
 }
 
 function wp_cache_add( $key, $data, $group = '', $expire = 0 ) {

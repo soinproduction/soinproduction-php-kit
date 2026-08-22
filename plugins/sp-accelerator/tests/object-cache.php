@@ -148,6 +148,29 @@ function sp_oc_test_boot( string $root, string $salt, string $dropin ): void {
 	wp_cache_init();
 }
 
+function sp_oc_test_boot_without_persistence( string $root, string $salt, string $dropin ): void {
+	$GLOBALS['blog_id'] = 1;
+	$GLOBALS['sp_oc_test_using_ext_object_cache'] = true;
+	define( 'ABSPATH', $root . '/public/' );
+	define( 'WP_CONTENT_DIR', $root . '/wp-content' );
+	define( 'WP_CACHE_KEY_SALT', $salt );
+	// A system temporary root is deliberately rejected by the drop-in's safety
+	// checks, which provides a deterministic non-persistent backend fixture.
+	define( 'SP_ACCELERATOR_CACHE_DIR', sys_get_temp_dir() );
+	require $dropin;
+	wp_cache_init();
+}
+
+if ( ! function_exists( 'wp_using_ext_object_cache' ) ) {
+	function wp_using_ext_object_cache( $using = null ) {
+		$current = $GLOBALS['sp_oc_test_using_ext_object_cache'] ?? false;
+		if ( $using !== null ) {
+			$GLOBALS['sp_oc_test_using_ext_object_cache'] = (bool) $using;
+		}
+		return $current;
+	}
+}
+
 /** @return string|null */
 function sp_oc_test_file_mode( string $path ) {
 	clearstatcache( true, $path );
@@ -276,6 +299,18 @@ function sp_oc_test_ttl( string $root, string $salt, string $dropin ): void {
 	sp_oc_test_emit_checks( $checks );
 }
 
+function sp_oc_test_non_persistent_fallback( string $root, string $salt, string $dropin ): void {
+	sp_oc_test_boot_without_persistence( $root, $salt, $dropin );
+	$checks = [];
+
+	sp_oc_test_record( $checks, 'persistent backend remains disabled', ! $GLOBALS['wp_object_cache']->is_persistent() );
+	sp_oc_test_record( $checks, 'WordPress external cache flag is disabled', wp_using_ext_object_cache() === false );
+	sp_oc_test_record( $checks, 'request-local cache remains available', wp_cache_set( 'local', 'value', 'fallback', 60 ) && wp_cache_get( 'local', 'fallback' ) === 'value' );
+
+	wp_cache_close();
+	sp_oc_test_emit_checks( $checks );
+}
+
 function sp_oc_test_write_value( string $root, string $salt, string $dropin, string $value ): void {
 	sp_oc_test_boot( $root, $salt, $dropin );
 	$ok = method_exists( $GLOBALS['wp_object_cache'], 'is_persistent' )
@@ -368,6 +403,9 @@ if ( $sp_oc_test_mode !== 'run' ) {
 		case 'ttl':
 			sp_oc_test_ttl( $root, $salt, $sp_oc_test_dropin );
 			break;
+		case 'non-persistent-fallback':
+			sp_oc_test_non_persistent_fallback( $root, $salt, $sp_oc_test_dropin );
+			break;
 		case 'write-value':
 			sp_oc_test_write_value( $root, $salt, $sp_oc_test_dropin, isset( $argv[4] ) ? (string) $argv[4] : '' );
 			break;
@@ -422,6 +460,7 @@ $sp_oc_test_checks   = 0;
 $sp_oc_test_cases    = [
 	'contract'    => $sp_oc_test_root . '/contract',
 	'ttl'         => $sp_oc_test_root . '/ttl',
+	'fallback'    => $sp_oc_test_root . '/fallback',
 	'salt'        => $sp_oc_test_root . '/salt',
 	'concurrency' => $sp_oc_test_root . '/concurrency',
 ];
@@ -434,6 +473,9 @@ sp_oc_test_merge_child( 'contract checks', $result, $sp_oc_test_failures, $sp_oc
 
 $result = sp_oc_test_run_process( [ PHP_BINARY, $sp_oc_test_script, 'ttl', $sp_oc_test_cases['ttl'], 'ttl-salt' ] );
 sp_oc_test_merge_child( 'TTL checks', $result, $sp_oc_test_failures, $sp_oc_test_checks );
+
+$result = sp_oc_test_run_process( [ PHP_BINARY, $sp_oc_test_script, 'non-persistent-fallback', $sp_oc_test_cases['fallback'], 'fallback-salt' ] );
+sp_oc_test_merge_child( 'non-persistent fallback checks', $result, $sp_oc_test_failures, $sp_oc_test_checks );
 
 $salt_root = $sp_oc_test_cases['salt'];
 $result    = sp_oc_test_run_process( [ PHP_BINARY, $sp_oc_test_script, 'write-value', $salt_root, 'salt-a', 'A' ] );
