@@ -3,7 +3,7 @@
 /**
  * Plugin Name: SP Deployment Manager
  * Description: Composer-backed repository updates, status checks and rollback from WordPress admin.
- * Version: 1.0.4
+ * Version: 1.0.5
  */
 
 if (! defined('ABSPATH')) {
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 if (! class_exists('SP_Deployment_Manager', false)) {
 	final class SP_Deployment_Manager
 	{
-		private const VERSION = '1.0.4';
+		private const VERSION = '1.0.5';
 		private const PAGE_SLUG = 'sp-deployment-manager';
 		private const NONCE_ACTION = 'sp_deployment_manager';
 		private const CRON_HOOK = 'sp_deployment_manager_run_job';

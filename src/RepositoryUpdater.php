@@ -410,19 +410,38 @@ final class RepositoryUpdater
 		if ($home === '' && defined('SP_DEPLOYMENT_COMPOSER_HOME') && is_string(SP_DEPLOYMENT_COMPOSER_HOME)) {
 			$home = trim(SP_DEPLOYMENT_COMPOSER_HOME);
 		}
-		if ($home === '' && (! empty($inherited['HOME']) || ! empty($inherited['COMPOSER_HOME']))) {
+		if ($home !== '') {
+			if ((! is_dir($home) && ! @mkdir($home, 0700, true)) || ! is_writable($home)) {
+				return $inherited;
+			}
+			@chmod($home, 0700);
+			$inherited['COMPOSER_HOME'] = $home;
+			if (empty($inherited['HOME'])) {
+				$inherited['HOME'] = dirname($home);
+			}
 			return $inherited;
 		}
-		if ($home === '') {
-			$home = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'sp-deployment-composer-' . substr(hash('sha256', $cwd), 0, 16);
+
+		if (! empty($inherited['HOME']) || ! empty($inherited['COMPOSER_HOME'])) {
+			return $inherited;
 		}
 
+		if (function_exists('posix_geteuid') && function_exists('posix_getpwuid')) {
+			$account = posix_getpwuid(posix_geteuid());
+			$accountHome = is_array($account) ? trim((string) ($account['dir'] ?? '')) : '';
+			if ($accountHome !== '' && is_dir($accountHome) && is_readable($accountHome) && is_writable($accountHome)) {
+				$inherited['HOME'] = $accountHome;
+				return $inherited;
+			}
+		}
+
+		$home = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'sp-deployment-composer-' . substr(hash('sha256', $cwd), 0, 16);
 		if ((! is_dir($home) && ! @mkdir($home, 0700, true)) || ! is_writable($home)) {
 			return $inherited;
 		}
 		@chmod($home, 0700);
 
-		$inherited['HOME'] = $home;
+		$inherited['HOME'] = dirname($home);
 		$inherited['COMPOSER_HOME'] = $home;
 		return $inherited;
 	}
