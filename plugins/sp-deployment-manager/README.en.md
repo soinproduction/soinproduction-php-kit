@@ -37,6 +37,7 @@ Defaults target the `main` branch of `soinproduction/soinproduction-php-kit`:
 	'branch'                => 'main',
 	'composer_command'      => [ '/usr/local/bin/composer' ],
 	'php_binary'            => '',
+	'composer_home'         => '',
 	'timeout'               => 300,
 	'no_dev'                => true,
 	'capability'            => 'update_plugins',
@@ -48,6 +49,8 @@ Defaults target the `main` branch of `soinproduction/soinproduction-php-kit`:
 `project_root` is normally discovered through Composer's installed package metadata. Set it only when the package lives outside the project that owns `composer.json`.
 
 `composer_command` is an argument array, never a shell string. Leave it empty to use a project `composer.phar`, `SP_DEPLOYMENT_COMPOSER_BINARY`, or finally `composer` from `PATH`. When the configured Composer executable is a PHP script with a shebang, the manager automatically invokes it through the CLI binary from `PHP_BINDIR` instead of relying on the web server's `PATH`. Use `php_binary` or `SP_DEPLOYMENT_PHP_BINARY` for non-standard installations.
+
+When PHP-FPM does not provide `HOME` or `COMPOSER_HOME`, the manager creates a private Composer home under the system temporary directory. Set `composer_home` or `SP_DEPLOYMENT_COMPOSER_HOME` for a persistent cache/auth directory outside the public web root.
 
 ## Private Repositories
 

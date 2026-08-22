@@ -22,6 +22,7 @@ final class RepositoryUpdater
 			'project_root'          => '',
 			'composer_command'      => [],
 			'php_binary'            => '',
+			'composer_home'         => '',
 			'timeout'               => 300,
 			'no_dev'                => false,
 			'capability'            => 'update_plugins',
@@ -51,6 +52,7 @@ final class RepositoryUpdater
 			? array_values(array_filter(array_map('strval', $config['composer_command']), static fn (string $part): bool => $part !== ''))
 			: [];
 		$phpBinary = isset($config['php_binary']) ? trim((string) $config['php_binary']) : '';
+		$composerHome = isset($config['composer_home']) ? trim((string) $config['composer_home']) : '';
 
 		$capability = isset($config['capability']) ? trim((string) $config['capability']) : '';
 		if (preg_match('/^[a-z0-9_-]+$/i', $capability) !== 1) {
@@ -68,6 +70,7 @@ final class RepositoryUpdater
 		$config['project_root']          = $projectRoot;
 		$config['composer_command']      = $composerCommand;
 		$config['php_binary']            = $phpBinary;
+		$config['composer_home']         = $composerHome;
 		$config['timeout']               = max(30, min(1800, (int) $config['timeout']));
 		$config['no_dev']                = ! empty($config['no_dev']);
 		$config['capability']            = $capability;
@@ -203,6 +206,8 @@ final class RepositoryUpdater
 	 */
 	public static function environment(array $config, string $projectRoot): array
 	{
+		$config = self::normalizeConfig($config);
+
 		if ($projectRoot === '' || ! self::projectRequiresPackage($projectRoot, (string) $config['package'])) {
 			return ['available' => false, 'message' => 'Composer project was not found.', 'command' => []];
 		}
@@ -221,7 +226,12 @@ final class RepositoryUpdater
 		}
 
 		$command = self::composerCommand($config, 'update', $projectRoot);
-		$probe = self::runProcess(array_merge(array_slice($command, 0, self::binaryPrefixLength($command)), ['--version', '--no-ansi']), $projectRoot, 15);
+		$probe = self::runProcess(
+			array_merge(array_slice($command, 0, self::binaryPrefixLength($command)), ['--version', '--no-ansi']),
+			$projectRoot,
+			15,
+			(string) $config['composer_home']
+		);
 
 		if ($probe['exit_code'] !== 0) {
 			return [
@@ -238,7 +248,7 @@ final class RepositoryUpdater
 	 * @param array<int, string> $command
 	 * @return array{exit_code: int, stdout: string, stderr: string, timed_out: bool}
 	 */
-	public static function runProcess(array $command, string $cwd, int $timeout): array
+	public static function runProcess(array $command, string $cwd, int $timeout, string $composerHome = ''): array
 	{
 		$result = ['exit_code' => 1, 'stdout' => '', 'stderr' => '', 'timed_out' => false];
 		if ($command === [] || ! self::functionAvailable('proc_open')) {
@@ -252,7 +262,8 @@ final class RepositoryUpdater
 			2 => ['pipe', 'w'],
 		];
 		$pipes = [];
-		$process = @proc_open($command, $descriptors, $pipes, $cwd, null, ['bypass_shell' => true]);
+		$environment = self::processEnvironment($cwd, $composerHome);
+		$process = @proc_open($command, $descriptors, $pipes, $cwd, $environment, ['bypass_shell' => true]);
 		if (! is_resource($process)) {
 			$result['stderr'] = 'Unable to start Composer.';
 			return $result;
@@ -378,6 +389,42 @@ final class RepositoryUpdater
 
 		$disabled = array_map('trim', explode(',', (string) ini_get('disable_functions')));
 		return ! in_array($function, $disabled, true);
+	}
+
+	/** @param array<string, string>|null $inherited */
+	private static function processEnvironment(string $cwd, string $configuredHome = '', ?array $inherited = null): array
+	{
+		if ($inherited === null) {
+			$current = getenv();
+			$inherited = is_array($current) ? array_map('strval', $current) : [];
+		}
+
+		if (empty($inherited['PATH'])) {
+			$path = getenv('PATH');
+			$inherited['PATH'] = is_string($path) && $path !== ''
+				? $path
+				: '/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
+		}
+
+		$home = $configuredHome;
+		if ($home === '' && defined('SP_DEPLOYMENT_COMPOSER_HOME') && is_string(SP_DEPLOYMENT_COMPOSER_HOME)) {
+			$home = trim(SP_DEPLOYMENT_COMPOSER_HOME);
+		}
+		if ($home === '' && (! empty($inherited['HOME']) || ! empty($inherited['COMPOSER_HOME']))) {
+			return $inherited;
+		}
+		if ($home === '') {
+			$home = rtrim(sys_get_temp_dir(), '/\\') . DIRECTORY_SEPARATOR . 'sp-deployment-composer-' . substr(hash('sha256', $cwd), 0, 16);
+		}
+
+		if ((! is_dir($home) && ! @mkdir($home, 0700, true)) || ! is_writable($home)) {
+			return $inherited;
+		}
+		@chmod($home, 0700);
+
+		$inherited['HOME'] = $home;
+		$inherited['COMPOSER_HOME'] = $home;
+		return $inherited;
 	}
 
 	/** @param array<int, string> $command */

@@ -54,6 +54,7 @@ $normalized = RepositoryUpdater::normalizeConfig([
 	'timeout'          => 2,
 	'backup_limit'     => 99,
 	'composer_command' => ['/usr/local/bin/composer', ''],
+	'composer_home'    => '  ' . $testRoot . '/composer-home  ',
 ]);
 $command = RepositoryUpdater::composerCommand([
 	'package'          => 'vendor/package',
@@ -70,6 +71,9 @@ $explicitInterpreterCommand = RepositoryUpdater::composerCommand([
 	'composer_command' => [PHP_BINARY, $composerFixture],
 	'php_binary'       => PHP_BINARY,
 ], 'update', $projectRoot);
+$processEnvironment = new ReflectionMethod(RepositoryUpdater::class, 'processEnvironment');
+$processEnvironment->setAccessible(true);
+$isolatedEnvironment = $processEnvironment->invoke(null, $projectRoot, $testRoot . '/composer-home', []);
 $process = RepositoryUpdater::runProcess([
 	PHP_BINARY,
 	'-r',
@@ -100,6 +104,7 @@ $checks = [
 	'timeout is clamped to a safe minimum'             => $normalized['timeout'] === 30,
 	'backup limit is clamped to a safe maximum'        => $normalized['backup_limit'] === 20,
 	'empty command fragments are discarded'           => $normalized['composer_command'] === ['/usr/local/bin/composer'],
+	'configured Composer home is normalized'           => $normalized['composer_home'] === $testRoot . '/composer-home',
 	'configured Composer project is detected'          => RepositoryUpdater::findProjectRoot('soinproduction/php-kit', $projectRoot) === realpath($projectRoot),
 	'project package requirement is validated'         => RepositoryUpdater::projectRequiresPackage($projectRoot, 'soinproduction/php-kit'),
 	'unrelated package requirement is rejected'        => ! RepositoryUpdater::projectRequiresPackage($projectRoot, 'vendor/missing'),
@@ -107,6 +112,9 @@ $checks = [
 	'update command targets only the configured package' => array_slice($command, 0, 4) === ['sp-composer-command', 'update', 'vendor/package', '--with-dependencies'],
 	'PHP Composer scripts receive a CLI interpreter'    => array_slice($interpretedCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'explicit PHP interpreter is not duplicated'        => array_slice($explicitInterpreterCommand, 0, 2) === [PHP_BINARY, $composerFixture],
+	'missing HOME receives a private Composer home'     => ($isolatedEnvironment['HOME'] ?? '') === $testRoot . '/composer-home'
+		&& ($isolatedEnvironment['COMPOSER_HOME'] ?? '') === $testRoot . '/composer-home'
+		&& is_dir($testRoot . '/composer-home'),
 	'non-interactive Composer flags are present'        => in_array('--no-interaction', $command, true) && in_array('--prefer-dist', $command, true),
 	'production no-dev mode is supported'              => in_array('--no-dev', $command, true),
 	'process output and exit code are captured'        => $process['exit_code'] === 0 && $process['stdout'] === 'ok' && $process['stderr'] === 'warn',

@@ -3,7 +3,7 @@
 /**
  * Plugin Name: SP Deployment Manager
  * Description: Composer-backed repository updates, status checks and rollback from WordPress admin.
- * Version: 1.0.3
+ * Version: 1.0.4
  */
 
 if (! defined('ABSPATH')) {
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 if (! class_exists('SP_Deployment_Manager', false)) {
 	final class SP_Deployment_Manager
 	{
-		private const VERSION = '1.0.3';
+		private const VERSION = '1.0.4';
 		private const PAGE_SLUG = 'sp-deployment-manager';
 		private const NONCE_ACTION = 'sp_deployment_manager';
 		private const CRON_HOOK = 'sp_deployment_manager_run_job';
@@ -301,7 +301,7 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 			}
 
 			$command = \SoinProduction\Kit\RepositoryUpdater::composerCommand($config, $commandOperation, $projectRoot);
-			$result = \SoinProduction\Kit\RepositoryUpdater::runProcess($command, $projectRoot, (int) $config['timeout']);
+			$result = \SoinProduction\Kit\RepositoryUpdater::runProcess($command, $projectRoot, (int) $config['timeout'], (string) $config['composer_home']);
 			$installedAfter = \SoinProduction\Kit\RepositoryUpdater::installedReference($projectRoot, (string) $config['package']);
 			$target = (string) ($state['target'] ?? '');
 			$matchesTarget = $target === '' || hash_equals($target, $installedAfter);
@@ -312,7 +312,7 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 				$recovered = \SoinProduction\Kit\RepositoryUpdater::restoreLock($projectRoot, $currentBackup, $backupDir);
 				if ($recovered) {
 					$recoveryCommand = \SoinProduction\Kit\RepositoryUpdater::composerCommand($config, 'install', $projectRoot);
-					$recovery = \SoinProduction\Kit\RepositoryUpdater::runProcess($recoveryCommand, $projectRoot, (int) $config['timeout']);
+					$recovery = \SoinProduction\Kit\RepositoryUpdater::runProcess($recoveryCommand, $projectRoot, (int) $config['timeout'], (string) $config['composer_home']);
 					$log .= "\n\nRecovery:\n" . self::processLog($recoveryCommand, $recovery, $projectRoot);
 				}
 			}
@@ -326,9 +326,15 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 					: null;
 			} else {
 				$state['status'] = 'error';
-				$state['message'] = $result['timed_out']
-					? 'Composer timed out; the previous lock file was restored.'
-					: ($matchesTarget ? 'Composer update failed; recovery was attempted.' : 'Composer finished, but the installed reference does not match the requested commit.');
+				if ($result['timed_out']) {
+					$state['message'] = 'Composer timed out; the previous lock file was restored.';
+				} elseif ($result['exit_code'] !== 0) {
+					$state['message'] = 'Composer update failed; the previous lock file was restored.';
+				} elseif ($installedAfter === '') {
+					$state['message'] = 'Composer finished, but the installed package reference could not be read.';
+				} else {
+					$state['message'] = 'Composer finished, but the installed reference does not match the requested commit.';
+				}
 			}
 
 			$state['log'] = self::truncate($log);
@@ -429,6 +435,7 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 			$cacheKey = 'sp_deployment_environment_' . md5(self::VERSION . '|' . $projectRoot . '|' . wp_json_encode([
 				$config['composer_command'],
 				$config['php_binary'],
+				$config['composer_home'],
 			]));
 			if (! $force) {
 				$cached = get_transient($cacheKey);
