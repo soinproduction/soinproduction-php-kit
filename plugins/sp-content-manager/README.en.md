@@ -18,7 +18,7 @@ Admin menu configuration is stored in the `sp_content_manager_cfg` option. Runti
 
 ## Duplicate Action
 
-The duplicate handler checks capabilities and a nonce, copies post data and supported metadata, creates a draft, and redirects to the new editor. Review relationships and unique external IDs before publishing a duplicate.
+The duplicate handler checks capabilities and a nonce, copies post data and supported metadata, creates a draft, and redirects to the new editor. It supports every eligible UI post type, including private custom types. Review relationships and unique external IDs before publishing a duplicate.
 
 ## Safety
 
@@ -45,7 +45,17 @@ Attachments, revisions, nav-menu items and the `nav_menu` taxonomy are excluded.
 
 The row action appears only when duplication is enabled and the user can edit the source and create content in its post type. The URL uses action `sp_cm_duplicate_post` with a post-specific nonce.
 
-The handler creates a draft containing content, excerpt, parent, menu order, discussion/password settings and current timestamps. The current user becomes author and the slug is left empty. It copies all post meta except `_edit_lock`, `_edit_last`, `_wp_old_slug`, preserving serialized values through `maybe_unserialize()`, and assigns all taxonomy term IDs.
+The handler creates a draft containing content, excerpt, parent, menu order, discussion/password settings and current timestamps. The current user becomes author and the slug is left empty. Shared `PostDuplicator` logic copies all post meta except `_edit_lock`, `_edit_last`, `_wp_old_slug` and WPML duplicate ownership state, preserving serialized values through `maybe_unserialize()`, and assigns all ordinary taxonomy term IDs.
+
+With Polylang or WPML active for the post type, the copy receives the source language through the plugin's public API. It intentionally starts a new translation group: two posts in the same language cannot occupy one translation group. Polylang's `language`/`post_translations` taxonomies are never copied directly.
+
+Other duplication entry points can use the same behavior after inserting their target post:
+
+```php
+\SoinProduction\Kit\PostDuplicator::copyAssociatedData( $source_id, $target_id );
+```
+
+Use `sp_post_duplicator_excluded_meta_keys`, `sp_post_duplicator_excluded_taxonomies` and `sp_post_duplicator_language_providers` to customize copying. `sp_post_duplicator_after_copy` fires after the shared copy step; the older `sp_cm_after_duplicate` action remains available for Content Manager-specific integrations.
 
 After copying, `sp_cm_after_duplicate` fires with source and target IDs:
 

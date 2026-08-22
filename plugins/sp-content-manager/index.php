@@ -2,7 +2,7 @@
 	/**
 	 * Plugin Name: SP Content Manager
 	 * Description: Duplicate posts/pages/CPTs and reorder posts + terms + admin menu via drag and drop.
-	 * Version: 1.2.0
+	 * Version: 1.3.0
 	 */
 
 	if ( ! defined( 'ABSPATH' ) ) {
@@ -14,7 +14,7 @@
 			private const OPT_KEY        = 'sp_content_manager_cfg';
 			private const PAGE_SLUG      = 'sp-content-manager';
 			private const NONCE_ACTION   = 'sp_content_manager_admin';
-			private const VERSION        = '1.2.0';
+			private const VERSION        = '1.3.0';
 			private const TERM_ORDER_KEY = '_sp_cm_order';
 
 			private static ?self $instance = null;
@@ -805,48 +805,6 @@
 				return $actions;
 			}
 
-			private function duplicate_post_meta( int $source_id, int $target_id ): void {
-				$skip_keys = [
-					'_edit_lock',
-					'_edit_last',
-					'_wp_old_slug',
-				];
-
-				$meta = get_post_meta( $source_id );
-				if ( ! is_array( $meta ) ) {
-					return;
-				}
-
-				foreach ( $meta as $meta_key => $values ) {
-					$meta_key = (string) $meta_key;
-					if ( in_array( $meta_key, $skip_keys, true ) ) {
-						continue;
-					}
-
-					delete_post_meta( $target_id, $meta_key );
-					foreach ( (array) $values as $value ) {
-						add_post_meta( $target_id, $meta_key, maybe_unserialize( $value ) );
-					}
-				}
-			}
-
-			private function duplicate_terms( WP_Post $source, int $target_id ): void {
-				$taxonomies = get_object_taxonomies( $source->post_type, 'names' );
-				if ( ! is_array( $taxonomies ) || ! $taxonomies ) {
-					return;
-				}
-
-				foreach ( $taxonomies as $taxonomy ) {
-					$term_ids = wp_get_object_terms( $source->ID, $taxonomy, [ 'fields' => 'ids' ] );
-					if ( is_wp_error( $term_ids ) || ! is_array( $term_ids ) ) {
-						continue;
-					}
-
-					$term_ids = array_values( array_filter( array_map( 'intval', $term_ids ), static fn( int $id ): bool => $id > 0 ) );
-					wp_set_object_terms( $target_id, $term_ids, $taxonomy, false );
-				}
-			}
-
 			public function handle_duplicate_post(): void {
 				if ( ! $this->is_duplicate_enabled() ) {
 					wp_die( esc_html__( 'Duplicate feature is disabled.', 'frontre' ), 403 );
@@ -895,8 +853,7 @@
 				}
 
 				$new_id = (int) $new_id;
-				$this->duplicate_post_meta( $source_id, $new_id );
-				$this->duplicate_terms( $source, $new_id );
+				\SoinProduction\Kit\PostDuplicator::copyAssociatedData( $source_id, $new_id );
 
 				do_action( 'sp_cm_after_duplicate', $source_id, $new_id );
 

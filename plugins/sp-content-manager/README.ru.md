@@ -45,7 +45,17 @@ Attachments, revisions, nav-menu items и `nav_menu` исключены. Choices
 
 Row action виден только при включённой функции и правах edit source + create posts. URL использует action `sp_cm_duplicate_post` и post-specific nonce.
 
-Handler создаёт draft с content, excerpt, parent, menu order, discussion/password settings и текущими timestamps. Current user становится author, slug пустой. Копируется вся meta кроме `_edit_lock`, `_edit_last`, `_wp_old_slug`; serialized values проходят `maybe_unserialize()`. Назначаются все taxonomy terms.
+Handler создаёт draft с content, excerpt, parent, menu order, discussion/password settings и текущими timestamps. Current user становится author, slug пустой. Общий механизм `PostDuplicator` копирует всю meta кроме `_edit_lock`, `_edit_last`, `_wp_old_slug` и служебного состояния WPML-дубликата; serialized values проходят `maybe_unserialize()`. Назначаются все обычные taxonomy terms.
+
+Если post type переведён через Polylang или WPML, копии назначается язык исходника через публичный API плагина. Копия намеренно начинает новую translation group: две записи одного языка не могут находиться в одной группе переводов. Служебные taxonomies Polylang `language` и `post_translations` напрямую не копируются.
+
+Другие обработчики дублирования могут использовать тот же механизм после создания целевой записи:
+
+```php
+\SoinProduction\Kit\PostDuplicator::copyAssociatedData( $source_id, $target_id );
+```
+
+Копирование настраивается фильтрами `sp_post_duplicator_excluded_meta_keys`, `sp_post_duplicator_excluded_taxonomies` и `sp_post_duplicator_language_providers`. После общего шага вызывается `sp_post_duplicator_after_copy`; прежний action `sp_cm_after_duplicate` остаётся доступным для интеграций Content Manager.
 
 После копирования вызывается `sp_cm_after_duplicate`:
 
