@@ -49,6 +49,12 @@ $plugins = [
 		'sp-cf7-icon-generator',
 	],
 	'sp-content-manager',
+	'sp-content-library' => [
+		'editor_layouts' => [
+			'author_quote',
+			'blockquote',
+		],
+	],
 	'sp-deployment-manager',
 	'sp-archive-pages',
 	'sp-debug-toolbar',

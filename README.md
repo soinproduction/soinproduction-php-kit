@@ -62,6 +62,10 @@ Bootstrap предназначен для URL, nonce, capabilities, перево
 
 Модуль `sp-deployment-manager` сравнивает установленный Composer reference с выбранной веткой GitHub и обновляет пакет целиком через `composer update soinproduction/php-kit --with-dependencies`. Операция запускается через WordPress Cron, защищена nonce/capabilities и filesystem lock; перед установкой сохраняется `composer.lock`, доступный для отката через интерфейс **Инструменты → Обновления репозитория**. Подробные требования к Composer, `proc_open`, приватным репозиториям и конфигурации описаны в `plugins/sp-deployment-manager/README.ru.md`.
 
+### Библиотека переиспользуемого контента
+
+Модуль `sp-content-library` переносит admin-регистрацию исторических post types `widgets` и `for-editor` в общий пакет и показывает их во **Внешний вид → Reusable Sections / Editor Blocks**. Внутренние slug и ACF field names не меняются. Разрешённые layout поля `blocks` задаются массивом `editor_layouts`; полная конфигурация и требования к callbacks описаны в `plugins/sp-content-library/README.ru.md`.
+
 Чтобы сохранить модуль в конфигурации, но отключить его, добавьте `_` перед именем. Например, `sp-share` будет загружен, а `_sp-share` — нет. Правило одинаково работает в списках `platform`, `acf` и `plugins`.
 
 ### Интеграция в тему
@@ -126,6 +130,12 @@ $plugins = [
 		'sp-cf7-icon-generator',
 	],
 	'sp-content-manager',
+	'sp-content-library' => [
+		'editor_layouts' => [
+			'author_quote',
+			'blockquote',
+		],
+	],
 	'sp-deployment-manager',
 	'sp-archive-pages',
 	'sp-debug-toolbar',
