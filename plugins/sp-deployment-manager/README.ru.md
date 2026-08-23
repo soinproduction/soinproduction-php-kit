@@ -28,7 +28,9 @@ Composer согласованно обновляет `composer.lock`, checkout �
 
 ## Конфигурация
 
-По умолчанию используется ветка `main` репозитория `soinproduction/soinproduction-php-kit`:
+Для публичного репозитория модуль работает без обязательных constants: PHP CLI определяется из текущего PHP runtime, Composer ищется в `composer.phar`, стандартных hosting paths и `PATH`, приватный `COMPOSER_HOME` создаётся автоматически, а commit ветки сначала проверяется через публичный `git ls-remote` без GitHub API rate limit.
+
+По умолчанию используется ветка `main` репозитория `soinproduction/soinproduction-php-kit`. Конфигурация ниже нужна только для переопределения автодетекта:
 
 ```php
 'sp-deployment-manager' => [
@@ -55,7 +57,7 @@ Composer согласованно обновляет `composer.lock`, checkout �
 
 ## Приватные репозитории
 
-Read-only GitHub token для проверки commit храните вне базы данных:
+Для публичного репозитория token не нужен. Для приватного репозитория read-only GitHub token для проверки commit храните вне базы данных:
 
 ```php
 define( 'SP_DEPLOYMENT_GITHUB_TOKEN', 'github-token-here' );

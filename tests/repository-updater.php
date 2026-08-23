@@ -31,6 +31,7 @@ $packagePath = $projectRoot . '/vendor/soinproduction/php-kit';
 $composerDir = $projectRoot . '/vendor/composer';
 $backupDir = $testRoot . '/backups';
 $composerFixture = $testRoot . '/composer';
+$gitFixture = $testRoot . '/git';
 
 mkdir($packagePath, 0755, true);
 mkdir($composerDir, 0755, true);
@@ -40,6 +41,10 @@ file_put_contents($projectRoot . '/composer.json', json_encode([
 file_put_contents($projectRoot . '/composer.lock', "original-lock\n");
 file_put_contents($composerFixture, "#!/usr/bin/env php\n<?php\n");
 chmod($composerFixture, 0755);
+file_put_contents($projectRoot . '/composer.phar', "#!/usr/bin/env php\n<?php\n");
+chmod($projectRoot . '/composer.phar', 0755);
+file_put_contents($gitFixture, "#!/usr/bin/env php\n<?php echo \"abcdef1234567890abcdef1234567890abcdef12\\trefs/heads/main\\n\";\n");
+chmod($gitFixture, 0755);
 file_put_contents($composerDir . '/installed.json', json_encode([
 	'packages' => [[
 		'name'   => 'soinproduction/php-kit',
@@ -62,6 +67,9 @@ $normalized = RepositoryUpdater::normalizeConfig([
 $defaultCommand = RepositoryUpdater::composerCommand([
 	'package'          => 'vendor/package',
 	'composer_command' => [ 'sp-composer-command' ],
+], 'install', $projectRoot);
+$automaticCommand = RepositoryUpdater::composerCommand([
+	'package' => 'vendor/package',
 ], 'install', $projectRoot);
 $command = RepositoryUpdater::composerCommand([
 	'package'          => 'vendor/package',
@@ -86,6 +94,9 @@ file_put_contents($testRoot . '/composer-home/auth.json', json_encode([
 ]));
 $composerToken = RepositoryUpdater::composerGithubToken([
 	'composer_home' => $testRoot . '/composer-home',
+], $projectRoot);
+$publicRemote = RepositoryUpdater::remoteReference([
+	'git_binary' => $gitFixture,
 ], $projectRoot);
 $process = RepositoryUpdater::runProcess([
 	PHP_BINARY,
@@ -124,6 +135,8 @@ $checks = [
 	'installed Composer reference is read'             => RepositoryUpdater::installedReference($projectRoot, 'soinproduction/php-kit') === '1234567890abcdef1234567890abcdef12345678',
 	'installed Composer source URL is read'             => RepositoryUpdater::installedSourceUrl($projectRoot, 'soinproduction/php-kit') === 'git@github.com:soinproduction/soinproduction-php-kit.git',
 	'Composer GitHub OAuth token is reused'             => $composerToken === 'test-read-only-token',
+	'project Composer PHAR is discovered automatically' => array_slice($automaticCommand, 0, 2) === [PHP_BINARY, $projectRoot . '/composer.phar'],
+	'public Git remote resolves without an API token'    => $publicRemote['sha'] === 'abcdef1234567890abcdef1234567890abcdef12',
 	'update command targets only the configured package' => array_slice($command, 0, 4) === ['sp-composer-command', 'update', 'vendor/package', '--with-dependencies'],
 	'PHP Composer scripts receive a CLI interpreter'    => array_slice($interpretedCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'explicit PHP interpreter is not duplicated'        => array_slice($explicitInterpreterCommand, 0, 2) === [PHP_BINARY, $composerFixture],

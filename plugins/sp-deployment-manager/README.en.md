@@ -28,7 +28,9 @@ The page appears under **Tools → Repository Updates** for administrators with 
 
 ## Configuration
 
-Defaults target the `main` branch of `soinproduction/soinproduction-php-kit`:
+Public repositories require no mandatory constants: the PHP CLI is derived from the current PHP runtime, Composer is discovered from `composer.phar`, common hosting paths and `PATH`, a private `COMPOSER_HOME` is created automatically, and the branch commit is checked through public `git ls-remote` before using the rate-limited GitHub API.
+
+Defaults target the `main` branch of `soinproduction/soinproduction-php-kit`. The configuration below only overrides auto-discovery:
 
 ```php
 'sp-deployment-manager' => [
@@ -55,7 +57,7 @@ When PHP-FPM does not provide `HOME` or `COMPOSER_HOME`, the manager creates a p
 
 ## Private Repositories
 
-Define a read-only GitHub token outside the database for GitHub API status checks:
+No token is required for a public repository. For a private repository, define a read-only GitHub token outside the database for GitHub API status checks:
 
 ```php
 define( 'SP_DEPLOYMENT_GITHUB_TOKEN', 'github-token-here' );

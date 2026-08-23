@@ -385,13 +385,30 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 				}
 			}
 
+			$token = self::githubToken();
+			if ($token === '') {
+				$reference = \SoinProduction\Kit\RepositoryUpdater::remoteReference($config, $projectRoot);
+				if ($reference['sha'] !== '') {
+					$info = [
+						'sha'     => $reference['sha'],
+						'short'   => $reference['short'],
+						'message' => '',
+						'date'    => '',
+						'url'     => '',
+						'error'   => '',
+					];
+					set_transient($cacheKey, $info, self::REMOTE_CACHE_TTL);
+
+					return $info;
+				}
+			}
+
 			$url = 'https://api.github.com/repos/' . (string) $config['repository'] . '/commits/' . rawurlencode((string) $config['branch']);
 			$headers = [
 				'Accept'               => 'application/vnd.github+json',
 				'X-GitHub-Api-Version' => '2022-11-28',
 				'User-Agent'           => 'SoinProduction-Deployment-Manager/' . self::VERSION,
 			];
-			$token = self::githubToken();
 			if ($token !== '') {
 				$headers['Authorization'] = 'Bearer ' . $token;
 			}

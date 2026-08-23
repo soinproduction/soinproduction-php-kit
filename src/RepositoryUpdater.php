@@ -279,7 +279,7 @@ final class RepositoryUpdater
 			} elseif (defined('SP_DEPLOYMENT_COMPOSER_BINARY') && is_string(SP_DEPLOYMENT_COMPOSER_BINARY) && SP_DEPLOYMENT_COMPOSER_BINARY !== '') {
 				$command = [SP_DEPLOYMENT_COMPOSER_BINARY];
 			} else {
-				$command = ['composer'];
+				$command = self::discoverComposerCommand();
 			}
 		}
 
@@ -303,6 +303,24 @@ final class RepositoryUpdater
 		}
 
 		return $command;
+	}
+
+	/** @return array<int, string> */
+	private static function discoverComposerCommand(): array
+	{
+		foreach ([
+			'/usr/local/bin/composer',
+			'/usr/local/bin/composer2',
+			'/usr/bin/composer',
+			'/usr/bin/composer2',
+			'/opt/cpanel/composer/bin/composer',
+		] as $candidate) {
+			if (is_file($candidate) && is_readable($candidate)) {
+				return [$candidate];
+			}
+		}
+
+		return ['composer'];
 	}
 
 	/**
