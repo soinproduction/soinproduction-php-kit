@@ -76,6 +76,13 @@ $command = RepositoryUpdater::composerCommand([
 	'composer_command' => ['sp-composer-command'],
 	'no_dev'           => true,
 ], 'update', $projectRoot);
+$cacheCommand = RepositoryUpdater::composerCommand([
+	'composer_command' => ['sp-composer-command'],
+], 'clear-cache', $projectRoot);
+$reinstallCommand = RepositoryUpdater::composerCommand([
+	'package'          => 'vendor/package',
+	'composer_command' => ['sp-composer-command'],
+], 'reinstall', $projectRoot);
 $interpretedCommand = RepositoryUpdater::composerCommand([
 	'package'          => 'vendor/package',
 	'composer_command' => [$composerFixture],
@@ -103,6 +110,18 @@ $process = RepositoryUpdater::runProcess([
 	'-r',
 	'fwrite(STDOUT, "ok"); fwrite(STDERR, "warn");',
 ], $projectRoot, 10);
+$recoverableGitFailure = RepositoryUpdater::isRecoverableGitFailure([
+	'exit_code' => 1,
+	'stdout'    => 'In GitDownloader.php line 241:',
+	'stderr'    => 'Failed to execute git show-ref --head -d: fatal: git show-ref: bad ref HEAD',
+	'timed_out' => false,
+]);
+$ordinaryComposerFailure = RepositoryUpdater::isRecoverableGitFailure([
+	'exit_code' => 1,
+	'stdout'    => '',
+	'stderr'    => 'Your requirements could not be resolved to an installable set of packages.',
+	'timed_out' => false,
+]);
 $backup = RepositoryUpdater::backupLock(
 	$projectRoot,
 	$backupDir,
@@ -140,6 +159,12 @@ $checks = [
 		&& $automaticCommand[1] === $projectRoot . '/composer.phar',
 	'public Git remote resolves without an API token'    => $publicRemote['sha'] === 'abcdef1234567890abcdef1234567890abcdef12',
 	'update command targets only the configured package' => array_slice($command, 0, 4) === ['sp-composer-command', 'update', 'vendor/package', '--with-dependencies'],
+	'cache repair command clears only Composer cache state' => $cacheCommand === ['sp-composer-command', 'clear-cache', '--no-interaction'],
+	'package repair command forces a dist reinstall'       => array_slice($reinstallCommand, 0, 4) === ['sp-composer-command', 'reinstall', 'vendor/package', '--no-interaction']
+		&& in_array('--prefer-dist', $reinstallCommand, true)
+		&& ! in_array('--no-dev', $reinstallCommand, true),
+	'broken Git metadata is eligible for one repair attempt' => $recoverableGitFailure,
+	'ordinary dependency failures are not retried'          => ! $ordinaryComposerFailure,
 	'PHP Composer scripts receive a CLI interpreter'    => array_slice($interpretedCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'explicit PHP interpreter is not duplicated'        => array_slice($explicitInterpreterCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'missing HOME receives a private Composer home'     => ($isolatedEnvironment['HOME'] ?? '') === $testRoot

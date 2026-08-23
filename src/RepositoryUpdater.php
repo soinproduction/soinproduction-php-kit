@@ -285,7 +285,17 @@ final class RepositoryUpdater
 
 		$command = self::withPhpInterpreter($command, (string) $config['php_binary']);
 
-		if ($operation === 'install') {
+		if ($operation === 'clear-cache') {
+			$command[] = 'clear-cache';
+			$command[] = '--no-interaction';
+
+			return $command;
+		}
+
+		if ($operation === 'reinstall') {
+			$command[] = 'reinstall';
+			$command[] = $config['package'];
+		} elseif ($operation === 'install') {
 			$command[] = 'install';
 		} else {
 			$command[] = 'update';
@@ -298,11 +308,34 @@ final class RepositoryUpdater
 		$command[] = '--prefer-dist';
 		$command[] = '--optimize-autoloader';
 
-		if ($config['no_dev']) {
+		if ($config['no_dev'] && $operation !== 'reinstall') {
 			$command[] = '--no-dev';
 		}
 
 		return $command;
+	}
+
+	/**
+	 * Composer may retain an incomplete VCS checkout whose HEAD points to an
+	 * object that is no longer present. This is safe to retry after clearing
+	 * Composer's disposable cache and reinstalling the managed package.
+	 *
+	 * @param array{exit_code: int, stdout: string, stderr: string, timed_out: bool} $result
+	 */
+	public static function isRecoverableGitFailure(array $result): bool
+	{
+		if ($result['exit_code'] === 0 || $result['timed_out']) {
+			return false;
+		}
+
+		$output = strtolower($result['stdout'] . "\n" . $result['stderr']);
+		$gitMetadataFailure = str_contains($output, 'bad ref head')
+			|| str_contains($output, 'reference is not a tree')
+			|| str_contains($output, 'unable to read tree')
+			|| str_contains($output, 'not a git repository');
+
+		return $gitMetadataFailure
+			&& (str_contains($output, 'git show-ref') || str_contains($output, 'gitdownloader.php'));
 	}
 
 	/** @return array<int, string> */

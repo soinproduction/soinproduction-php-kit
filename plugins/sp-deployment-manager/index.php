@@ -3,7 +3,7 @@
 /**
  * Plugin Name: SP Deployment Manager
  * Description: Composer-backed repository updates, status checks and rollback from WordPress admin.
- * Version: 1.0.6
+ * Version: 1.0.7
  */
 
 if (! defined('ABSPATH')) {
@@ -13,7 +13,7 @@ if (! defined('ABSPATH')) {
 if (! class_exists('SP_Deployment_Manager', false)) {
 	final class SP_Deployment_Manager
 	{
-		private const VERSION = '1.0.6';
+		private const VERSION = '1.0.7';
 		private const PAGE_SLUG = 'sp-deployment-manager';
 		private const NONCE_ACTION = 'sp_deployment_manager';
 		private const CRON_HOOK = 'sp_deployment_manager_run_job';
@@ -307,6 +307,32 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 			$matchesTarget = $target === '' || hash_equals($target, $installedAfter);
 			$success = $result['exit_code'] === 0 && $installedAfter !== '' && $matchesTarget;
 			$log = self::processLog($command, $result, $projectRoot);
+
+			if (! $success && \SoinProduction\Kit\RepositoryUpdater::isRecoverableGitFailure($result)) {
+				$cacheCommand = \SoinProduction\Kit\RepositoryUpdater::composerCommand($config, 'clear-cache', $projectRoot);
+				$cacheResult = \SoinProduction\Kit\RepositoryUpdater::runProcess($cacheCommand, $projectRoot, (int) $config['timeout'], (string) $config['composer_home']);
+				$log .= "\n\nAutomatic Git cache repair:\n" . self::processLog($cacheCommand, $cacheResult, $projectRoot);
+
+				if ($cacheResult['exit_code'] === 0) {
+					$reinstallCommand = \SoinProduction\Kit\RepositoryUpdater::composerCommand($config, 'reinstall', $projectRoot);
+					$reinstallResult = \SoinProduction\Kit\RepositoryUpdater::runProcess($reinstallCommand, $projectRoot, (int) $config['timeout'], (string) $config['composer_home']);
+					$log .= "\n\nManaged package reinstall:\n" . self::processLog($reinstallCommand, $reinstallResult, $projectRoot);
+					$installedAfter = \SoinProduction\Kit\RepositoryUpdater::installedReference($projectRoot, (string) $config['package']);
+					$matchesTarget = $target === '' || ($installedAfter !== '' && hash_equals($target, $installedAfter));
+
+					if ($reinstallResult['exit_code'] === 0 && $installedAfter !== '' && $matchesTarget) {
+						$result = $reinstallResult;
+						$success = true;
+					} elseif ($reinstallResult['exit_code'] === 0) {
+						$retryResult = \SoinProduction\Kit\RepositoryUpdater::runProcess($command, $projectRoot, (int) $config['timeout'], (string) $config['composer_home']);
+						$log .= "\n\nComposer retry:\n" . self::processLog($command, $retryResult, $projectRoot);
+						$result = $retryResult;
+						$installedAfter = \SoinProduction\Kit\RepositoryUpdater::installedReference($projectRoot, (string) $config['package']);
+						$matchesTarget = $target === '' || ($installedAfter !== '' && hash_equals($target, $installedAfter));
+						$success = $result['exit_code'] === 0 && $installedAfter !== '' && $matchesTarget;
+					}
+				}
+			}
 
 			if (! $success && $currentBackup !== '') {
 				$recovered = \SoinProduction\Kit\RepositoryUpdater::restoreLock($projectRoot, $currentBackup, $backupDir);
