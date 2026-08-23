@@ -135,7 +135,9 @@ $checks = [
 	'installed Composer reference is read'             => RepositoryUpdater::installedReference($projectRoot, 'soinproduction/php-kit') === '1234567890abcdef1234567890abcdef12345678',
 	'installed Composer source URL is read'             => RepositoryUpdater::installedSourceUrl($projectRoot, 'soinproduction/php-kit') === 'git@github.com:soinproduction/soinproduction-php-kit.git',
 	'Composer GitHub OAuth token is reused'             => $composerToken === 'test-read-only-token',
-	'project Composer PHAR is discovered automatically' => array_slice($automaticCommand, 0, 2) === [PHP_BINARY, $projectRoot . '/composer.phar'],
+	'project Composer PHAR is discovered automatically' => isset($automaticCommand[0], $automaticCommand[1])
+		&& is_executable($automaticCommand[0])
+		&& $automaticCommand[1] === $projectRoot . '/composer.phar',
 	'public Git remote resolves without an API token'    => $publicRemote['sha'] === 'abcdef1234567890abcdef1234567890abcdef12',
 	'update command targets only the configured package' => array_slice($command, 0, 4) === ['sp-composer-command', 'update', 'vendor/package', '--with-dependencies'],
 	'PHP Composer scripts receive a CLI interpreter'    => array_slice($interpretedCommand, 0, 2) === [PHP_BINARY, $composerFixture],
