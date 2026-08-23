@@ -338,6 +338,55 @@ final class RepositoryUpdater
 			&& (str_contains($output, 'git show-ref') || str_contains($output, 'gitdownloader.php'));
 	}
 
+	public static function quarantinePackageGitMetadata(string $projectRoot, string $package, string $quarantineRoot): string
+	{
+		if (preg_match('#^[a-z0-9][a-z0-9_.-]*/[a-z0-9][a-z0-9_.-]*$#i', $package) !== 1) {
+			return '';
+		}
+
+		$vendorRoot = realpath(rtrim($projectRoot, '/\\') . '/vendor');
+		$packagePath = is_string($vendorRoot) ? realpath($vendorRoot . '/' . $package) : false;
+		if (
+			! is_string($vendorRoot)
+			|| ! is_string($packagePath)
+			|| ! str_starts_with($packagePath, rtrim($vendorRoot, '/\\') . DIRECTORY_SEPARATOR)
+		) {
+			return '';
+		}
+
+		$metadataPath = $packagePath . '/.git';
+		if (! is_dir($metadataPath) && ! is_file($metadataPath)) {
+			return '';
+		}
+
+		if ((! is_dir($quarantineRoot) && ! mkdir($quarantineRoot, 0750, true)) || ! is_writable($quarantineRoot)) {
+			return '';
+		}
+
+		$quarantineReal = realpath($quarantineRoot);
+		if (! is_string($quarantineReal)) {
+			return '';
+		}
+
+		$target = $quarantineReal . '/broken-git-' . bin2hex(random_bytes(8));
+		return @rename($metadataPath, $target) ? $target : '';
+	}
+
+	public static function cleanupQuarantinedGitMetadata(string $path, string $quarantineRoot): bool
+	{
+		$pathReal = realpath($path);
+		$rootReal = realpath($quarantineRoot);
+		if (
+			! is_string($pathReal)
+			|| ! is_string($rootReal)
+			|| ! str_starts_with($pathReal, rtrim($rootReal, '/\\') . DIRECTORY_SEPARATOR . 'broken-git-')
+		) {
+			return false;
+		}
+
+		return self::removeTree($pathReal);
+	}
+
 	/** @return array<int, string> */
 	private static function discoverComposerCommand(): array
 	{
@@ -534,6 +583,32 @@ final class RepositoryUpdater
 
 		$decoded = json_decode((string) file_get_contents($path), true);
 		return is_array($decoded) ? $decoded : [];
+	}
+
+	private static function removeTree(string $path): bool
+	{
+		if (is_link($path) || is_file($path)) {
+			return @unlink($path);
+		}
+		if (! is_dir($path)) {
+			return true;
+		}
+
+		$items = scandir($path);
+		if (! is_array($items)) {
+			return false;
+		}
+
+		foreach ($items as $item) {
+			if ($item === '.' || $item === '..' || ! self::removeTree($path . DIRECTORY_SEPARATOR . $item)) {
+				if ($item === '.' || $item === '..') {
+					continue;
+				}
+				return false;
+			}
+		}
+
+		return @rmdir($path);
 	}
 
 	/** @param mixed $auth */

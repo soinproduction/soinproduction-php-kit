@@ -12,7 +12,7 @@ The manager deliberately does not run `git pull` and does not replace individual
 composer update soinproduction/php-kit --with-dependencies --no-interaction --no-progress --prefer-dist --optimize-autoloader
 ```
 
-Composer updates `composer.lock`, the package checkout and generated installed metadata together. If Composer detects a broken VCS cache (`bad ref HEAD`, `git show-ref`), the manager clears that disposable cache once, reinstalls only the managed package from dist, and retries the update when still necessary. A final failure restores the previous lock and attempts `composer install` recovery.
+Composer updates `composer.lock`, the package checkout and generated installed metadata together. If Composer detects broken Git metadata in the installed package (`bad ref HEAD`, `git show-ref`), the manager quarantines only that package's `.git`, clears Composer's disposable cache once, reinstalls the managed package from dist, and retries the update when still necessary. A final failure restores the previous lock and attempts `composer install` recovery.
 
 ## Enabling
 
@@ -75,7 +75,7 @@ Composer must also already be able to read the repository through its normal `au
 4. The current `composer.lock` is copied into a protected directory under `wp-content/sp-deployment-backups`.
 5. Composer updates only the configured package and its dependencies.
 6. The installed commit is read from `vendor/composer/installed.json` and compared with GitHub.
-7. Broken Git cache metadata is cleared automatically and the managed package is forcibly reinstalled from dist.
+7. Broken `.git` metadata for the managed package is quarantined and removed, Composer cache is cleared, and the package is forcibly reinstalled from dist.
 8. On final failure, the previous lock is restored and Composer recovery is attempted.
 
 The successful update leaves one rollback point in the UI. Rollback restores that lock and runs `composer install`, so network access to the previous package revision must remain available.

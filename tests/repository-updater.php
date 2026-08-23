@@ -35,6 +35,8 @@ $gitFixture = $testRoot . '/git';
 
 mkdir($packagePath, 0755, true);
 mkdir($composerDir, 0755, true);
+mkdir($packagePath . '/.git/refs/heads', 0755, true);
+file_put_contents($packagePath . '/.git/HEAD', "ref: refs/heads/main\n");
 file_put_contents($projectRoot . '/composer.json', json_encode([
 	'require' => ['soinproduction/php-kit' => 'dev-main'],
 ], JSON_PRETTY_PRINT));
@@ -122,6 +124,15 @@ $ordinaryComposerFailure = RepositoryUpdater::isRecoverableGitFailure([
 	'stderr'    => 'Your requirements could not be resolved to an installable set of packages.',
 	'timed_out' => false,
 ]);
+$quarantinedGitMetadata = RepositoryUpdater::quarantinePackageGitMetadata(
+	$projectRoot,
+	'soinproduction/php-kit',
+	$backupDir
+);
+$gitMetadataQuarantined = $quarantinedGitMetadata !== ''
+	&& ! file_exists($packagePath . '/.git')
+	&& is_file($quarantinedGitMetadata . '/HEAD');
+$gitMetadataCleaned = RepositoryUpdater::cleanupQuarantinedGitMetadata($quarantinedGitMetadata, $backupDir);
 $backup = RepositoryUpdater::backupLock(
 	$projectRoot,
 	$backupDir,
@@ -165,6 +176,8 @@ $checks = [
 		&& ! in_array('--no-dev', $reinstallCommand, true),
 	'broken Git metadata is eligible for one repair attempt' => $recoverableGitFailure,
 	'ordinary dependency failures are not retried'          => ! $ordinaryComposerFailure,
+	'only managed package Git metadata is quarantined'       => $gitMetadataQuarantined,
+	'quarantined Git metadata is removed safely'             => $gitMetadataCleaned && ! file_exists($quarantinedGitMetadata),
 	'PHP Composer scripts receive a CLI interpreter'    => array_slice($interpretedCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'explicit PHP interpreter is not duplicated'        => array_slice($explicitInterpreterCommand, 0, 2) === [PHP_BINARY, $composerFixture],
 	'missing HOME receives a private Composer home'     => ($isolatedEnvironment['HOME'] ?? '') === $testRoot

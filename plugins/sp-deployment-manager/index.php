@@ -307,8 +307,18 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 			$matchesTarget = $target === '' || hash_equals($target, $installedAfter);
 			$success = $result['exit_code'] === 0 && $installedAfter !== '' && $matchesTarget;
 			$log = self::processLog($command, $result, $projectRoot);
+			$quarantinedGitMetadata = '';
 
 			if (! $success && \SoinProduction\Kit\RepositoryUpdater::isRecoverableGitFailure($result)) {
+				$quarantinedGitMetadata = \SoinProduction\Kit\RepositoryUpdater::quarantinePackageGitMetadata(
+					$projectRoot,
+					(string) $config['package'],
+					$backupDir
+				);
+				if ($quarantinedGitMetadata !== '') {
+					$log .= "\n\nBroken installed-package Git metadata was quarantined.";
+				}
+
 				$cacheCommand = \SoinProduction\Kit\RepositoryUpdater::composerCommand($config, 'clear-cache', $projectRoot);
 				$cacheResult = \SoinProduction\Kit\RepositoryUpdater::runProcess($cacheCommand, $projectRoot, (int) $config['timeout'], (string) $config['composer_home']);
 				$log .= "\n\nAutomatic Git cache repair:\n" . self::processLog($cacheCommand, $cacheResult, $projectRoot);
@@ -341,6 +351,13 @@ if (! class_exists('SP_Deployment_Manager', false)) {
 					$recovery = \SoinProduction\Kit\RepositoryUpdater::runProcess($recoveryCommand, $projectRoot, (int) $config['timeout'], (string) $config['composer_home']);
 					$log .= "\n\nRecovery:\n" . self::processLog($recoveryCommand, $recovery, $projectRoot);
 				}
+			}
+
+			if (
+				$quarantinedGitMetadata !== ''
+				&& ! \SoinProduction\Kit\RepositoryUpdater::cleanupQuarantinedGitMetadata($quarantinedGitMetadata, $backupDir)
+			) {
+				$log .= "\n\nWarning: quarantined Git metadata could not be removed from the protected backup directory.";
 			}
 
 			if ($success) {

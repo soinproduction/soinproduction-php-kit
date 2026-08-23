@@ -12,7 +12,7 @@ PHP Kit является одним Composer-пакетом. Поэтому ус
 composer update soinproduction/php-kit --with-dependencies --no-interaction --no-progress --prefer-dist --optimize-autoloader
 ```
 
-Composer согласованно обновляет `composer.lock`, checkout пакета и generated metadata. Если Composer обнаруживает повреждённый VCS cache (`bad ref HEAD`, `git show-ref`), менеджер один раз очищает его disposable cache, переустанавливает только управляемый пакет через dist и повторяет update, если это ещё необходимо. При окончательной ошибке менеджер восстанавливает предыдущий lock и пытается выполнить recovery через `composer install`.
+Composer согласованно обновляет `composer.lock`, checkout пакета и generated metadata. Если Composer обнаруживает повреждённые Git metadata установленного пакета (`bad ref HEAD`, `git show-ref`), менеджер изолирует только его `.git`, один раз очищает disposable cache Composer, переустанавливает управляемый пакет через dist и повторяет update, если это ещё необходимо. При окончательной ошибке менеджер восстанавливает предыдущий lock и пытается выполнить recovery через `composer install`.
 
 ## Подключение
 
@@ -75,7 +75,7 @@ Composer также должен иметь настроенный доступ 
 4. Текущий `composer.lock` копируется в защищённую директорию `wp-content/sp-deployment-backups`.
 5. Composer обновляет только настроенный пакет и его зависимости.
 6. Установленный commit читается из `vendor/composer/installed.json` и сравнивается с GitHub.
-7. Повреждённый Git cache автоматически очищается, а управляемый пакет принудительно переустанавливается из dist.
+7. Повреждённые `.git` metadata управляемого пакета изолируются и удаляются, Composer cache очищается, а пакет принудительно переустанавливается из dist.
 8. При окончательной ошибке восстанавливается предыдущий lock и запускается recovery.
 
 После успешной установки в интерфейсе остаётся одна точка отката. Откат восстанавливает lock и выполняет `composer install`, поэтому серверу нужен сетевой доступ к предыдущей ревизии пакета.
