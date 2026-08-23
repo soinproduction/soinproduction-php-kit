@@ -134,21 +134,47 @@
 	add_action( 'wpcf7_init', 'cf7cs_register_tag', 5 );
 	add_action( 'wpcf7_admin_init', 'cf7cs_register_tag', 5 );
 
-	add_filter( 'wpcf7_validate_custom_select*', function ( $result, $tag ) {
+	function cf7cs_tag_values( $tag, string $option ): array {
+		if ( ! is_object( $tag ) || ! method_exists( $tag, 'get_option' ) ) {
+			return [];
+		}
+
+		$value = ( (array) $tag->get_option( $option, '', true ) )[0] ?? '';
+		if ( $option === 'options' && $value === '' && ! empty( $tag->values ) ) {
+			return array_values( array_unique( array_filter( array_map( 'trim', (array) $tag->values ), 'strlen' ) ) );
+		}
+
+		return array_values( array_unique( array_filter( array_map( 'trim', explode( '|', (string) $value ) ), 'strlen' ) ) );
+	}
+
+	function cf7cs_validate_value( $result, $tag ) {
 		$name = is_object( $tag ) ? ( $tag->name ?? '' ) : '';
 		if ( ! $name ) {
 			return $result;
 		}
+
 		$val = isset( $_POST[ $name ] ) ? wp_unslash( $_POST[ $name ] ) : '';
-		$is_empty = is_array( $val )
-			? empty( array_filter( $val, function ( $value ) { return trim( (string) $value ) !== ''; } ) )
-			: trim( (string) $val ) === '';
-		if ( $is_empty && method_exists( $result, 'invalidate' ) ) {
+		$values = is_array( $val ) ? $val : [ $val ];
+		$values = array_values( array_filter( array_map( static fn ( $value ): string => trim( sanitize_text_field( (string) $value ) ), $values ), 'strlen' ) );
+		$is_required = is_object( $tag ) && method_exists( $tag, 'is_required' ) ? $tag->is_required() : str_ends_with( (string) ( $tag->type ?? '' ), '*' );
+
+		if ( $is_required && $values === [] && method_exists( $result, 'invalidate' ) ) {
 			$result->invalidate( $tag, wpcf7_get_message( 'invalid_required' ) );
+			return $result;
+		}
+
+		$allowed  = cf7cs_tag_values( $tag, 'options' );
+		$disabled = cf7cs_tag_values( $tag, 'disabled' );
+		$invalid  = array_diff( $values, array_diff( $allowed, $disabled ) );
+		if ( $values !== [] && ( $allowed === [] || $invalid !== [] ) && method_exists( $result, 'invalidate' ) ) {
+			$result->invalidate( $tag, __( 'Please select a valid option.', 'sp-cf7' ) );
 		}
 
 		return $result;
-	}, 10, 2 );
+	}
+
+	add_filter( 'wpcf7_validate_custom_select', 'cf7cs_validate_value', 10, 2 );
+	add_filter( 'wpcf7_validate_custom_select*', 'cf7cs_validate_value', 10, 2 );
 
 	function cf7cs_extract_required_names( $template ) {
 		if ( ! is_string( $template ) || $template === '' ) {

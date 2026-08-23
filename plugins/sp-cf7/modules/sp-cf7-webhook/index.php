@@ -1094,7 +1094,9 @@ JS
 
 		if ( ! empty( $settings['debug'] ) ) {
 			error_log( '[CF7 Webhook] form ' . $form_id . ' -> ' . $settings['url'] . ' : ' . $result );
-			error_log( '[CF7 Webhook] payload: ' . wp_json_encode( $payload ) );
+			if ( apply_filters( 'cf7_webhook_log_payload', false, $payload, $form_id ) ) {
+				error_log( '[CF7 Webhook] payload: ' . wp_json_encode( $payload ) );
+			}
 		}
 	}
 
@@ -1147,16 +1149,17 @@ JS
 			}
 		}
 
+		$timeout = (int) apply_filters( 'cf7_webhook_timeout', 5, $settings );
 		$args = array(
 			'method'      => $settings['method'],
-			'timeout'     => 15,
+			'timeout'     => max( 1, min( 15, $timeout ) ),
 			'redirection' => 3,
 			'headers'     => $headers,
 			'body'        => $body,
 			'blocking'    => true,
 		);
 
-		$response = wp_remote_request( $settings['url'], $args );
+		$response = wp_safe_remote_request( $settings['url'], $args );
 
 		if ( is_wp_error( $response ) ) {
 			return 'ERROR: ' . $response->get_error_message();

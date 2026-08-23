@@ -246,6 +246,9 @@ final class SP_CF7_Mail_Viewer
 			wp_die('Forbidden', 'Forbidden', ['response' => 403]);
 		}
 		check_admin_referer('sp_cf7_mail_delete_' . $id);
+		if (get_post_type($id) !== self::POST_TYPE) {
+			wp_die('Invalid mail log.', 'Invalid mail log', ['response' => 400]);
+		}
 		wp_delete_post($id, true);
 		wp_safe_redirect(admin_url('admin.php?page=' . self::PAGE_SLUG));
 		exit;

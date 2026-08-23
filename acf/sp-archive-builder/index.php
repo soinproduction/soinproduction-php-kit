@@ -2459,8 +2459,10 @@ if (! function_exists('sp_archive_ajax_query')) {
         $card_template    = $config['card_template'];
         $empty_template   = $config['empty_template'] ?? '';
         $archive_filters  = $config['filters'];       // [{name, query_arg, taxonomy}]
-        $default_per_page = (int) $config['per_page'];
-        $per_page         = max(1, (int) ($source['per_page'] ?? $default_per_page));
+		$default_per_page = (int) $config['per_page'];
+		$max_per_page     = (int) apply_filters( 'sp_archive_ajax_max_per_page', 48, $config );
+		$max_per_page     = max( 1, min( 100, $max_per_page ) );
+		$per_page         = min( $max_per_page, max( 1, (int) ( $source['per_page'] ?? $default_per_page ) ) );
         $pagination_type  = $config['pagination_type'];
         $page_arg         = $config['page_arg'];
         $url_page_arg     = $config['url_page_arg'];

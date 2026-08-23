@@ -25,7 +25,7 @@ final class RepositoryUpdater
 			'composer_home'         => '',
 			'git_binary'            => 'git',
 			'timeout'               => 300,
-			'no_dev'                => false,
+			'no_dev'                => true,
 			'capability'            => 'update_plugins',
 			'github_token_constant' => 'SP_DEPLOYMENT_GITHUB_TOKEN',
 			'backup_limit'          => 5,

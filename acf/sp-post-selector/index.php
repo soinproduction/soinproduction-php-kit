@@ -421,15 +421,44 @@
 			/* ── Save ──────────────────────────────────────── */
 
 			public function update_value( $value, $post_id, array $field ) {
+				$allowed_modes = array_values( array_intersect(
+					[ 'manual', 'favorites', 'all' ],
+					array_map( 'sanitize_key', (array) ( $field['modes'] ?? [] ) )
+				) );
+				if ( $allowed_modes === [] ) {
+					$allowed_modes = [ 'manual' ];
+				}
+
+				$default_mode = sanitize_key( (string) ( $field['default_mode'] ?? $allowed_modes[0] ) );
+				if ( ! in_array( $default_mode, $allowed_modes, true ) ) {
+					$default_mode = $allowed_modes[0];
+				}
+
 				if ( ! is_array( $value ) ) {
-					return [ 'mode' => $field['default_mode'] ?? 'manual', 'ids' => [] ];
+					return [ 'mode' => $default_mode, 'ids' => [] ];
 				}
 
 				$mode = sanitize_key( $value['mode'] ?? 'manual' );
+				if ( ! in_array( $mode, $allowed_modes, true ) ) {
+					$mode = $default_mode;
+				}
+
 				$ids  = [];
 
 				if ( ! empty( $value['ids'] ) && is_array( $value['ids'] ) ) {
 					$ids = array_values( array_unique( array_filter( array_map( 'absint', $value['ids'] ) ) ) );
+				}
+
+				$allowed_post_types = array_values( array_filter( array_map( 'sanitize_key', (array) ( $field['post_type'] ?? [] ) ) ) );
+				$ids = array_values( array_filter( $ids, static function ( int $id ) use ( $allowed_post_types ): bool {
+					$post_type = get_post_type( $id );
+					return is_string( $post_type ) && $post_type !== ''
+						&& ( $allowed_post_types === [] || in_array( $post_type, $allowed_post_types, true ) );
+				} ) );
+
+				$max = max( 0, (int) ( $field['max'] ?? 0 ) );
+				if ( $max > 0 ) {
+					$ids = array_slice( $ids, 0, $max );
 				}
 
 				return [ 'mode' => $mode, 'ids' => $ids ];

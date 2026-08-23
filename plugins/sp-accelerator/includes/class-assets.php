@@ -210,10 +210,12 @@ final class SP_Accelerator_Assets {
 
 		$scripts = wp_scripts();
 		$src     = isset( $scripts->registered[ $handle ] ) ? (string) $scripts->registered[ $handle ]->src : '';
-		$path    = (string) wp_parse_url( $src, PHP_URL_PATH );
-		if ( $path === '' || strpos( $path, '/assets/js/' ) === false || strpos( $path, '/assets/js/modules/section-hero.js' ) !== false ) {
-			return $tag;
-		}
+			$path    = (string) wp_parse_url( $src, PHP_URL_PATH );
+			$is_critical_script = preg_match( '~(?:^|/)assets/js/modules/section-hero(?:\.[a-z0-9_-]+)?\.js$~i', $path ) === 1;
+			$is_critical_script = (bool) apply_filters( 'sp_accelerator_critical_script', $is_critical_script, $handle, $src, $tag );
+			if ( $path === '' || strpos( $path, '/assets/js/' ) === false || $is_critical_script ) {
+				return $tag;
+			}
 
 		$should_delay = strpos( $path, '/assets/js/modules/' ) !== false || strpos( $path, '/assets/js/npm.' ) !== false;
 		$before       = $scripts->get_data( $handle, 'before' );

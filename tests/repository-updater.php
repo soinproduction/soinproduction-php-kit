@@ -59,6 +59,10 @@ $normalized = RepositoryUpdater::normalizeConfig([
 	'composer_command' => ['/usr/local/bin/composer', ''],
 	'composer_home'    => '  ' . $testRoot . '/composer-home  ',
 ]);
+$defaultCommand = RepositoryUpdater::composerCommand([
+	'package'          => 'vendor/package',
+	'composer_command' => [ 'sp-composer-command' ],
+], 'install', $projectRoot);
 $command = RepositoryUpdater::composerCommand([
 	'package'          => 'vendor/package',
 	'composer_command' => ['sp-composer-command'],
@@ -129,6 +133,7 @@ $checks = [
 		&& is_dir($testRoot . '/composer-home'),
 	'non-interactive Composer flags are present'        => in_array('--no-interaction', $command, true) && in_array('--prefer-dist', $command, true),
 	'production no-dev mode is supported'              => in_array('--no-dev', $command, true),
+	'production no-dev mode is the safe default'        => in_array('--no-dev', $defaultCommand, true),
 	'process output and exit code are captured'        => $process['exit_code'] === 0 && $process['stdout'] === 'ok' && $process['stderr'] === 'warn',
 	'composer lock backup is created'                  => $backup !== '' && is_readable($backup),
 	'composer lock backup is restored atomically'      => $restored && file_get_contents($projectRoot . '/composer.lock') === "original-lock\n",
