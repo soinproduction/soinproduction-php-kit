@@ -2,6 +2,8 @@
 
 A collection of reusable WordPress administration UI components. Enable it with `sp-admin-ui` in the PHP Kit `plugins` configuration.
 
+The package base also enhances a compatible Builder Widgets catalogue (`.wsb-radio-field`): opening a row scrolls its list to the saved widget and shows its name in the ACF layout heading as `Widget: Name`. Selecting another widget updates the heading immediately.
+
 | Module | Purpose |
 | --- | --- |
 | `sp-admin-ui-menu-heading` | Adds draggable, non-clickable headings to Appearance → Menus. |

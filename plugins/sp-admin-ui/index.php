@@ -5,6 +5,26 @@
 
 	require_once __DIR__ . '/includes/taxonomy.php';
 
+	add_action( 'admin_enqueue_scripts', static function ( string $hook ): void {
+		if ( ! in_array( $hook, [ 'post.php', 'post-new.php' ], true ) ) {
+			return;
+		}
+
+		$asset_path = __DIR__ . '/assets/builder-widget-selection.js';
+		$asset_url  = \SoinProduction\Kit\Bootstrapper::pathToUrl( __DIR__ );
+		if ( ! is_readable( $asset_path ) || $asset_url === '' ) {
+			return;
+		}
+
+		wp_enqueue_script(
+			'sp-admin-ui-builder-widget-selection',
+			trailingslashit( $asset_url ) . 'assets/builder-widget-selection.js',
+			[ 'jquery' ],
+			(string) filemtime( $asset_path ),
+			true
+		);
+	} );
+
 	$sp_admin_ui_modules = [
 		'sp-admin-ui-menu-heading',
 		'sp-admin-ui-text-column',
