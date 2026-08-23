@@ -64,7 +64,7 @@ Bootstrap предназначен для URL, nonce, capabilities, перево
 
 ### Библиотека переиспользуемого контента
 
-Модуль `sp-content-library` переносит admin-регистрацию исторических post types `widgets` и `for-editor` в общий пакет и показывает их во **Внешний вид → Reusable Sections / Editor Blocks**. Внутренние slug и ACF field names не меняются. Разрешённые layout поля `blocks` задаются массивом `editor_layouts`; полная конфигурация и требования к callbacks описаны в `plugins/sp-content-library/README.ru.md`.
+Модуль `sp-content-library` переносит admin-регистрацию исторических post types `widgets` и `for-editor`, Builder layout `section_widgets` и TinyMCE workflow `[widget]` в общий пакет и показывает страницы во **Внешний вид → Reusable Sections / Editor Blocks**. Внутренние slug и ACF field names не меняются. Разрешённые layout поля `blocks` задаются массивом `editor_layouts`; полная конфигурация и требования к callbacks описаны в `plugins/sp-content-library/README.ru.md`.
 
 Чтобы сохранить модуль в конфигурации, но отключить его, добавьте `_` перед именем. Например, `sp-share` будет загружен, а `_sp-share` — нет. Правило одинаково работает в списках `platform`, `acf` и `plugins`.
 

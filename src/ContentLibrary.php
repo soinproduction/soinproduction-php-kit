@@ -60,6 +60,44 @@ final class ContentLibrary
 		add_action('init', [self::class, 'ensureDefaultTerms'], 20);
 		add_action('acf/init', [self::class, 'registerFieldGroups'], 20);
 		add_action('after_setup_theme', [self::class, 'registerPreviewColumns'], 20);
+		add_action(
+			'get_template_part_template_parts/section-widgets/index',
+			[self::class, 'renderReusableSection'],
+			10,
+			3
+		);
+	}
+
+	/**
+	 * Render the reusable-section Builder layout when the active theme does not
+	 * provide its own legacy template part.
+	 *
+	 * @param string              $slug Template slug passed by WordPress.
+	 * @param string|null         $name Optional template name.
+	 * @param array<string,mixed> $args Optional template arguments.
+	 */
+	public static function renderReusableSection(string $slug = '', ?string $name = null, array $args = []): void
+	{
+		unset($slug, $name, $args);
+
+		$legacyTemplate = locate_template('template_parts/section-widgets/index.php', false, false);
+		if (is_string($legacyTemplate) && $legacyTemplate !== '') {
+			return;
+		}
+
+		$sectionId = function_exists('get_sub_field') ? absint(get_sub_field('widget_static_block')) : 0;
+		if ($sectionId <= 0 || ! function_exists('have_rows')) {
+			return;
+		}
+
+		while (have_rows('builder', $sectionId)) {
+			the_row();
+			$layout = function_exists('get_row_layout') ? (string) get_row_layout() : '';
+			$layout = str_replace('_', '-', $layout);
+			if ($layout !== '') {
+				get_template_part("template_parts/{$layout}/index");
+			}
+		}
 	}
 
 	public static function registerContentTypes(): void

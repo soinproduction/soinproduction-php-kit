@@ -57,10 +57,13 @@ $GLOBALS['sp_content_library_fields'] = [
 $GLOBALS['sp_content_library_groups'] = [];
 $GLOBALS['sp_content_library_builder_calls'] = [];
 $GLOBALS['sp_content_library_blocks_calls'] = [];
+$GLOBALS['sp_content_library_rendered_templates'] = [];
+$GLOBALS['sp_content_library_have_rows_calls'] = 0;
+$GLOBALS['sp_content_library_legacy_template'] = '';
 
-function add_action(string $hook, $callback, int $priority = 10): void
+function add_action(string $hook, $callback, int $priority = 10, int $acceptedArgs = 1): void
 {
-	$GLOBALS['sp_content_library_hooks'][] = compact('hook', 'callback', 'priority');
+	$GLOBALS['sp_content_library_hooks'][] = compact('hook', 'callback', 'priority', 'acceptedArgs');
 }
 
 function __(string $value, string $domain = ''): string
@@ -96,6 +99,45 @@ function term_exists(string $slug, string $taxonomy): bool
 function get_field(string $field, int $postId): array
 {
 	return $GLOBALS['sp_content_library_fields'][$postId] ?? [];
+}
+
+function locate_template(string $template, bool $load = false, bool $requireOnce = true)
+{
+	unset($template, $load, $requireOnce);
+	return $GLOBALS['sp_content_library_legacy_template'];
+}
+
+function get_sub_field(string $field): int
+{
+	return $field === 'widget_static_block' ? 44 : 0;
+}
+
+function absint($value): int
+{
+	return abs((int) $value);
+}
+
+function have_rows(string $field, int $postId): bool
+{
+	if ($field !== 'builder' || $postId !== 44) {
+		return false;
+	}
+
+	return $GLOBALS['sp_content_library_have_rows_calls']++ === 0;
+}
+
+function the_row(): void
+{
+}
+
+function get_row_layout(): string
+{
+	return 'section_hero';
+}
+
+function get_template_part(string $slug): void
+{
+	$GLOBALS['sp_content_library_rendered_templates'][] = $slug;
 }
 
 function acf_add_local_field_group(array $group): void
@@ -141,6 +183,7 @@ ContentLibrary::init([
 ]);
 ContentLibrary::registerContentTypes();
 ContentLibrary::registerFieldGroups();
+ContentLibrary::renderReusableSection();
 
 $sections = $GLOBALS['sp_content_library_post_types']['widgets'] ?? [];
 $editor = $GLOBALS['sp_content_library_post_types']['for-editor'] ?? [];
@@ -162,11 +205,16 @@ $checks = [
 	'sections keep title and thumbnail support'          => ($sections['supports'] ?? []) === ['title', 'thumbnail'],
 	'taxonomy remains attached to Reusable Sections'     => ($taxonomy['postTypes'] ?? []) === ['widgets'],
 	'ACF registration runs after theme field callbacks' => ($hooks['acf/init'] ?? 0) === 20,
+	'package fallback hooks the historical template slug' => isset($hooks['get_template_part_template_parts/section-widgets/index']),
+	'package fallback renders the selected section builder' => $GLOBALS['sp_content_library_rendered_templates'] === ['template_parts/section-hero/index'],
 	'legacy ACF group names remain stable'               => array_column($GLOBALS['sp_content_library_groups'], 'name') === ['widgets_builder', 'for_editor_widgets'],
 	'sections still use the theme Builder callback'      => ($GLOBALS['sp_content_library_builder_calls'][0]['fieldName'] ?? '') === 'builder',
 	'configured Editor layouts reach the blocks factory' => count($GLOBALS['sp_content_library_blocks_calls'][0]['layouts'] ?? []) === 1,
 	'editor block rows are returned unchanged'           => count(ContentLibrary::editorBlocks(12)) === 3,
 	'editor block labels are unique and readable'        => ContentLibrary::editorBlockLabels(12) === ['Author Quote', 'Blockquote'],
+	'Editor Widgets runtime is bundled with the module'  => is_file(dirname(__DIR__) . '/plugins/sp-content-library/editor-widgets/index.php')
+		&& is_file(dirname(__DIR__) . '/plugins/sp-content-library/editor-widgets/script.js'),
+	'Builder selector runtime is bundled with the module' => is_file(dirname(__DIR__) . '/plugins/sp-content-library/section-widgets/fields.php'),
 ];
 
 $failed = array_keys(array_filter($checks, static fn (bool $passed): bool => ! $passed));
