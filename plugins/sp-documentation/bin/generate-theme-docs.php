@@ -1,8 +1,14 @@
 <?php
 declare(strict_types=1);
 
-if (PHP_SAPI !== 'cli') {
-	exit(1);
+$entryScript = isset($_SERVER['SCRIPT_FILENAME'])
+	? realpath((string) $_SERVER['SCRIPT_FILENAME'])
+	: false;
+
+// This file lives inside a runtime module, but it is an executable build tool.
+// Requiring the module must never execute the command or terminate WordPress.
+if (PHP_SAPI !== 'cli' || $entryScript !== __FILE__) {
+	return;
 }
 
 $options   = getopt('', [ 'theme-root:', 'check' ]);

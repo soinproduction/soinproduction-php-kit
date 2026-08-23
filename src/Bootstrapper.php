@@ -10,6 +10,12 @@ if (!defined('ABSPATH')) {
 class Bootstrapper {
 
 	private const DISABLED_MODULE_PREFIX = '_';
+	private const AUTOLOAD_SKIP_DIRECTORIES = [
+		'bin',
+		'blocks',
+		'templates',
+		'tests',
+	];
 	private static array $moduleConfigs = [];
 	private static array $activeModules = [
 		'platform' => [],
@@ -170,7 +176,7 @@ class Bootstrapper {
 					continue;
 				}
 
-				if (strtolower($item) === 'templates' || strtolower($item) === 'blocks') {
+				if (in_array(strtolower($item), self::AUTOLOAD_SKIP_DIRECTORIES, true)) {
 					continue;
 				}
 

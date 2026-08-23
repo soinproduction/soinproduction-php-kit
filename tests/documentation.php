@@ -62,6 +62,14 @@ try {
 	$english   = \SoinProduction\Kit\DocumentationInventory::renderMarkdown($inventory, 'en');
 	$russian   = \SoinProduction\Kit\DocumentationInventory::renderMarkdown($inventory, 'ru');
 	$wiki      = file_get_contents(dirname(__DIR__) . '/plugins/sp-documentation/index.php');
+	$generator = dirname(__DIR__) . '/plugins/sp-documentation/bin/generate-theme-docs.php';
+	$probe     = $fixture . '/include-generator.php';
+	file_put_contents(
+		$probe,
+		'<?php chdir(' . var_export($fixture, true) . '); require ' . var_export($generator, true) . '; echo "continued";'
+	);
+	$probeOutput = shell_exec(escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($probe));
+	$bootstrapperSource = file_get_contents(dirname(__DIR__) . '/src/Bootstrapper.php');
 	$sections  = array_column($inventory['sections'], 'name');
 	$blocks    = array_column($inventory['blocks'], 'name');
 	$modules   = array_column($inventory['modules'], 'name');
@@ -82,6 +90,10 @@ try {
 		'public nested config is documented'            => str_contains($english, 'editor_layouts=author_quote, blockquote'),
 		'Russian inventory is localized'                => str_contains($russian, '# Текущая конфигурация темы'),
 		'Bootstrapper exposes runtime active modules'    => \SoinProduction\Kit\Bootstrapper::activeModules('plugins') === [ 'sp-documentation' ],
+		'build generator is inert when included by runtime' => trim((string) $probeOutput) === 'continued',
+		'runtime autoloader skips executable bin directories' => is_string($bootstrapperSource)
+			&& str_contains($bootstrapperSource, "'bin'")
+			&& str_contains($bootstrapperSource, 'AUTOLOAD_SKIP_DIRECTORIES'),
 		'Wiki discovers platform and ACF module docs'     => is_string($wiki) && str_contains($wiki, 'php-kit/platform') && str_contains($wiki, 'php-kit/acf'),
 		'Wiki builds a runtime theme inventory'           => is_string($wiki) && str_contains($wiki, 'DocumentationInventory::collect'),
 	];
