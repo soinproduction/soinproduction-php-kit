@@ -84,8 +84,8 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 
 			$language     = self::site_language();
 			$theme_docs   = self::discover_theme_docs( $language );
-			$plugin_docs  = self::discover_plugin_docs( $language );
-			$catalog      = array_merge( $theme_docs, $plugin_docs );
+			$module_docs  = self::discover_module_docs( $language );
+			$catalog      = array_merge( $theme_docs, $module_docs );
 			$requested_id = isset( $_GET['doc'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['doc'] ) ) : '';
 			$current       = self::find_document( $catalog, $requested_id );
 
@@ -118,7 +118,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 					</div>
 					<div class="sp-admin-metric">
 						<span><?php echo esc_html( $copy['connected_modules'] ); ?></span>
-						<strong><?php echo esc_html( (string) count( $plugin_docs ) ); ?></strong>
+						<strong><?php echo esc_html( (string) count( $module_docs ) ); ?></strong>
 						<small><?php echo esc_html( $copy['dynamic_note'] ); ?></small>
 					</div>
 				</div>
@@ -132,7 +132,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 						</label>
 
 						<?php self::render_navigation_group( $copy['theme'], $theme_docs, $current, 'admin-home' ); ?>
-						<?php self::render_navigation_group( $copy['modules'], $plugin_docs, $current, 'admin-plugins' ); ?>
+						<?php self::render_navigation_group( $copy['modules'], $module_docs, $current, 'admin-plugins' ); ?>
 
 						<p class="sp-wiki__empty" data-sp-wiki-empty hidden><?php echo esc_html( $copy['nothing_found'] ); ?></p>
 					</aside>
@@ -141,7 +141,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 						<?php if ( $current !== null ) : ?>
 							<div class="sp-wiki__article-head sp-admin-card__header">
 								<div class="sp-admin-card__copy">
-									<p class="sp-wiki__eyebrow"><?php echo esc_html( $current['type'] === 'plugin' ? $copy['connected_module'] : $copy['theme_documentation'] ); ?></p>
+									<p class="sp-wiki__eyebrow"><?php echo esc_html( $current['type'] === 'module' ? $copy['connected_module'] : $copy['theme_documentation'] ); ?></p>
 									<h2><?php echo esc_html( $current['title'] ); ?></h2>
 								</div>
 								<code><?php echo esc_html( $current['source'] ); ?></code>
@@ -175,7 +175,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 				<ul>
 					<?php foreach ( $documents as $document ) :
 						$is_current = $current !== null && $current['id'] === $document['id'];
-						$doc_icon   = $document['type'] === 'plugin' ? ( self::PLUGIN_ICONS[ $document['slug'] ] ?? 'admin-plugins' ) : 'media-document';
+						$doc_icon   = $document['type'] === 'module' ? ( self::PLUGIN_ICONS[ $document['slug'] ] ?? 'admin-plugins' ) : 'media-document';
 						$url        = add_query_arg( [ 'page' => self::PAGE_SLUG, 'doc' => $document['id'] ], admin_url( 'options-general.php' ) );
 						?>
 						<li data-sp-wiki-item data-search="<?php echo esc_attr( strtolower( $document['title'] . ' ' . $document['slug'] ) ); ?>">
@@ -243,6 +243,26 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 
 			natcasesort( $files );
 			$documents = [];
+			if ( class_exists( \SoinProduction\Kit\DocumentationInventory::class ) ) {
+				try {
+					$theme_root = defined( 'THEME_DIR' ) ? (string) THEME_DIR : get_template_directory();
+					$inventory  = \SoinProduction\Kit\DocumentationInventory::collect(
+						$theme_root,
+						\SoinProduction\Kit\Bootstrapper::activeModules()
+					);
+					$content    = \SoinProduction\Kit\DocumentationInventory::renderMarkdown( $inventory, $language );
+					$documents[] = [
+						'id'      => 'theme:current-configuration',
+						'type'    => 'theme',
+						'slug'    => 'current-configuration',
+						'title'   => self::document_title( $content, 'Current configuration' ),
+						'content' => $content,
+						'source'  => $language === 'ru' ? 'сгенерировано из runtime' : 'generated from runtime',
+					];
+				} catch ( \Throwable $error ) {
+					// Static chapters remain available if a custom theme layout cannot be inspected.
+				}
+			}
 			$home      = $directory . '/README.md';
 
 			if ( in_array( $home, $files, true ) ) {
@@ -251,6 +271,9 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 			}
 
 			foreach ( $files as $file ) {
+				if ( in_array( basename( $file ), [ '00-current-configuration.md', '00-tekushchaya-konfiguraciya.md' ], true ) ) {
+					continue;
+				}
 				$content = self::read_file( $file );
 				if ( $content === null ) {
 					continue;
@@ -271,18 +294,31 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 		}
 
 		/** @return array<int, array<string, string>> */
-		private static function discover_plugin_docs( string $language ): array {
+		private static function discover_module_docs( string $language ): array {
 			$theme_dir = trailingslashit( defined( 'THEME_DIR' ) ? THEME_DIR : get_template_directory() );
 			$roots     = [
 				[
 					'directory' => $theme_dir . 'core/plugins',
 					'source'    => 'core/plugins',
+					'category'  => 'plugins',
+				],
+				[
+					'directory' => $theme_dir . 'vendor/soinproduction/php-kit/platform',
+					'source'    => 'vendor/soinproduction/php-kit/platform',
+					'category'  => 'platform',
+				],
+				[
+					'directory' => $theme_dir . 'vendor/soinproduction/php-kit/acf',
+					'source'    => 'vendor/soinproduction/php-kit/acf',
+					'category'  => 'acf',
 				],
 				[
 					'directory' => $theme_dir . 'vendor/soinproduction/php-kit/plugins',
 					'source'    => 'vendor/soinproduction/php-kit/plugins',
+					'category'  => 'plugins',
 				],
 			];
+			$roots = apply_filters( 'sp_theme_wiki_module_roots', $roots );
 			$roots = apply_filters( 'sp_theme_wiki_plugin_roots', $roots );
 			$roots = is_array( $roots ) ? $roots : [];
 
@@ -292,6 +328,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 			foreach ( $roots as $root ) {
 				$plugins_dir = isset( $root['directory'] ) ? (string) $root['directory'] : '';
 				$source_root = isset( $root['source'] ) ? trim( (string) $root['source'], '/' ) : '';
+				$category    = isset( $root['category'] ) ? sanitize_key( (string) $root['category'] ) : 'plugins';
 				$directories = $plugins_dir !== '' ? glob( trailingslashit( $plugins_dir ) . '*', GLOB_ONLYDIR ) : [];
 
 				if ( ! is_array( $directories ) ) {
@@ -302,7 +339,8 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 
 				foreach ( $directories as $directory ) {
 					$slug = basename( $directory );
-					if ( $slug === '' || isset( $documents[ $slug ] ) || str_starts_with( $slug, '_' ) || ! is_file( $directory . '/index.php' ) ) {
+					$key  = $category . ':' . $slug;
+					if ( $slug === '' || isset( $documents[ $key ] ) || str_starts_with( $slug, '_' ) || ! is_file( $directory . '/index.php' ) ) {
 						continue;
 					}
 
@@ -331,10 +369,11 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 							: '# ' . self::humanize_slug( $slug ) . "\n\nDocumentation for this connected module has not been added yet. Create `README.ru.md` and `README.en.md` next to `index.php`.";
 					}
 
-					$documents[ $slug ] = [
-						'id'      => 'plugin:' . $slug,
-						'type'    => 'plugin',
+					$documents[ $key ] = [
+						'id'      => 'module:' . $category . ':' . $slug,
+						'type'    => 'module',
 						'slug'    => $slug,
+						'category' => $category,
 						'title'   => self::document_title( $content, self::humanize_slug( $slug ) ),
 						'content' => $content,
 						'source'  => $source_root . '/' . $slug . '/' . ( $file !== '' ? basename( $file ) : 'README.' . $language . '.md' ),

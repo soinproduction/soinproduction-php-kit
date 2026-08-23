@@ -11,6 +11,11 @@ class Bootstrapper {
 
 	private const DISABLED_MODULE_PREFIX = '_';
 	private static array $moduleConfigs = [];
+	private static array $activeModules = [
+		'platform' => [],
+		'acf'      => [],
+		'plugins'  => [],
+	];
 
 	private const MODULE_ALIASES = [
 		'platform' => [
@@ -220,8 +225,23 @@ class Bootstrapper {
 		return self::$moduleConfigs[$category][$module] ?? null;
 	}
 
+	/**
+	 * Return the normalized modules selected by the current application.
+	 *
+	 * @return array<int, string>|array<string, array<int, string>>
+	 */
+	public static function activeModules(?string $category = null): array {
+		if ($category !== null) {
+			return self::$activeModules[$category] ?? [];
+		}
+
+		return self::$activeModules;
+	}
+
 	private static function normalize_modules($modules, string $category): array {
 		if (!is_array($modules)) {
+			self::$moduleConfigs[$category] = [];
+			self::$activeModules[$category] = [];
 			return [];
 		}
 
@@ -255,7 +275,9 @@ class Bootstrapper {
 			}
 		}
 
-		return array_keys($enabled);
+		self::$activeModules[$category] = array_keys($enabled);
+
+		return self::$activeModules[$category];
 	}
 
 	private static function normalize_skip_paths($paths): array {

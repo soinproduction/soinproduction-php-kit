@@ -5,7 +5,8 @@ Dynamic in-admin documentation browser for the custom theme and every connected 
 ## Discovery Rules
 
 - Theme chapters are read from `docs/en/*.md` or `docs/ru/*.md`.
-- Module documentation is discovered beside loaded modules under the PHP Kit `plugins/*` directory.
+- Module documentation is discovered beside loaded modules under the PHP Kit `platform/*`, `acf/*`, and `plugins/*` directories.
+- The first theme chapter is generated at runtime from the actual theme metadata, connected modules, CPT folders, builder sections, blocks, ACF directories, and root templates.
 - A module is listed only when its folder is not prefixed with `_`, contains `index.php`, and at least one PHP file from that folder is loaded in the current admin request.
 - The Wiki itself does not activate or include other modules.
 
@@ -38,7 +39,7 @@ The render lifecycle is:
 
 1. Determine language from `get_locale()`.
 2. Scan the matching theme documentation directory.
-3. Scan module directories and compare them with `get_included_files()`.
+3. Generate the current-theme inventory and scan module directories against `get_included_files()`.
 4. Merge both catalogs and validate the requested `doc` ID.
 5. Read the selected Markdown file from disk.
 6. Convert supported Markdown blocks to HTML.
@@ -50,9 +51,13 @@ Theme chapters are every readable `*.md` file directly inside `docs/en` or `docs
 
 Relative Markdown links to another `.md` file are rewritten to `options-general.php?page=sp-wiki&doc=theme:<slug>`. Links that explicitly target the other language are rendered as non-clickable labels because site locale is authoritative. External `http`/`https` links open in a new tab with `noopener noreferrer`; anchors remain in the current article.
 
+## Build-Time Inventory
+
+`bin/generate-theme-docs.php --theme-root=<path>` writes deterministic EN/RU current-configuration chapters from theme metadata, Composer/Node requirements, `config/php-kit.php`, CPT directories, builder sections, blocks, ACF directories and root templates. `--check` performs a read-only comparison for CI. Themes should call the generator inside their existing `npm run build` and freshness test rather than exposing extra documentation commands.
+
 ## Module Discovery in Detail
 
-The default discovery roots are `vendor/soinproduction/php-kit/plugins` and the legacy theme path `core/plugins`. Each discovered module requires:
+The default discovery roots are `vendor/soinproduction/php-kit/platform`, `acf`, `plugins`, and the legacy theme path `core/plugins`. Each discovered module requires:
 
 - a folder name that does not begin with `_`;
 - a real `index.php` file;

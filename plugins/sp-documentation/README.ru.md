@@ -5,7 +5,8 @@
 ## Правила Обнаружения
 
 - Главы темы читаются из `docs/en/*.md` или `docs/ru/*.md`.
-- Документация модулей обнаруживается рядом с загруженными модулями в каталоге PHP Kit `plugins/*`.
+- Документация модулей обнаруживается рядом с загруженными модулями в каталогах PHP Kit `platform/*`, `acf/*` и `plugins/*`.
+- Первая глава темы генерируется в runtime из фактических metadata темы, подключённых модулей, CPT-каталогов, builder sections, blocks, ACF-каталогов и корневых templates.
 - Модуль показывается только если его папка не начинается с `_`, содержит `index.php` и хотя бы один PHP-файл этой папки загружен в текущем admin request.
 - Wiki самостоятельно не активирует и не подключает другие модули.
 
@@ -38,7 +39,7 @@ README.ru.md
 
 1. Определить язык через `get_locale()`.
 2. Просканировать соответствующую папку theme docs.
-3. Просканировать modules и сравнить с `get_included_files()`.
+3. Сгенерировать inventory текущей темы и сравнить modules с `get_included_files()`.
 4. Объединить catalogs и проверить requested `doc` ID.
 5. Прочитать выбранный Markdown с диска.
 6. Преобразовать поддерживаемые Markdown blocks в HTML.
@@ -50,9 +51,13 @@ Theme chapters — все readable `*.md` непосредственно в `doc
 
 Relative links на `.md` переписываются в `options-general.php?page=sp-wiki&doc=theme:<slug>`. Ссылки явно на другой язык выводятся как non-clickable labels, потому что locale сайта является источником истины. External `http`/`https` открываются в новой вкладке с `noopener noreferrer`; anchors остаются в статье.
 
+## Build-Time Inventory
+
+`bin/generate-theme-docs.php --theme-root=<path>` записывает deterministic EN/RU главы текущей конфигурации из metadata темы, Composer/Node requirements, `config/php-kit.php`, CPT directories, builder sections, blocks, ACF directories и root templates. Флаг `--check` выполняет read-only сравнение для CI. Тема должна вызывать генератор внутри существующих `npm run build` и freshness test, не добавляя отдельные пользовательские команды документации.
+
 ## Discovery Модулей
 
-Default roots discovery — `vendor/soinproduction/php-kit/plugins` и legacy-путь темы `core/plugins`. Для каждого найденного модуля требуются:
+Default roots discovery — `vendor/soinproduction/php-kit/platform`, `acf`, `plugins` и legacy-путь темы `core/plugins`. Для каждого найденного модуля требуются:
 
 - folder name без начального `_`;
 - реальный `index.php`;
