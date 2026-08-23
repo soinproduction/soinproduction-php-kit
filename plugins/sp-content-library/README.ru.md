@@ -10,7 +10,7 @@
 Модуль также содержит весь workflow переиспользуемого контента:
 
 - Builder layout `section_widgets`, каталог, импорт и AJAX-действие «сохранить как переиспользуемую секцию»;
-- fallback-рендер `template_parts/section-widgets/index`, когда в активной теме уже нет старой папки шаблона;
+- принадлежащий пакету рендер `template_parts/section-widgets/index`;
 - TinyMCE plugin `sp_widgets`, рендер shortcode `[widget]`, AJAX catalog/preview/create/duplicate и iframe редактирования ACF.
 
 Проектные Builder layouts, их frontend template parts, `display_blocks()`, editor CSS и preview images остаются в теме. Существующая конфигурация TinyMCE может по-прежнему связывать `sp_widgets` с глобальным compatibility class `SP_Widgets_Plugin`.
@@ -43,4 +43,4 @@
 
 Удаление layout из конфигурации скрывает его для новых Editor Blocks. Перед удалением убедитесь, что сохранённые записи больше его не используют.
 
-После обновления до этой версии пакета старые папки темы `core/mce/sp-widgets/` и `template_parts/section-widgets/` можно удалить. При поэтапном обновлении пакет видит уже объявленные классы/функции и не регистрирует их повторно.
+Пакет является единственным источником runtime. Папки темы `core/mce/sp-widgets/` и `template_parts/section-widgets/` не должны существовать одновременно с этим модулем.

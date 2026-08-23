@@ -69,8 +69,7 @@ final class ContentLibrary
 	}
 
 	/**
-	 * Render the reusable-section Builder layout when the active theme does not
-	 * provide its own legacy template part.
+	 * Render the package-owned reusable-section Builder layout.
 	 *
 	 * @param string              $slug Template slug passed by WordPress.
 	 * @param string|null         $name Optional template name.
@@ -79,11 +78,6 @@ final class ContentLibrary
 	public static function renderReusableSection(string $slug = '', ?string $name = null, array $args = []): void
 	{
 		unset($slug, $name, $args);
-
-		$legacyTemplate = locate_template('template_parts/section-widgets/index.php', false, false);
-		if (is_string($legacyTemplate) && $legacyTemplate !== '') {
-			return;
-		}
 
 		$sectionId = function_exists('get_sub_field') ? absint(get_sub_field('widget_static_block')) : 0;
 		if ($sectionId <= 0 || ! function_exists('have_rows')) {

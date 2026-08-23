@@ -59,6 +59,7 @@ class Bootstrapper {
 		'plugins/sp-admin-ui/modules/',
 		'plugins/sp-admin-ui/includes/',
 		'plugins/sp-cf7/modules/',
+		'plugins/sp-editor-tools/modules/',
 	];
 
 	public static function pathToUrl(string $path): string {

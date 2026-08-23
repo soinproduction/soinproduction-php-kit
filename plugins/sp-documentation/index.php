@@ -16,6 +16,7 @@ if ( ! class_exists( 'SP_Theme_Wiki', false ) ) {
 			'sp-admin-ui'             => 'admin-customizer',
 			'sp-content-manager'      => 'admin-users',
 			'sp-content-library'      => 'screenoptions',
+			'sp-editor-tools'         => 'editor-code',
 			'sp-deployment-manager'   => 'update',
 			'sp-archive-pages'        => 'archive',
 			'sp-debug-toolbar'        => 'editor-code',

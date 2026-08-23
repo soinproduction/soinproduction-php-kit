@@ -2,12 +2,6 @@
 
 	use StoutLogic\AcfBuilder\FieldsBuilder;
 
-	// Preserve compatibility during staged upgrades where a theme still ships
-	// the legacy section-widgets implementation.
-	if ( function_exists( 'section_widgets' ) ) {
-		return;
-	}
-
 	$function_name = str_replace( '-', '_', basename( __DIR__ ) );
 
 	$GLOBALS[ '_builder_' . $function_name ] = function ( $layout_name ) {

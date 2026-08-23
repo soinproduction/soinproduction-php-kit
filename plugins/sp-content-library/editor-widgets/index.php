@@ -4,7 +4,6 @@
         exit;
     }
 
-    if ( ! class_exists( 'SP_Widgets_Plugin', false ) ) {
     final class SP_Widgets_Plugin
     {
         private const VERSION = '1.2.0';
@@ -58,9 +57,7 @@
     }
 
     SP_Widgets_Plugin::init();
-    }
 
-    if ( ! class_exists( 'SP_Editor_Widgets', false ) ) {
     final class SP_Editor_Widgets
     {
         public static function init(): void
@@ -729,4 +726,3 @@
     }
 
     SP_Editor_Widgets::init();
-    }

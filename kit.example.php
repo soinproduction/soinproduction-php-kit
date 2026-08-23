@@ -55,6 +55,7 @@ $plugins = [
 			'blockquote',
 		],
 	],
+	'sp-editor-tools',
 	'sp-deployment-manager',
 	'sp-archive-pages',
 	'sp-debug-toolbar',

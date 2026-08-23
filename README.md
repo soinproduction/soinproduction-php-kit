@@ -66,6 +66,10 @@ Bootstrap предназначен для URL, nonce, capabilities, перево
 
 Модуль `sp-content-library` переносит admin-регистрацию исторических post types `widgets` и `for-editor`, Builder layout `section_widgets` и TinyMCE workflow `[widget]` в общий пакет и показывает страницы во **Внешний вид → Reusable Sections / Editor Blocks**. Внутренние slug и ACF field names не меняются. Разрешённые layout поля `blocks` задаются массивом `editor_layouts`; полная конфигурация и требования к callbacks описаны в `plugins/sp-content-library/README.ru.md`.
 
+### Инструменты Classic Editor
+
+Модуль `sp-editor-tools` является единственным источником PHP/JS/CSS расширений TinyMCE и связанных admin enhancers. Он сохраняет глобальные имена классов, которыми управляют `sp_get_default_editor_tools()` и `sp_get_tinymce_plugin_class_map()` темы. Локальная папка темы `core/mce` при включённом модуле не используется и должна быть удалена. Полный список инструментов находится в `plugins/sp-editor-tools/README.md`.
+
 Чтобы сохранить модуль в конфигурации, но отключить его, добавьте `_` перед именем. Например, `sp-share` будет загружен, а `_sp-share` — нет. Правило одинаково работает в списках `platform`, `acf` и `plugins`.
 
 ### Интеграция в тему
@@ -136,6 +140,7 @@ $plugins = [
 			'blockquote',
 		],
 	],
+	'sp-editor-tools',
 	'sp-deployment-manager',
 	'sp-archive-pages',
 	'sp-debug-toolbar',

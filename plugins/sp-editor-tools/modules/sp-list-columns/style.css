@@ -1,0 +1,12 @@
+ul[data-column="2"], ol[data-column="2"] {
+    column-count: 2;
+    column-gap: 20px;
+}
+ul[data-column="3"], ol[data-column="3"] {
+    column-count: 3;
+    column-gap: 20px;
+}
+ul[data-column="4"], ol[data-column="4"] {
+    column-count: 4;
+    column-gap: 20px;
+}

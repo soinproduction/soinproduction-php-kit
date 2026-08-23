@@ -10,7 +10,7 @@ Both pages live under **Appearance**. Only visible admin labels change: internal
 The module also owns the complete reusable-content workflow:
 
 - the `section_widgets` Builder layout, catalog UI, import and “save as reusable section” AJAX actions;
-- fallback rendering for `template_parts/section-widgets/index` when the active theme no longer contains the legacy template directory;
+- package-owned rendering for `template_parts/section-widgets/index`;
 - the `sp_widgets` TinyMCE plugin, `[widget]` renderer, catalog/preview/create/duplicate AJAX actions and ACF editing iframe.
 
 Theme-specific Builder layouts, their frontend template parts, `display_blocks()`, editor CSS and preview images remain in the theme. Existing TinyMCE configuration can keep mapping `sp_widgets` to the global compatibility class `SP_Widgets_Plugin`.
@@ -43,4 +43,4 @@ The field factory defaults to `blocks`, while Reusable Sections use `sp_builder_
 
 Removing a layout from the configuration hides it from new Editor Blocks. Ensure saved records no longer use it before removing it.
 
-After updating to this package version, legacy theme directories `core/mce/sp-widgets/` and `template_parts/section-widgets/` can be removed. During a staged update the package detects their existing classes/functions and avoids duplicate registration.
+The package is the single runtime source. Theme directories `core/mce/sp-widgets/` and `template_parts/section-widgets/` must not coexist with this module.

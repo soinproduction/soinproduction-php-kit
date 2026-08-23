@@ -59,7 +59,6 @@ $GLOBALS['sp_content_library_builder_calls'] = [];
 $GLOBALS['sp_content_library_blocks_calls'] = [];
 $GLOBALS['sp_content_library_rendered_templates'] = [];
 $GLOBALS['sp_content_library_have_rows_calls'] = 0;
-$GLOBALS['sp_content_library_legacy_template'] = '';
 
 function add_action(string $hook, $callback, int $priority = 10, int $acceptedArgs = 1): void
 {
@@ -99,12 +98,6 @@ function term_exists(string $slug, string $taxonomy): bool
 function get_field(string $field, int $postId): array
 {
 	return $GLOBALS['sp_content_library_fields'][$postId] ?? [];
-}
-
-function locate_template(string $template, bool $load = false, bool $requireOnce = true)
-{
-	unset($template, $load, $requireOnce);
-	return $GLOBALS['sp_content_library_legacy_template'];
 }
 
 function get_sub_field(string $field): int
@@ -205,8 +198,8 @@ $checks = [
 	'sections keep title and thumbnail support'          => ($sections['supports'] ?? []) === ['title', 'thumbnail'],
 	'taxonomy remains attached to Reusable Sections'     => ($taxonomy['postTypes'] ?? []) === ['widgets'],
 	'ACF registration runs after theme field callbacks' => ($hooks['acf/init'] ?? 0) === 20,
-	'package fallback hooks the historical template slug' => isset($hooks['get_template_part_template_parts/section-widgets/index']),
-	'package fallback renders the selected section builder' => $GLOBALS['sp_content_library_rendered_templates'] === ['template_parts/section-hero/index'],
+	'package renderer hooks the historical template slug' => isset($hooks['get_template_part_template_parts/section-widgets/index']),
+	'package renders the selected section builder'         => $GLOBALS['sp_content_library_rendered_templates'] === ['template_parts/section-hero/index'],
 	'legacy ACF group names remain stable'               => array_column($GLOBALS['sp_content_library_groups'], 'name') === ['widgets_builder', 'for_editor_widgets'],
 	'sections still use the theme Builder callback'      => ($GLOBALS['sp_content_library_builder_calls'][0]['fieldName'] ?? '') === 'builder',
 	'configured Editor layouts reach the blocks factory' => count($GLOBALS['sp_content_library_blocks_calls'][0]['layouts'] ?? []) === 1,
