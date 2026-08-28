@@ -4,13 +4,8 @@
 		exit;
 	}
 
-	define( 'SP_PAGE_LOADER_OPTION', 'sp_enable_page_loader' );
 	define( 'SP_THEME_ANIMATIONS_OPTION', 'sp_enable_theme_animations' );
 	define( 'SP_THEME_MOTION_SETTINGS_SECTION', 'sp_theme_motion_settings' );
-
-	function sp_page_loader_enabled(): bool {
-		return get_option( SP_PAGE_LOADER_OPTION, '1' ) === '1';
-	}
 
 	function sp_theme_animations_enabled(): bool {
 		return get_option( SP_THEME_ANIMATIONS_OPTION, '1' ) === '1';
@@ -39,7 +34,6 @@
 			'default'           => '1',
 		];
 
-		register_setting( SP_THEME_MOTION_SETTINGS_SECTION, SP_PAGE_LOADER_OPTION, $setting_args );
 		register_setting( SP_THEME_MOTION_SETTINGS_SECTION, SP_THEME_ANIMATIONS_OPTION, $setting_args );
 	} );
 
@@ -64,7 +58,7 @@
 					<span class="sp-admin-header__icon dashicons dashicons-admin-customizer" aria-hidden="true"></span>
 					<div class="sp-admin-header__copy">
 						<h1><?php echo esc_html__( 'Theme Behavior', THEME_SLUG ); ?></h1>
-						<p><?php echo esc_html__( 'Control global animations and the page transition loader.', THEME_SLUG ); ?></p>
+						<p><?php echo esc_html__( 'Control global theme animations.', THEME_SLUG ); ?></p>
 					</div>
 				</div>
 				<div class="sp-admin-header__actions">
@@ -85,19 +79,6 @@
 										__( 'Enable animations', THEME_SLUG ),
 										__( 'Runs site motion effects only on screens from 1025px and up.', THEME_SLUG ),
 										sp_theme_animations_enabled()
-									);
-								?>
-							</td>
-						</tr>
-						<tr>
-							<th scope="row"><?php echo esc_html__( 'Page loader', THEME_SLUG ); ?></th>
-							<td>
-								<?php
-									sp_render_theme_switch_field(
-										SP_PAGE_LOADER_OPTION,
-										__( 'Enable loader', THEME_SLUG ),
-										__( 'Shows the transition loader only on screens from 1025px and up.', THEME_SLUG ),
-										sp_page_loader_enabled()
 									);
 								?>
 							</td>

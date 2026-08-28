@@ -12,7 +12,6 @@ Bootstrapper accepts the following legacy aliases for backward compatibility. Ne
 | `branding` | `sp-login-branding` |
 | `dev-user` | `sp-content-admin` |
 | `duplicator-key` | `sp-duplicator-license` |
-| `page-loader-settings` | `sp-motion-settings` |
 | `post-type-converter` | `sp-content-type-converter` |
 | `reading-time` | `sp-reading-time` |
 | `remove-post-slug` | `sp-permalink-manager` |

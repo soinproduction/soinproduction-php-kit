@@ -20,7 +20,7 @@
 - **[sp-login-branding](../platform/sp-login-branding/README.ru.md)** — branding экрана входа WordPress.
 - **[sp-content-admin](../platform/sp-content-admin/README.ru.md)** — ограниченная роль Content Admin.
 - **[sp-duplicator-license](../platform/sp-duplicator-license/README.ru.md)** — приватный compatibility layer Duplicator.
-- **[sp-motion-settings](../platform/sp-motion-settings/README.ru.md)** — настройки page loader и frontend-анимаций.
+- **[sp-motion-settings](../platform/sp-motion-settings/README.ru.md)** — настройки frontend-анимаций.
 - **[sp-content-type-converter](../platform/sp-content-type-converter/README.ru.md)** — административное преобразование записей между совместимыми post types.
 - **[sp-reading-time](../platform/sp-reading-time/README.ru.md)** — расчёт примерного времени чтения.
 - **[sp-permalink-manager](../platform/sp-permalink-manager/README.ru.md)** — управление удалением CPT/taxonomy bases из URL.
