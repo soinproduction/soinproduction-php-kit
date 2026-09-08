@@ -163,7 +163,11 @@ assert.strictEqual(typeof clickHandler, 'function', 'replace click handler must 
 
 const webpButton = button();
 clickHandler.call(webpButton, {preventDefault() {}});
-assert.strictEqual(lastInput.accept, '.webp,image/webp', 'file picker must prefer the current attachment format');
+assert.strictEqual(
+    lastInput.accept,
+    '.webp,.png,.jpg,.jpeg,image/webp,image/png,image/jpeg',
+    'WebP attachment picker must also allow convertible PNG and JPEG files'
+);
 lastInput.choose({name: 'replacement.webp', type: 'image/webp', size: 1024});
 
 assert.strictEqual(requests.length, 1, 'valid replacement must start one AJAX request');
@@ -200,16 +204,22 @@ assert.strictEqual(
 
 const requestCount = requests.length;
 clickHandler.call(webpButton, {preventDefault() {}});
-lastInput.choose({name: 'replacement.jpg', type: 'image/jpeg', size: 1024});
-assert.strictEqual(requests.length, requestCount, 'mismatched format must be rejected before AJAX');
+lastInput.choose({name: 'replacement.png', type: 'image/png', size: 1024});
+assert.strictEqual(requests.length, requestCount + 1, 'PNG replacement for WebP must start an AJAX request');
+assert.strictEqual(requests[requestCount].options.data.values.get('replacement').name, 'replacement.png');
+
+const jpegButton = button('image/jpeg');
+clickHandler.call(jpegButton, {preventDefault() {}});
+lastInput.choose({name: 'replacement.png', type: 'image/png', size: 1024});
+assert.strictEqual(requests.length, requestCount + 1, 'non-WebP mismatched format must be rejected before AJAX');
 assert.strictEqual(
     alerts.pop(),
-    'Use the same image format as the current attachment (WEBP) to keep its filename and URL.'
+    'Use the same image format as the current attachment. WebP attachments also accept PNG or JPEG and convert them automatically.'
 );
 
 clickHandler.call(webpButton, {preventDefault() {}});
 lastInput.choose({name: 'large.webp', type: 'image/webp', size: 2 * 1024 * 1024});
-assert.strictEqual(requests.length, requestCount, 'oversized replacement must be rejected before AJAX');
+assert.strictEqual(requests.length, requestCount + 1, 'oversized replacement must be rejected before AJAX');
 assert.strictEqual(alerts.pop(), 'The replacement file is too large. Maximum upload size: 1 MB.');
 
-console.log('WebP replace JS: 11 checks passed.');
+console.log('WebP replace JS: 14 checks passed.');

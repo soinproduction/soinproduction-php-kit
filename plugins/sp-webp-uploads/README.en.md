@@ -133,14 +133,14 @@ There is no trash/undo for attachments. Never interpret a scan result as proof; 
 
 ## Replace File In Place
 
-**Replace file** is available in Media Library rows and attachment fields for users with both `upload_files` and `edit_post` for that attachment. It supports GIF, JPEG, PNG, SVG and WebP but requires the replacement MIME to match the current MIME (with `image/jpg` treated as JPEG). This requirement preserves filename and URL.
+**Replace file** is available in Media Library rows and attachment fields for users with both `upload_files` and `edit_post` for that attachment. It supports GIF, JPEG, PNG, SVG and WebP. The replacement MIME must normally match the current MIME (with `image/jpg` treated as JPEG), while an existing WebP attachment also accepts PNG or JPEG and converts it to WebP using the configured quality. This preserves the existing filename and URL.
 
 The upload must be a real PHP upload, readable, under `wp_max_upload_size()` and a valid raster image; SVG is limited to a basic `<svg` presence check, not a full security sanitizer. Site-wide SVG upload security remains the responsibility of the SVG module/policy.
 
 Replacement flow:
 
 1. Ensure the current file exists, is writable and resides inside uploads.
-2. Copy the uploaded file to a UUID temporary sibling, preserve file permissions and atomically rename it over the current path.
+2. Copy the uploaded file to a UUID temporary sibling, or convert PNG/JPEG to that sibling for a WebP target, preserve file permissions and atomically rename it over the current path.
 3. Keep attachment ID, title, slug, filename, URL, alt, caption and other post/meta fields.
 4. Update MIME, regenerate metadata/sizes, remove obsolete old sizes and clear caches/transients.
 5. Return a cache-busted thumbnail preview.

@@ -133,14 +133,14 @@ Trash/undo нет. Preview, URL, context и application behavior проверя�
 
 ## Replace file in place
 
-**Replace file** доступен в строках Media Library и attachment fields пользователю с `upload_files` и `edit_post` для конкретного attachment. Formats: GIF/JPEG/PNG/SVG/WebP, но replacement MIME обязан совпадать с current MIME (`image/jpg` считается JPEG). Так сохраняются filename и URL.
+**Replace file** доступен в строках Media Library и attachment fields пользователю с `upload_files` и `edit_post` для конкретного attachment. Formats: GIF/JPEG/PNG/SVG/WebP. Обычно replacement MIME обязан совпадать с current MIME (`image/jpg` считается JPEG), но существующий WebP attachment также принимает PNG или JPEG и конвертирует его в WebP с настроенным quality. Так сохраняются filename и URL.
 
 Файл должен быть реальным PHP upload, readable, меньше `wp_max_upload_size()`. Raster проверяется `getimagesize`; SVG — только наличием `<svg`, это не полноценный security sanitizer. За общую безопасность загрузки SVG по-прежнему отвечает site-wide SVG module/policy.
 
 Flow:
 
 1. Current file существует, writable и внутри uploads.
-2. Upload копируется во временный UUID sibling с сохранением file permissions и atomic rename поверх current.
+2. Upload копируется во временный UUID sibling; для WebP target PNG/JPEG сначала конвертируется в этот sibling. Затем сохраняются file permissions и выполняется atomic rename поверх current.
 3. ID/title/slug/filename/URL/alt/caption и прочие fields остаются.
 4. MIME/metadata/sizes regenerates, obsolete sizes удаляются, caches очищаются.
 5. Возвращается cache-busted preview.

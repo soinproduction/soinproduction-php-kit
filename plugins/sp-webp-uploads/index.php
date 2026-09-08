@@ -8,7 +8,7 @@
             private const OPT_KEY      = 'sp_webp_convert_cfg';
             private const NONCE_ACTION = 'sp_webp_convert_admin';
             private const PAGE_SLUG    = 'sp-uploads-webp-convert';
-            private const VERSION      = '2.2.1';
+            private const VERSION      = '2.3.0';
             private const URL_MAP_TRANSIENT = 'sp_webp_url_replace_map_cache';
             private const UNUSED_SCHEMA_TRANSIENT = 'sp_webp_unused_schema_cache';
             private const UNUSED_SCHEMA_CACHE_VERSION = 4;
@@ -768,6 +768,14 @@
                 return $current_mime === 'image/jpg' && $replacement_mime === 'image/jpeg';
             }
 
+            private function replacement_can_convert_to_webp( string $current_mime, string $replacement_mime ): bool {
+                $current_mime     = strtolower( trim( $current_mime ) );
+                $replacement_mime = strtolower( trim( $replacement_mime ) );
+
+                return $current_mime === 'image/webp'
+                       && in_array( $replacement_mime, [ 'image/jpeg', 'image/png' ], true );
+            }
+
             private function fallback_attachment_metadata( string $file, string $relative, string $mime ): array {
                 $meta = [
                         'file'  => $relative,
@@ -851,10 +859,11 @@
                     ];
                 }
 
-                if ( ! $this->replacement_mime_matches_attachment( $current_mime, $replacement_mime ) ) {
+                $convert_to_webp = $this->replacement_can_convert_to_webp( $current_mime, $replacement_mime );
+                if ( ! $this->replacement_mime_matches_attachment( $current_mime, $replacement_mime ) && ! $convert_to_webp ) {
                     return [
                             'status'  => 'error',
-                            'message' => 'Use the same image format to keep the existing filename and URL.',
+                            'message' => 'Use the same image format. Existing WebP attachments also accept PNG or JPEG and convert them to WebP automatically.',
                     ];
                 }
 
@@ -877,8 +886,38 @@
                 $old_meta       = wp_get_attachment_metadata( $attachment_id );
                 $old_size_files = $this->collect_generated_size_files( $current_file, $old_meta );
                 $tmp_target     = trailingslashit( dirname( $current_file ) ) . '.sp-replace-' . wp_generate_uuid4() . '.' . strtolower( (string) pathinfo( $current_file, PATHINFO_EXTENSION ) );
+                $stored_mime    = $replacement_mime;
 
-                if ( ! @copy( $tmp_file, $tmp_target ) || ! is_file( $tmp_target ) ) {
+                if ( $convert_to_webp ) {
+                    $image = wp_get_image_editor( $tmp_file );
+                    if ( is_wp_error( $image ) ) {
+                        return [
+                                'status'  => 'error',
+                                'message' => 'Unable to open the replacement image for WebP conversion: ' . $image->get_error_message(),
+                        ];
+                    }
+
+                    if ( method_exists( $image, 'set_quality' ) ) {
+                        $cfg = $this->cfg();
+                        $image->set_quality( (int) $cfg['quality'] );
+                    }
+
+                    $saved = $image->save( $tmp_target, 'image/webp' );
+                    if ( is_wp_error( $saved ) || ! is_file( $tmp_target ) || $this->detect_mime( $tmp_target ) !== 'image/webp' ) {
+                        if ( is_file( $tmp_target ) ) {
+                            @unlink( $tmp_target );
+                        }
+
+                        return [
+                                'status'  => 'error',
+                                'message' => is_wp_error( $saved )
+                                        ? 'Unable to convert the replacement image to WebP: ' . $saved->get_error_message()
+                                        : 'Unable to create a valid WebP replacement file.',
+                        ];
+                    }
+
+                    $stored_mime = 'image/webp';
+                } elseif ( ! @copy( $tmp_file, $tmp_target ) || ! is_file( $tmp_target ) ) {
                     if ( is_file( $tmp_target ) ) {
                         @unlink( $tmp_target );
                     }
@@ -904,12 +943,12 @@
 
                 wp_update_post( [
                         'ID'             => $attachment_id,
-                        'post_mime_type' => $replacement_mime,
+                        'post_mime_type' => $stored_mime,
                 ] );
 
                 $new_meta = wp_generate_attachment_metadata( $attachment_id, $current_file );
                 if ( is_wp_error( $new_meta ) || ! is_array( $new_meta ) ) {
-                    $new_meta = $this->fallback_attachment_metadata( $current_file, $relative, $replacement_mime );
+                    $new_meta = $this->fallback_attachment_metadata( $current_file, $relative, $stored_mime );
                 }
 
                 if ( empty( $new_meta['file'] ) ) {
@@ -932,7 +971,9 @@
 
                 return [
                         'status'      => 'replaced',
-                        'message'     => 'Attachment file replaced. ID, title, slug, filename, URL, alt, caption, and metadata fields were kept.',
+                        'message'     => $convert_to_webp
+                                ? 'Replacement image converted to WebP and installed. ID, title, slug, filename, URL, alt, caption, and metadata fields were kept.'
+                                : 'Attachment file replaced. ID, title, slug, filename, URL, alt, caption, and metadata fields were kept.',
                         'preview_url' => add_query_arg( 'sp-replaced', time(), $preview_url ),
                 ];
             }
@@ -3375,7 +3416,7 @@
                 $form_fields['sp_webp_replace_file'] = [
                         'label' => esc_html__( 'Replace file', 'sp-webp-convert' ),
                         'input' => 'html',
-                        'html'  => $this->replace_button_html( (int) $post->ID ) . '<p class="description">Uploads a new file into the existing attachment path. ID, title, slug, alt, caption, filename, and URL stay unchanged. Use the same image format.</p>',
+                        'html'  => $this->replace_button_html( (int) $post->ID ) . '<p class="description">Uploads a new file into the existing attachment path. ID, title, slug, alt, caption, filename, and URL stay unchanged. WebP attachments accept WebP, PNG, or JPEG; PNG/JPEG files are converted to WebP.</p>',
                 ];
 
                 return $form_fields;
@@ -3424,7 +3465,7 @@
                         'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
                         'nonce'         => wp_create_nonce( self::NONCE_ACTION ),
                         'maxUploadSize' => (int) wp_max_upload_size(),
-                        'confirm'       => 'Replace this attachment file? The attachment ID, title, slug, filename, URL, alt, and caption will stay unchanged. The new file must use the same image format.',
+                        'confirm'       => 'Replace this attachment file? The attachment ID, title, slug, filename, URL, alt, and caption will stay unchanged. PNG or JPEG replacements for a WebP attachment will be converted to WebP.',
                 ];
 
                 wp_add_inline_script(
@@ -3515,10 +3556,18 @@
             'image/jpeg': '.jpg,.jpeg,image/jpeg',
             'image/png': '.png,image/png',
             'image/svg+xml': '.svg,image/svg+xml',
-            'image/webp': '.webp,image/webp'
+            'image/webp': '.webp,.png,.jpg,.jpeg,image/webp,image/png,image/jpeg'
         };
 
         return types[normalizedMime(mime)] || 'image/*,.svg,.webp';
+    }
+
+    function replacementCanBeStored(attachmentMime, replacementMime) {
+        attachmentMime = normalizedMime(attachmentMime);
+        replacementMime = normalizedMime(replacementMime);
+
+        return attachmentMime === replacementMime
+            || (attachmentMime === 'image/webp' && (replacementMime === 'image/png' || replacementMime === 'image/jpeg'));
     }
 
     function replaceAttachment($button, file) {
@@ -3589,8 +3638,8 @@
 
             const attachmentMime = normalizedMime($button.attr('data-attachment-mime'));
             const replacementMime = normalizedMime(file.type);
-            if (attachmentMime && replacementMime && attachmentMime !== replacementMime) {
-                showMessage('Use the same image format as the current attachment (' + attachmentMime.replace('image/', '').toUpperCase() + ') to keep its filename and URL.');
+            if (attachmentMime && replacementMime && !replacementCanBeStored(attachmentMime, replacementMime)) {
+                showMessage('Use the same image format as the current attachment. WebP attachments also accept PNG or JPEG and convert them automatically.');
                 return;
             }
 
