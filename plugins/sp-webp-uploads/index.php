@@ -8,7 +8,7 @@
             private const OPT_KEY      = 'sp_webp_convert_cfg';
             private const NONCE_ACTION = 'sp_webp_convert_admin';
             private const PAGE_SLUG    = 'sp-uploads-webp-convert';
-            private const VERSION      = '2.2.0';
+            private const VERSION      = '2.2.1';
             private const URL_MAP_TRANSIENT = 'sp_webp_url_replace_map_cache';
             private const UNUSED_SCHEMA_TRANSIENT = 'sp_webp_unused_schema_cache';
             private const UNUSED_SCHEMA_CACHE_VERSION = 4;
@@ -3345,8 +3345,9 @@
 
             private function replace_button_html( int $attachment_id, string $label = 'Replace file' ): string {
                 return sprintf(
-                        '<button type="button" class="button sp-webp-replace-trigger" data-attachment-id="%d">%s</button>',
+                        '<button type="button" class="button sp-webp-replace-trigger" data-attachment-id="%d" data-attachment-mime="%s">%s</button>',
                         $attachment_id,
+                        esc_attr( (string) get_post_mime_type( $attachment_id ) ),
                         esc_html( $label )
                 );
             }
@@ -3357,8 +3358,9 @@
                 }
 
                 $actions['sp_webp_replace_file'] = sprintf(
-                        '<a href="#" class="sp-webp-replace-trigger" data-attachment-id="%d">%s</a>',
+                        '<a href="#" class="sp-webp-replace-trigger" data-attachment-id="%d" data-attachment-mime="%s">%s</a>',
                         (int) $post->ID,
+                        esc_attr( (string) get_post_mime_type( $post ) ),
                         esc_html__( 'Replace file', 'sp-webp-convert' )
                 );
 
@@ -3419,9 +3421,10 @@
                 wp_enqueue_script( 'sp-webp-replace-admin' );
 
                 $data = [
-                        'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-                        'nonce'   => wp_create_nonce( self::NONCE_ACTION ),
-                        'confirm' => 'Replace this attachment file? The attachment ID, title, slug, filename, URL, alt, and caption will stay unchanged. The new file must use the same image format.',
+                        'ajaxUrl'       => admin_url( 'admin-ajax.php' ),
+                        'nonce'         => wp_create_nonce( self::NONCE_ACTION ),
+                        'maxUploadSize' => (int) wp_max_upload_size(),
+                        'confirm'       => 'Replace this attachment file? The attachment ID, title, slug, filename, URL, alt, and caption will stay unchanged. The new file must use the same image format.',
                 ];
 
                 wp_add_inline_script(
@@ -3444,6 +3447,78 @@
 
     function showMessage(message) {
         window.alert(message);
+    }
+
+    function responseMessage(response, fallback) {
+        if (!response) {
+            return fallback;
+        }
+
+        if (typeof response.data === 'string' && response.data.trim()) {
+            return response.data.trim();
+        }
+
+        if (response.data && typeof response.data.message === 'string' && response.data.message.trim()) {
+            return response.data.message.trim();
+        }
+
+        return fallback;
+    }
+
+    function requestErrorMessage(xhr) {
+        const status = Number(xhr && xhr.status ? xhr.status : 0);
+        const response = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+        let message = responseMessage(response, '');
+
+        if (!message && xhr && typeof xhr.responseText === 'string') {
+            const text = xhr.responseText.trim();
+            if (text && text !== '0' && text !== '-1' && text.charAt(0) === '{') {
+                try {
+                    message = responseMessage(JSON.parse(text), '');
+                } catch (error) {
+                    // The response was not valid WordPress JSON; use the status fallback below.
+                }
+            }
+
+            if (!message && text === '-1') {
+                message = 'The security check expired. Reload the Media Library page and try again.';
+            }
+        }
+
+        if (message) {
+            return message;
+        }
+
+        if (status === 413) {
+            return 'The replacement file is larger than the server upload limit.';
+        }
+
+        if (status === 400) {
+            return 'The server rejected the replacement request. Check the image format and file size, reload the page, and try again.';
+        }
+
+        if (status === 403) {
+            return 'The replacement was rejected by the security check. Reload the page and try again.';
+        }
+
+        return status ? 'Replace failed (HTTP ' + status + ').' : 'Replace failed. Check your connection and try again.';
+    }
+
+    function normalizedMime(mime) {
+        mime = String(mime || '').toLowerCase();
+        return mime === 'image/jpg' ? 'image/jpeg' : mime;
+    }
+
+    function acceptForMime(mime) {
+        const types = {
+            'image/gif': '.gif,image/gif',
+            'image/jpeg': '.jpg,.jpeg,image/jpeg',
+            'image/png': '.png,image/png',
+            'image/svg+xml': '.svg,image/svg+xml',
+            'image/webp': '.webp,image/webp'
+        };
+
+        return types[normalizedMime(mime)] || 'image/*,.svg,.webp';
     }
 
     function replaceAttachment($button, file) {
@@ -3469,15 +3544,14 @@
             processData: false
         }).done(function (response) {
             if (!response || !response.success) {
-                const message = response && response.data && response.data.message ? response.data.message : 'Replace failed.';
-                showMessage(message);
+                showMessage(responseMessage(response, 'Replace failed.'));
                 return;
             }
 
             showMessage(response.data && response.data.message ? response.data.message : 'Attachment file replaced.');
             window.location.reload();
-        }).fail(function () {
-            showMessage('Replace failed.');
+        }).fail(function (xhr) {
+            showMessage(requestErrorMessage(xhr));
         }).always(function () {
             setBusy($button, false);
         });
@@ -3493,7 +3567,7 @@
 
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = 'image/*,.svg,.webp';
+        input.accept = acceptForMime($button.attr('data-attachment-mime'));
         input.style.position = 'fixed';
         input.style.left = '-9999px';
         document.body.appendChild(input);
@@ -3506,6 +3580,20 @@
             }
 
             const cfg = window.spWebpReplace || {};
+            const maxUploadSize = Number(cfg.maxUploadSize || 0);
+            if (maxUploadSize > 0 && file.size > maxUploadSize) {
+                const maxMb = Math.max(1, Math.floor(maxUploadSize / 1024 / 1024));
+                showMessage('The replacement file is too large. Maximum upload size: ' + maxMb + ' MB.');
+                return;
+            }
+
+            const attachmentMime = normalizedMime($button.attr('data-attachment-mime'));
+            const replacementMime = normalizedMime(file.type);
+            if (attachmentMime && replacementMime && attachmentMime !== replacementMime) {
+                showMessage('Use the same image format as the current attachment (' + attachmentMime.replace('image/', '').toUpperCase() + ') to keep its filename and URL.');
+                return;
+            }
+
             if (!window.confirm(cfg.confirm || 'Replace this attachment file?')) {
                 return;
             }
