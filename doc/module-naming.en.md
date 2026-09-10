@@ -20,6 +20,7 @@ Bootstrapper accepts the following legacy aliases for backward compatibility. Ne
 | `icon-link-list` | `sp-icon-links` |
 | `related-posts` | `sp-related-content` |
 | `smart-relationship` | `sp-post-selector` |
+| `post-relationships` | `sp-post-relationships` |
 | `smart-taxonomy` | `sp-term-selector` |
 | `table` | `sp-table` |
 | `taxonomy-urls` | `sp-term-links` |

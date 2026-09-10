@@ -37,6 +37,7 @@ class Bootstrapper {
 		'acf' => [
 			'archive-builder'    => 'sp-archive-builder',
 			'icon-link-list'     => 'sp-icon-links',
+			'post-relationships' => 'sp-post-relationships',
 			'related-posts'      => 'sp-related-content',
 			'smart-relationship' => 'sp-post-selector',
 			'smart-taxonomy'     => 'sp-term-selector',

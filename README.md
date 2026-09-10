@@ -111,6 +111,7 @@ $platform = [
 $acf = [
 	'sp-background-media',
 	'sp-post-selector',
+	'sp-post-relationships',
 	'_sp-term-selector',
 ];
 

@@ -34,6 +34,7 @@ ACF-типы и общие ACF-хелперы загружаются до рег
 - **[sp-icon-links](../acf/sp-icon-links/README.ru.md)** — сортируемый список ссылок с иконками.
 - **[sp-related-content](../acf/sp-related-content/README.ru.md)** — поле выбора связанных записей и хелперы для вывода.
 - **[sp-post-selector](../acf/sp-post-selector/README.ru.md)** — расширенное relationship-поле ACF.
+- **[sp-post-relationships](../acf/sp-post-relationships/README.ru.md)** — двусторонние relationship-поля между типами записей; тема хранит только конфигурацию.
 - **[sp-term-selector](../acf/sp-term-selector/README.ru.md)** — расширенное taxonomy-поле ACF.
 - **[sp-table](../acf/sp-table/README.ru.md)** — редактируемая таблица и хелперы рендера.
 - **[sp-term-links](../acf/sp-term-links/README.ru.md)** — поле для управления URL таксономий.

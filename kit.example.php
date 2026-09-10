@@ -22,6 +22,7 @@ $acf = [
 	'_sp-icon-links',
 	'_sp-related-content',
 	'_sp-post-selector',
+	'_sp-post-relationships',
 	'_sp-term-selector',
 	'_sp-table',
 	'_sp-term-links',

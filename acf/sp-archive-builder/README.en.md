@@ -22,14 +22,21 @@ Use the field in section `fields.php`:
     'confirm'         => 1,
     'reset'           => 1,
     'disable_empty'   => 1,
+    'term_scope'      => [
+        'case_study_industry' => [ 'healthcare', 'finance' ],
+    ],
 
     'filters' => [
-        'case_study_industry' => [ 'enabled' => 1, 'ui' => 'buttons' ],
+        'case_study_industry' => [ 'enabled' => 1, 'ui' => 'buttons', 'terms_mode' => 'children' ],
         'case_study_service'  => [ 'enabled' => 1, 'ui' => 'buttons' ],
         'case_study_location' => [ 'enabled' => 1, 'ui' => 'select' ],
     ],
 
     'per_page'        => 9,
+    'per_page_choices' => [ 6, 9, 12, 'all' ],
+    'load_more_label' => 'Show more',
+    'all_label'       => 'All',
+    'group_on_all'    => 0,
     'pagination_type' => 'pagination',
     'order_mode'      => 'newest',
 
@@ -68,8 +75,22 @@ Taxonomy filter definitions. Supported `ui` values:
 'checkbox'
 ```
 
+Each filter also supports `terms_mode`: `selected`, `children`, or `parent`. `term_scope` limits the query and visible filter terms to configured taxonomy slugs.
+
 `per_page`:
 Default number of posts per page. Use `-1` or `all` to render every matching post without pagination.
+
+`per_page_choices`:
+Optional field-level list shown to editors. Values may be positive integers plus `-1` or `all`.
+
+`load_more_label`, `all_label`:
+Project-specific labels saved with the field configuration.
+
+`group_on_all`:
+Groups the unfiltered result by the first configured taxonomy filter while preserving pagination/load-more behavior.
+
+`favorite_first`:
+Optional runtime/field flag that puts posts with `_sp_favorite_post` first.
 
 `pagination_type`:
 
@@ -214,7 +235,17 @@ sp_archive_per_page(
 );
 ```
 
-Card and empty-state templates may live under `template_parts/`, `templates/`, `php/cards/` or `php/templates/`. Extend the allow-list with `sp_archive_template_prefixes`. Pagination automatically uses the first available template from `templates/ui/pagination`, `php/templates/ui/pagination` or `template_parts/ui/pagination`; override it with `sp_archive_pagination_template`.
+Card and empty-state templates may live under `template_parts/`, `templates/`, `php/cards/` or `php/templates/`. Extend the allow-list with `sp_archive_template_prefixes`. Filter, select, and pagination components are resolved across `templates/ui/`, `php/templates/ui/`, `php/templates/`, and `template_parts/ui/`; override individual components with `sp_archive_component_template` or pagination with `sp_archive_pagination_template`.
+
+## Multilingual behavior
+
+The active Polylang or WPML language is stored in the server-side archive token and passed to every normal and AJAX query. AJAX requests switch the multilingual context before rendering cards, so translated labels and templates use the same language as the archive page.
+
+The AJAX nonce action defaults to `ajax_global`. A project using another dedicated nonce can configure the single accepted action:
+
+```php
+add_filter('sp_archive_nonce_action', static fn(): string => 'sp_ajax_nonce');
+```
 
 `sp_archive_confirm(string $label = '', string $class = ''): void`
 Renders a confirm/apply button only when `confirm => 1`.
