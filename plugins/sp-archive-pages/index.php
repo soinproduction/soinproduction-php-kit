@@ -1,7 +1,7 @@
 <?php
 
 	add_filter( 'fake_archive_supported_post_types', function () {
-		return ARCHIVE_POSTS;
+		return defined( 'ARCHIVE_POSTS' ) && is_array( ARCHIVE_POSTS ) ? ARCHIVE_POSTS : [];
 	} );
 
 	add_action( 'admin_menu', function () {
@@ -18,15 +18,118 @@
 		);
 	} );
 
+	add_action( 'admin_enqueue_scripts', function ( string $hook ): void {
+		if ( $hook !== 'settings_page_fake_archives' ) {
+			return;
+		}
+
+		$style      = __DIR__ . '/assets/admin.css';
+		$module_url = \SoinProduction\Kit\Bootstrapper::pathToUrl( __DIR__ );
+		if ( $module_url === '' ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'sp-archive-pages-admin',
+			trailingslashit( $module_url ) . 'assets/admin.css',
+			wp_style_is( 'sp-admin-ui', 'registered' ) ? [ 'sp-admin-ui' ] : [],
+			is_file( $style ) ? (string) filemtime( $style ) : null
+		);
+	} );
+
 	function fa_current_lang(): string {
-		if ( function_exists( 'icl_object_id' ) ) {
-			$cur = apply_filters( 'wpml_current_language', null );
-			if ( is_string( $cur ) && $cur !== '' ) {
-				return $cur;
+		if ( function_exists( 'pll_current_language' ) ) {
+			$lang = pll_current_language( 'slug' );
+			if ( is_string( $lang ) && $lang !== '' ) {
+				return sanitize_key( $lang );
 			}
 		}
 
+		$lang = apply_filters( 'wpml_current_language', null );
+		if ( is_string( $lang ) && $lang !== '' ) {
+			return sanitize_key( $lang );
+		}
+
 		return 'default';
+	}
+
+	function fa_default_lang(): string {
+		if ( function_exists( 'pll_default_language' ) ) {
+			$lang = pll_default_language( 'slug' );
+			if ( is_string( $lang ) && $lang !== '' ) {
+				return sanitize_key( $lang );
+			}
+		}
+
+		$lang = apply_filters( 'wpml_default_language', null );
+		if ( is_string( $lang ) && $lang !== '' ) {
+			return sanitize_key( $lang );
+		}
+
+		return 'default';
+	}
+
+	function fa_get_archive_map_for_language( string $lang ): array {
+		$lang = sanitize_key( $lang );
+		$lang = $lang !== '' ? $lang : 'default';
+
+		$map     = get_option( 'custom_fake_archives_' . $lang, [] );
+		$default = get_option( 'custom_fake_archives_default', [] );
+		$legacy  = get_option( 'custom_fake_archives', [] );
+
+		$map     = is_array( $map ) ? $map : [];
+		$default = is_array( $default ) ? $default : [];
+		$legacy  = is_array( $legacy ) ? $legacy : [];
+
+		if ( $lang !== 'default' ) {
+			$map += $default;
+		}
+		$map += $legacy;
+
+		$out = [];
+		foreach ( $map as $post_type => $page_id ) {
+			$post_type = sanitize_key( (string) $post_type );
+			$page_id   = (int) $page_id;
+			if ( $post_type !== '' && $page_id > 0 ) {
+				$out[ $post_type ] = $page_id;
+			}
+		}
+
+		return $out;
+	}
+
+	function fa_get_fake_archive_page_for_language( string $post_type, string $lang ): ?WP_Post {
+		$post_type = sanitize_key( $post_type );
+		if ( $post_type === '' ) {
+			return null;
+		}
+
+		$map     = fa_get_archive_map_for_language( $lang );
+		$page_id = (int) ( $map[ $post_type ] ?? 0 );
+		$post    = $page_id > 0 ? get_post( $page_id ) : null;
+
+		return ( $post instanceof WP_Post && $post->post_status !== 'trash' ) ? $post : null;
+	}
+
+	function fa_get_post_type_rewrite_base( string $post_type ): string {
+		$post_type = sanitize_key( $post_type );
+		if ( $post_type === '' ) {
+			return '';
+		}
+
+		$archive_page = fa_get_fake_archive_page_for_language( $post_type, fa_default_lang() );
+		if ( ! ( $archive_page instanceof WP_Post ) ) {
+			$archive_page = fa_get_fake_archive_page_for_language( $post_type, fa_current_lang() );
+		}
+
+		if ( $archive_page instanceof WP_Post ) {
+			$base = trim( (string) get_page_uri( $archive_page->ID ), '/' );
+			if ( $base !== '' ) {
+				return $base;
+			}
+		}
+
+		return $post_type;
 	}
 
 	function get_supported_fake_archive_post_types(): array {
@@ -35,38 +138,118 @@
 		return array_values( array_filter( is_array( $list ) ? $list : [] ) );
 	}
 
+	function fa_individual_archive_option_name( ?string $lang = null ): string {
+		$lang = sanitize_key( (string) ( $lang ?: fa_current_lang() ) );
+
+		return 'custom_fake_archives_individual_' . ( $lang !== '' ? $lang : 'default' );
+	}
+
+	function fa_get_individual_archive_map_for_language( string $lang ): array {
+		$lang = sanitize_key( $lang );
+		$lang = $lang !== '' ? $lang : 'default';
+		$map  = get_option( fa_individual_archive_option_name( $lang ), [] );
+		$map  = is_array( $map ) ? $map : [];
+
+		if ( $lang !== 'default' ) {
+			$default = get_option( fa_individual_archive_option_name( 'default' ), [] );
+			if ( is_array( $default ) ) {
+				$map += $default;
+			}
+		}
+
+		$out = [];
+		foreach ( $map as $post_type => $enabled ) {
+			$post_type = sanitize_key( (string) $post_type );
+			if ( $post_type !== '' && ! empty( $enabled ) ) {
+				$out[ $post_type ] = 1;
+			}
+		}
+
+		return $out;
+	}
+
+	function fa_get_individual_archive_map_for_current_lang(): array {
+		return fa_get_individual_archive_map_for_language( fa_current_lang() );
+	}
+
+	function fa_post_type_allows_individual_archive( string $post_type, string $lang = '' ): bool {
+		$post_type = sanitize_key( $post_type );
+		$lang      = sanitize_key( $lang );
+		$map       = fa_get_individual_archive_map_for_language( $lang !== '' ? $lang : fa_current_lang() );
+
+		return $post_type !== '' && ! empty( $map[ $post_type ] );
+	}
+
+	function fa_get_post_language( $post ): string {
+		$post = get_post( $post );
+		if ( ! ( $post instanceof WP_Post ) ) {
+			return fa_current_lang();
+		}
+
+		if ( function_exists( 'pll_get_post_language' ) ) {
+			$lang = pll_get_post_language( $post->ID, 'slug' );
+			if ( is_string( $lang ) && $lang !== '' ) {
+				return sanitize_key( $lang );
+			}
+		}
+
+		$details = apply_filters( 'wpml_post_language_details', null, $post->ID );
+		if ( is_array( $details ) && ! empty( $details['language_code'] ) ) {
+			return sanitize_key( (string) $details['language_code'] );
+		}
+
+		return fa_current_lang();
+	}
+
 
 	function render_fake_archives_settings_page() {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
-		$lang = fa_current_lang();
+		$lang           = fa_current_lang();
+		$settings_nonce = isset( $_POST['fake_archives_nonce'] ) && is_string( $_POST['fake_archives_nonce'] )
+			? sanitize_text_field( wp_unslash( $_POST['fake_archives_nonce'] ) )
+			: '';
 
-		if ( isset( $_POST['fake_archives_nonce'] ) && wp_verify_nonce( $_POST['fake_archives_nonce'], 'save_fake_archives' ) ) {
-			$raw = $_POST['fake_archives'] ?? [];
-			$san = [];
+		if ( $settings_nonce !== '' && wp_verify_nonce( $settings_nonce, 'save_fake_archives' ) ) {
+			$raw = isset( $_POST['fake_archives'] ) && is_array( $_POST['fake_archives'] )
+				? wp_unslash( $_POST['fake_archives'] )
+				: [];
+			$raw_individual = isset( $_POST['individual_archives'] ) && is_array( $_POST['individual_archives'] )
+				? wp_unslash( $_POST['individual_archives'] )
+				: [];
+			$san        = [];
+			$individual = [];
 
-			if ( is_array( $raw ) ) {
-				foreach ( $raw as $pt => $page_id ) {
-					$pt      = sanitize_key( (string) $pt );
-					$page_id = absint( $page_id );
-					if ( $pt !== '' && $page_id > 0 ) {
-						$san[ $pt ] = $page_id;
-					}
+			foreach ( $raw as $pt => $page_id ) {
+				$pt      = sanitize_key( (string) $pt );
+				$page_id = is_scalar( $page_id ) ? absint( $page_id ) : 0;
+				if ( $pt !== '' && $page_id > 0 ) {
+					$san[ $pt ] = $page_id;
+				}
+			}
+
+			foreach ( get_supported_fake_archive_post_types() as $post_type ) {
+				$post_type = sanitize_key( (string) $post_type );
+				if ( $post_type !== '' && ! empty( $raw_individual[ $post_type ] ) ) {
+					$individual[ $post_type ] = 1;
 				}
 			}
 
 			update_option( 'custom_fake_archives_' . $lang, $san );
+			update_option( fa_individual_archive_option_name( $lang ), $individual );
+			fa_schedule_rewrite_flush();
 			echo '<div class="updated"><p>Saved successfully.</p></div>';
 		}
 
-		$fake_archives = get_option( 'custom_fake_archives_' . $lang, [] );
-		$fake_archives = is_array( $fake_archives ) ? $fake_archives : [];
+		$fake_archives       = get_option( 'custom_fake_archives_' . $lang, [] );
+		$fake_archives       = is_array( $fake_archives ) ? $fake_archives : [];
+		$individual_archives = fa_get_individual_archive_map_for_current_lang();
 
 		$supported_types = get_supported_fake_archive_post_types();
 		$post_types      = get_post_types( [], 'objects' );
-		$pages           = get_pages();
+		$pages           = get_pages( $lang !== 'default' ? [ 'lang' => $lang ] : [] );
 		?>
         <div class="wrap sp-cpt-archives sp-admin-page">
 			<header class="sp-admin-header">
@@ -93,6 +276,7 @@
                         <tr>
                             <th scope="row"><?= esc_html( $pt->label ); ?></th>
                             <td>
+								<div class="sp-cpt-archives__assignment">
                                 <select name="fake_archives[<?= esc_attr( $pt_name ); ?>]">
                                     <option value="">— Not selected —</option>
 									<?php foreach ( $pages as $page ) : ?>
@@ -102,6 +286,24 @@
                                         </option>
 									<?php endforeach; ?>
                                 </select>
+									<div class="sp-cpt-archives__toggle">
+										<span class="sp-cpt-archives__toggle-copy">
+											<strong>Individual archive pages</strong>
+											<small>Allow every entry to override the default archive page.</small>
+										</span>
+										<?php $toggle_id = 'individual-archive-' . sanitize_html_class( (string) $pt_name ); ?>
+										<label class="sp-favorite-ios-toggle" for="<?= esc_attr( $toggle_id ); ?>">
+											<input
+												type="checkbox"
+												id="<?= esc_attr( $toggle_id ); ?>"
+												name="individual_archives[<?= esc_attr( $pt_name ); ?>]"
+												value="1"
+												<?= checked( ! empty( $individual_archives[ $pt_name ] ), true, false ); ?>
+											>
+											<span class="sp-favorite-ios-track"><span class="sp-favorite-ios-thumb"></span></span>
+										</label>
+									</div>
+								</div>
                             </td>
                         </tr>
 					<?php endforeach; ?>
@@ -118,26 +320,7 @@
 			return null;
 		}
 
-		$lang     = fa_current_lang();
-		$map_lang = get_option( 'custom_fake_archives_' . $lang, [] );
-		$map_lang = is_array( $map_lang ) ? $map_lang : [];
-
-		$page_id = (int) ( $map_lang[ $post_type ] ?? 0 );
-
-
-		if ( $page_id <= 0 ) {
-			$map_def = get_option( 'custom_fake_archives_default', [] );
-			$map_def = is_array( $map_def ) ? $map_def : [];
-			$page_id = (int) ( $map_def[ $post_type ] ?? 0 );
-		}
-
-		if ( $page_id <= 0 ) {
-			return null;
-		}
-
-		$post = get_post( $page_id );
-
-		return ( $post instanceof WP_Post && $post->post_status !== 'trash' ) ? $post : null;
+		return fa_get_fake_archive_page_for_language( $post_type, fa_current_lang() );
 	}
 
 
@@ -146,20 +329,18 @@
 			return;
 		}
 
-		$lang = 'default';
-		if ( function_exists( 'icl_object_id' ) ) {
-			$det = apply_filters( 'wpml_post_language_details', null, $post_id );
-			if ( is_array( $det ) && ! empty( $det['language_code'] ) ) {
-				$lang = (string) $det['language_code'];
+		$is_global_archive = false;
+		foreach ( fa_get_all_archive_assignments() as $assignment ) {
+			if ( $assignment['page_id'] === (int) $post_id ) {
+				$is_global_archive = true;
+				break;
 			}
 		}
+		$is_individual_archive = in_array( (int) $post_id, fa_get_individual_archive_page_ids(), true );
 
-		$archives = get_option( 'custom_fake_archives_' . $lang, [] );
-		$archives = is_array( $archives ) ? array_map( 'intval', $archives ) : [];
-
-		if ( in_array( (int) $post_id, $archives, true ) ) {
+		if ( $is_global_archive || $is_individual_archive ) {
 			wp_die(
-				'This page is assigned as an archive for one of the post types. Please remove the assignment in the "CPT Archives" settings first.',
+				'This page is assigned as an archive. Remove the CPT assignment or the individual entry assignment first.',
 				'Deletion Forbidden',
 				[ 'response' => 403, 'back_link' => true ]
 			);
@@ -175,18 +356,9 @@
 			return $post_states;
 		}
 
-		$lang = 'default';
-		if ( function_exists( 'icl_object_id' ) ) {
-			$det = apply_filters( 'wpml_post_language_details', null, $post->ID );
-			if ( is_array( $det ) && ! empty( $det['language_code'] ) ) {
-				$lang = (string) $det['language_code'];
-			}
-		}
+		$lang = fa_get_post_language( $post );
 
-		$fake_archives = get_option( 'custom_fake_archives_' . $lang, [] );
-		if ( ! is_array( $fake_archives ) ) {
-			return $post_states;
-		}
+		$fake_archives = fa_get_archive_map_for_language( $lang );
 
 		$post_types = get_post_types( [], 'objects' );
 
@@ -201,39 +373,106 @@
 			$post_states['fake_archive_pages'] = 'Archive Page, ' . implode( ', ', $labels );
 		}
 
+		if ( in_array( (int) $post->ID, fa_get_individual_archive_page_ids(), true ) ) {
+			$post_states['individual_fake_archive_page'] = 'Individual Archive Page';
+		}
+
 		return $post_states;
 	}, 10, 2 );
 
 
 	function fa_get_archive_map_for_current_lang(): array {
-		$lang = fa_current_lang();
-		$map  = get_option( 'custom_fake_archives_' . $lang, [] );
-		if ( ! is_array( $map ) ) {
-			$map = [];
-		}
-
-		if ( $lang !== 'default' ) {
-			$def = get_option( 'custom_fake_archives_default', [] );
-			if ( is_array( $def ) ) {
-				foreach ( $def as $pt => $pid ) {
-					if ( ! isset( $map[ $pt ] ) ) {
-						$map[ $pt ] = $pid;
-					}
-				}
-			}
-		}
-
-		$out = [];
-		foreach ( $map as $pt => $pid ) {
-			$pt  = sanitize_key( (string) $pt );
-			$pid = (int) $pid;
-			if ( $pt && $pid > 0 ) {
-				$out[ $pt ] = $pid;
-			}
-		}
-
-		return $out;
+		return fa_get_archive_map_for_language( fa_current_lang() );
 	}
+
+	function fa_get_known_languages(): array {
+		$languages = [ 'default', fa_default_lang(), fa_current_lang() ];
+
+		if ( function_exists( 'pll_languages_list' ) ) {
+			$languages = array_merge(
+				$languages,
+				(array) pll_languages_list( [ 'fields' => 'slug' ] )
+			);
+		}
+
+		$wpml_languages = apply_filters( 'wpml_active_languages', null, [ 'skip_missing' => 0 ] );
+		if ( is_array( $wpml_languages ) ) {
+			$languages = array_merge( $languages, array_keys( $wpml_languages ) );
+		}
+
+		$languages = array_map( 'sanitize_key', $languages );
+
+		return array_values( array_unique( array_filter( $languages ) ) );
+	}
+
+	function fa_get_all_archive_assignments(): array {
+		$assignments = [];
+		$seen        = [];
+
+		foreach ( fa_get_known_languages() as $lang ) {
+			foreach ( fa_get_archive_map_for_language( $lang ) as $post_type => $page_id ) {
+				$key = $post_type . ':' . $page_id;
+				if ( isset( $seen[ $key ] ) ) {
+					continue;
+				}
+
+				$seen[ $key ] = true;
+				$assignments[] = [
+					'lang'      => $lang,
+					'post_type' => $post_type,
+					'page_id'   => (int) $page_id,
+				];
+			}
+		}
+
+		return $assignments;
+	}
+
+	function fa_get_archive_route_base( int $page_id ): string {
+		$permalink = get_permalink( $page_id );
+		if ( ! is_string( $permalink ) || $permalink === '' ) {
+			return '';
+		}
+
+		$path      = (string) wp_parse_url( $permalink, PHP_URL_PATH );
+		$home_path = (string) wp_parse_url( home_url( '/' ), PHP_URL_PATH );
+		$path      = trim( $path, '/' );
+		$home_path = trim( $home_path, '/' );
+
+		if ( $home_path !== '' && ( $path === $home_path || str_starts_with( $path, $home_path . '/' ) ) ) {
+			$path = ltrim( substr( $path, strlen( $home_path ) ), '/' );
+		}
+
+		return $path;
+	}
+
+	add_filter( 'pll_translated_slugs', function ( array $slugs, $language ): array {
+		$lang = is_object( $language ) && isset( $language->slug )
+			? sanitize_key( (string) $language->slug )
+			: '';
+
+		if ( $lang === '' ) {
+			return $slugs;
+		}
+
+		foreach ( get_supported_fake_archive_post_types() as $post_type ) {
+			$post_type   = sanitize_key( (string) $post_type );
+			$archive_page = fa_get_fake_archive_page_for_language( $post_type, $lang );
+			if ( ! ( $archive_page instanceof WP_Post ) ) {
+				continue;
+			}
+
+			$base = trim( (string) get_page_uri( $archive_page->ID ), '/' );
+			if ( $base === '' ) {
+				continue;
+			}
+
+			$slugs[ $post_type ]['slug'] = fa_get_post_type_rewrite_base( $post_type );
+			$slugs[ $post_type ]['translations'][ $lang ] = $base;
+		}
+
+		return $slugs;
+	}, 20, 2 );
 
 	add_filter( 'body_class', function ( array $classes ): array {
 		if ( ! is_page() ) {
@@ -258,6 +497,12 @@
 			}
 		}
 
+		foreach ( fa_get_all_individual_archive_assignments() as $assignment ) {
+			if ( $assignment['page_id'] === $page_id ) {
+				$archive_post_types[] = $assignment['post_type'];
+			}
+		}
+
 		$archive_post_types = array_values( array_unique( $archive_post_types ) );
 		if ( ! $archive_post_types ) {
 			return $classes;
@@ -278,11 +523,14 @@
 
 	add_filter( 'wp_link_query', function ( array $results, array $q ) {
 		$archive_map = fa_get_archive_map_for_current_lang();
-		if ( ! $archive_map ) {
+		$archive_page_ids = array_merge(
+			array_map( 'intval', array_values( $archive_map ) ),
+			fa_get_individual_archive_page_ids()
+		);
+		$archive_page_ids = array_values( array_unique( $archive_page_ids ) );
+		if ( ! $archive_page_ids ) {
 			return $results;
 		}
-
-		$archive_page_ids = array_map( 'intval', array_values( $archive_map ) );
 
 		foreach ( $results as &$r ) {
 			$page_id = isset( $r['ID'] ) ? (int) $r['ID'] : 0;
@@ -314,26 +562,9 @@
 
 
 	function fa_get_single_base_from_fake_archive_if_has_parent( string $post_type ): string {
-		$post_type = sanitize_key( $post_type );
-		if ( $post_type === '' ) {
-			return '';
-		}
-
-		$archive_page = get_fake_archive_page( $post_type );
-		if ( ! ( $archive_page instanceof WP_Post ) ) {
-			return '';
-		}
-
-		$archive_id = (int) $archive_page->ID;
-
-		if ( wp_get_post_parent_id( $archive_id ) <= 0 ) {
-			return '';
-		}
-
-		$uri = get_page_uri( $archive_id );
-		$uri = trim( (string) $uri, '/' );
-
-		return $uri;
+		// Backward-compatible name retained for integrations. Root-level archive
+		// pages are valid single bases too.
+		return fa_get_archive_base_for_post_type( $post_type );
 	}
 
 	function fa_get_archive_base_for_post_type( string $post_type ): string {
@@ -350,15 +581,289 @@
 		return trim( (string) get_page_uri( (int) $archive_page->ID ), '/' );
 	}
 
+	function fa_get_individual_archive_page_for_post( $post ): ?WP_Post {
+		$post = get_post( $post );
+		if ( ! ( $post instanceof WP_Post ) ) {
+			return null;
+		}
+
+		$post_lang = fa_get_post_language( $post );
+		if ( ! fa_post_type_allows_individual_archive( (string) $post->post_type, $post_lang ) ) {
+			return null;
+		}
+
+		$page_id = (int) get_post_meta( (int) $post->ID, '_fa_archive_page_id', true );
+		$page    = $page_id > 0 ? get_post( $page_id ) : null;
+		if ( ! ( $page instanceof WP_Post ) || $page->post_type !== 'page' || $page->post_status !== 'publish' ) {
+			return null;
+		}
+
+		$page_lang = fa_get_post_language( $page );
+		if ( $post_lang !== 'default' && $page_lang !== 'default' && $post_lang !== $page_lang ) {
+			return null;
+		}
+
+		return $page;
+	}
+
+	function fa_get_archive_page_for_post( $post ): ?WP_Post {
+		$post = get_post( $post );
+		if ( ! ( $post instanceof WP_Post ) ) {
+			return null;
+		}
+
+		$individual_page = fa_get_individual_archive_page_for_post( $post );
+		if ( $individual_page instanceof WP_Post ) {
+			return $individual_page;
+		}
+
+		return fa_get_fake_archive_page_for_language(
+			(string) $post->post_type,
+			fa_get_post_language( $post )
+		);
+	}
+
+	function fa_get_archive_base_for_post( $post ): string {
+		$archive_page = fa_get_archive_page_for_post( $post );
+
+		return $archive_page instanceof WP_Post
+			? fa_get_archive_route_base( (int) $archive_page->ID )
+			: '';
+	}
+
+	function fa_get_all_individual_archive_assignments(): array {
+		static $cache = null;
+		if ( is_array( $cache ) ) {
+			return $cache;
+		}
+
+		$enabled_post_types = [];
+		foreach ( fa_get_known_languages() as $lang ) {
+			$enabled_post_types = array_merge(
+				$enabled_post_types,
+				array_keys( fa_get_individual_archive_map_for_language( $lang ) )
+			);
+		}
+		$enabled_post_types = array_values( array_unique( array_filter( $enabled_post_types ) ) );
+		if ( ! $enabled_post_types ) {
+			$cache = [];
+			return $cache;
+		}
+
+		$post_ids = get_posts( [
+			'post_type'              => $enabled_post_types,
+			'post_status'            => 'any',
+			'posts_per_page'         => -1,
+			'fields'                 => 'ids',
+			'no_found_rows'          => true,
+			'suppress_filters'       => true,
+			'update_post_meta_cache' => true,
+			'update_post_term_cache' => false,
+			'meta_key'               => '_fa_archive_page_id',
+		] );
+
+		$assignments = [];
+		$seen        = [];
+		foreach ( $post_ids as $post_id ) {
+			$post = get_post( (int) $post_id );
+			$page = fa_get_individual_archive_page_for_post( $post );
+			if ( ! ( $post instanceof WP_Post ) || ! ( $page instanceof WP_Post ) ) {
+				continue;
+			}
+
+			$lang = fa_get_post_language( $post );
+			$key  = $post->post_type . ':' . $page->ID . ':' . $lang;
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+
+			$seen[ $key ] = true;
+			$assignments[] = [
+				'lang'       => $lang,
+				'post_type'  => sanitize_key( (string) $post->post_type ),
+				'page_id'    => (int) $page->ID,
+				'individual' => true,
+			];
+		}
+
+		$cache = $assignments;
+		return $cache;
+	}
+
+	function fa_get_individual_archive_page_ids( string $post_type = '' ): array {
+		$post_type = sanitize_key( $post_type );
+		$page_ids  = [];
+
+		foreach ( fa_get_all_individual_archive_assignments() as $assignment ) {
+			if ( $post_type === '' || $assignment['post_type'] === $post_type ) {
+				$page_ids[] = (int) $assignment['page_id'];
+			}
+		}
+
+		return array_values( array_unique( $page_ids ) );
+	}
+
+	function fa_get_all_archive_route_assignments(): array {
+		static $cache = null;
+		if ( is_array( $cache ) ) {
+			return $cache;
+		}
+
+		$assignments = array_merge(
+			fa_get_all_archive_assignments(),
+			fa_get_all_individual_archive_assignments()
+		);
+		$out  = [];
+		$seen = [];
+
+		foreach ( $assignments as $assignment ) {
+			$key = $assignment['post_type'] . ':' . $assignment['page_id'] . ':' . $assignment['lang'];
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+			$seen[ $key ] = true;
+			$out[] = $assignment;
+		}
+
+		$cache = $out;
+		return $cache;
+	}
+
+	function fa_resolve_archive_single_post_id_from_path( string $path, string $post_type = '' ): int {
+		$requested = trim( rawurldecode( $path ), '/' );
+		$post_type = sanitize_key( $post_type );
+		if ( $requested === '' || $post_type === '' ) {
+			return 0;
+		}
+
+		foreach ( fa_get_all_archive_route_assignments() as $assignment ) {
+			if ( $assignment['post_type'] !== $post_type ) {
+				continue;
+			}
+
+			$base = fa_get_archive_route_base( $assignment['page_id'] );
+			if ( $base === '' || ! str_starts_with( $requested, $base . '/' ) ) {
+				continue;
+			}
+
+			$slug = substr( $requested, strlen( $base ) + 1 );
+			if ( $slug === '' || str_contains( $slug, '/' ) ) {
+				continue;
+			}
+
+			$candidates = get_posts( [
+				'name'             => $slug,
+				'post_type'        => $post_type,
+				'post_status'      => 'publish',
+				'posts_per_page'   => -1,
+				'suppress_filters' => true,
+			] );
+
+			foreach ( $candidates as $candidate ) {
+				if ( $candidate instanceof WP_Post && fa_get_archive_base_for_post( $candidate ) === $base ) {
+					return (int) $candidate->ID;
+				}
+			}
+		}
+
+		return 0;
+	}
+
+	add_action( 'add_meta_boxes', function ( string $post_type, $post ): void {
+		$lang = $post instanceof WP_Post ? fa_get_post_language( $post ) : fa_current_lang();
+		if ( ! fa_post_type_allows_individual_archive( $post_type, $lang ) ) {
+			return;
+		}
+
+		add_meta_box(
+			'fa-individual-archive-page',
+			'Archive Page',
+			'fa_render_individual_archive_metabox',
+			$post_type,
+			'side',
+			'high'
+		);
+	}, 10, 2 );
+
+	function fa_render_individual_archive_metabox( WP_Post $post ): void {
+		$selected    = (int) get_post_meta( (int) $post->ID, '_fa_archive_page_id', true );
+		$default     = fa_get_fake_archive_page_for_language( (string) $post->post_type, fa_get_post_language( $post ) );
+		$default_txt = $default instanceof WP_Post ? get_the_title( $default ) : 'native CPT archive';
+		$lang        = fa_get_post_language( $post );
+
+		wp_nonce_field( 'fa_save_individual_archive_page', 'fa_individual_archive_nonce' );
+		?>
+		<p><label for="fa-individual-archive-page-id"><strong>URL archive page</strong></label></p>
+		<?php
+		wp_dropdown_pages( [
+			'id'                => 'fa-individual-archive-page-id',
+			'name'              => 'fa_individual_archive_page_id',
+			'selected'          => $selected,
+			'show_option_none'  => sprintf( 'Use default — %s', $default_txt ),
+			'option_none_value' => '0',
+			'post_status'       => 'publish',
+			'echo'              => true,
+			'class'             => 'widefat',
+			'lang'              => $lang,
+		] );
+		?>
+		<p class="description">The selected page and its parents become this entry’s URL base. Only a page in the entry language is accepted.</p>
+		<?php
+	}
+
+	add_action( 'save_post', function ( int $post_id, WP_Post $post ): void {
+		$nonce = isset( $_POST['fa_individual_archive_nonce'] ) && is_string( $_POST['fa_individual_archive_nonce'] )
+			? sanitize_text_field( wp_unslash( $_POST['fa_individual_archive_nonce'] ) )
+			: '';
+		$post_lang = fa_get_post_language( $post );
+
+		if (
+			wp_is_post_revision( $post_id )
+			|| wp_is_post_autosave( $post_id )
+			|| ! fa_post_type_allows_individual_archive( (string) $post->post_type, $post_lang )
+			|| $nonce === ''
+			|| ! wp_verify_nonce( $nonce, 'fa_save_individual_archive_page' )
+			|| ! current_user_can( 'edit_post', $post_id )
+		) {
+			return;
+		}
+
+		$old_page_id = (int) get_post_meta( $post_id, '_fa_archive_page_id', true );
+		$new_page_id = isset( $_POST['fa_individual_archive_page_id'] ) && is_scalar( $_POST['fa_individual_archive_page_id'] )
+			? absint( wp_unslash( $_POST['fa_individual_archive_page_id'] ) )
+			: 0;
+		$page        = $new_page_id > 0 ? get_post( $new_page_id ) : null;
+
+		if (
+			! ( $page instanceof WP_Post )
+			|| $page->post_type !== 'page'
+			|| $page->post_status !== 'publish'
+			|| fa_get_post_language( $page ) !== $post_lang
+		) {
+			$new_page_id = 0;
+		}
+
+		if ( $new_page_id > 0 ) {
+			update_post_meta( $post_id, '_fa_archive_page_id', $new_page_id );
+		} else {
+			delete_post_meta( $post_id, '_fa_archive_page_id' );
+		}
+
+		if ( $old_page_id !== $new_page_id ) {
+			fa_schedule_rewrite_flush();
+		}
+	}, 30, 2 );
+
 	add_filter( 'post_type_link', function ( string $permalink, WP_Post $post, bool $leavename ) {
 
-		$pt = (string) $post->post_type;
+		$pt = sanitize_key( (string) $post->post_type );
 		if ( $pt === '' ) {
 			return $permalink;
 		}
 
-		$base = fa_get_single_base_from_fake_archive_if_has_parent( $pt );
-		if ( $base === '' ) {
+		$archive_page = fa_get_archive_page_for_post( $post );
+
+		if ( ! ( $archive_page instanceof WP_Post ) ) {
 			return $permalink;
 		}
 
@@ -368,7 +873,12 @@
 			return $permalink;
 		}
 
-		return home_url( '/' . user_trailingslashit( $base . '/' . $slug ) );
+		$archive_url = get_permalink( $archive_page );
+		if ( ! is_string( $archive_url ) || $archive_url === '' ) {
+			return $permalink;
+		}
+
+		return trailingslashit( $archive_url ) . user_trailingslashit( $slug, 'single' );
 
 	}, 20, 3 );
 
@@ -387,81 +897,138 @@
 			return;
 		}
 
-		$archive_map = fa_get_archive_map_for_current_lang();
-		if ( ! isset( $archive_map[ $post_type ] ) ) {
-			return;
-		}
-
 		$request_path = trim( (string) $wp->request, '/' );
 		if ( $request_path === '' ) {
 			return;
 		}
 
-		$archive_base = fa_get_archive_base_for_post_type( $post_type );
-		if ( $archive_base === '' || $request_path === $archive_base ) {
-			return;
+		$matches_archive_route = false;
+		foreach ( fa_get_all_archive_route_assignments() as $assignment ) {
+			if ( $assignment['post_type'] !== $post_type ) {
+				continue;
+			}
+
+			$archive_base = fa_get_archive_route_base( $assignment['page_id'] );
+			if ( $archive_base !== '' && str_starts_with( $request_path . '/', $archive_base . '/' ) ) {
+				$matches_archive_route = true;
+				break;
+			}
 		}
 
-		if ( ! str_starts_with( $request_path . '/', $archive_base . '/' ) ) {
+		if ( ! $matches_archive_route ) {
 			return;
 		}
 
 		$page = get_page_by_path( $request_path, OBJECT, 'page' );
-		if ( ! ( $page instanceof WP_Post ) ) {
+		if ( $page instanceof WP_Post ) {
+			$wp->query_vars = [
+				'page_id'  => (string) $page->ID,
+				'pagename' => $request_path,
+			];
 			return;
 		}
 
+		$post_id = fa_resolve_archive_single_post_id_from_path( $request_path, $post_type );
+		if ( $post_id <= 0 ) {
+			$wp->query_vars = [ 'error' => '404' ];
+			return;
+		}
+
+		$post_lang = fa_get_post_language( $post_id );
 		$wp->query_vars = [
-			'page_id'  => (string) $page->ID,
-			'pagename' => $request_path,
+			'post_type' => $post_type,
+			'p'         => (string) $post_id,
+			'name'      => (string) $wp->query_vars['name'],
 		];
+		if ( $post_lang !== 'default' ) {
+			$wp->query_vars['lang'] = $post_lang;
+		}
 	}, 8 );
 
 	add_action( 'init', function () {
-
-		$map = fa_get_archive_map_for_current_lang();
-		if ( ! is_array( $map ) || ! $map ) {
-			return;
-		}
-
-		foreach ( $map as $pt => $page_id ) {
-			$pt      = sanitize_key( (string) $pt );
-			$page_id = (int) $page_id;
-
-			if ( $pt === '' || $page_id <= 0 ) {
-				continue;
-			}
-
-			if ( wp_get_post_parent_id( $page_id ) <= 0 ) {
-				continue;
-			}
-
-			$base = trim( (string) get_page_uri( $page_id ), '/' );
+		foreach ( fa_get_all_archive_route_assignments() as $assignment ) {
+			$pt   = $assignment['post_type'];
+			$base = fa_get_archive_route_base( $assignment['page_id'] );
 			if ( $base === '' ) {
 				continue;
 			}
 
+			$query = 'index.php?post_type=' . $pt . '&name=$matches[1]';
+			if ( $assignment['lang'] !== 'default' ) {
+				$query .= '&lang=' . sanitize_key( $assignment['lang'] );
+			}
+
 			add_rewrite_rule(
 				'^' . preg_quote( $base, '#' ) . '/([^/]+)/?$',
-				'index.php?post_type=' . $pt . '&name=$matches[1]',
+				$query,
 				'top'
 			);
 		}
 
 	}, 30 );
 
-	add_action( 'admin_init', function () {
-		if ( ! is_admin() ) {
+	function fa_schedule_rewrite_flush(): void {
+		update_option( 'sp_fake_archives_rewrite_flush_pending', '1', false );
+	}
+
+	function fa_get_rewrite_signature(): string {
+		$routes = [];
+		foreach ( fa_get_all_archive_route_assignments() as $assignment ) {
+			$routes[] = [
+				'lang'      => $assignment['lang'],
+				'post_type' => $assignment['post_type'],
+				'page_id'   => $assignment['page_id'],
+				'base'      => fa_get_archive_route_base( $assignment['page_id'] ),
+			];
+		}
+
+		usort( $routes, static function ( array $a, array $b ): int {
+			return strcmp( wp_json_encode( $a ), wp_json_encode( $b ) );
+		} );
+
+		return hash( 'sha256', (string) wp_json_encode( [
+			'version'             => 3,
+			'permalink_structure' => get_option( 'permalink_structure' ),
+			'routes'              => $routes,
+		] ) );
+	}
+
+	add_action( 'wp_loaded', function (): void {
+		$signature = fa_get_rewrite_signature();
+		$stored    = (string) get_option( 'sp_fake_archives_rewrite_signature', '' );
+		$pending   = get_option( 'sp_fake_archives_rewrite_flush_pending' ) === '1';
+
+		if ( ! $pending && hash_equals( $stored, $signature ) ) {
 			return;
 		}
 
-		if ( empty( $_POST['fake_archives_nonce'] ) ) {
-			return;
-		}
-
-		if ( ! wp_verify_nonce( $_POST['fake_archives_nonce'], 'save_fake_archives' ) ) {
-			return;
+		delete_transient( 'pll_translated_slugs' );
+		if ( function_exists( 'sp_theme_prepare_polylang_rewrite_filters' ) ) {
+			sp_theme_prepare_polylang_rewrite_filters();
 		}
 
 		flush_rewrite_rules( false );
-	}, 30 );
+		update_option( 'sp_fake_archives_rewrite_signature', $signature, false );
+		delete_option( 'sp_fake_archives_rewrite_flush_pending' );
+	}, 50 );
+
+	add_action( 'post_updated', function ( int $post_id, WP_Post $post_after, WP_Post $post_before ): void {
+		if ( $post_after->post_type !== 'page' ) {
+			return;
+		}
+
+		$route_changed = $post_after->post_name !== $post_before->post_name
+			|| (int) $post_after->post_parent !== (int) $post_before->post_parent
+			|| $post_after->post_status !== $post_before->post_status;
+
+		if ( ! $route_changed ) {
+			return;
+		}
+
+		foreach ( fa_get_all_archive_route_assignments() as $assignment ) {
+			if ( $assignment['page_id'] === $post_id ) {
+				fa_schedule_rewrite_flush();
+				break;
+			}
+		}
+	}, 10, 3 );

@@ -69,7 +69,7 @@ Taxonomy filter definitions. Supported `ui` values:
 ```
 
 `per_page`:
-Default number of posts per page.
+Default number of posts per page. Use `-1` or `all` to render every matching post without pagination.
 
 `pagination_type`:
 
@@ -208,11 +208,13 @@ Example:
 
 ```php
 sp_archive_per_page(
-    [ 6 => '6', 9 => '9', 12 => '12' ],
+    [ 6 => '6', 9 => '9', 12 => '12', -1 => 'All' ],
     'Show',
     '234'
 );
 ```
+
+Card and empty-state templates may live under `template_parts/`, `templates/`, `php/cards/` or `php/templates/`. Extend the allow-list with `sp_archive_template_prefixes`. Pagination automatically uses the first available template from `templates/ui/pagination`, `php/templates/ui/pagination` or `template_parts/ui/pagination`; override it with `sp_archive_pagination_template`.
 
 `sp_archive_confirm(string $label = '', string $class = ''): void`
 Renders a confirm/apply button only when `confirm => 1`.

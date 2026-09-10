@@ -365,13 +365,21 @@
 // JS — один раз для всех колонок
 // =========================================================================
 
-    add_action( 'admin_footer', function () {
+    add_action( 'admin_enqueue_scripts', function () {
         $screen = get_current_screen();
         if ( ! $screen || ! in_array( $screen->base, [ 'edit-tags', 'edit' ], true ) ) {
             return;
         }
 
+        // Must run before admin_footer so WordPress can print the media modal templates.
         wp_enqueue_media();
+    } );
+
+    add_action( 'admin_footer', function () {
+        $screen = get_current_screen();
+        if ( ! $screen || ! in_array( $screen->base, [ 'edit-tags', 'edit' ], true ) ) {
+            return;
+        }
         ?>
         <script>
             (function ($) {

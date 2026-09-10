@@ -12,3 +12,5 @@ ACF field/factory `archive_builder()` для настройки архивов: 
 ```
 
 Модуль также предоставляет семейство `sp_archive_*` для подготовки query, filters, cards и pagination. Полный список опций и helpers приведён в `README.en.md`.
+
+Для `per_page` поддерживаются положительное число, `-1` и строка `all`; два последних значения выводят все найденные записи без pagination. Шаблоны карточек могут находиться в `template_parts/`, `templates/`, `php/cards/` или `php/templates/`. Список путей расширяется фильтром `sp_archive_template_prefixes`, а шаблон pagination переопределяется через `sp_archive_pagination_template`.

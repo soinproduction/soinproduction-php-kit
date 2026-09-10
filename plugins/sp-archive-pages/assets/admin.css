@@ -1,0 +1,93 @@
+.sp-cpt-archives__assignment {
+	display: flex;
+	align-items: center;
+	gap: 28px;
+	flex-wrap: wrap;
+}
+
+.sp-cpt-archives__assignment > select {
+	min-width: 240px;
+}
+
+.sp-cpt-archives__toggle {
+	display: flex;
+	flex: 1 1 420px;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	max-width: 560px;
+}
+
+.sp-cpt-archives__toggle-copy {
+	display: grid;
+	gap: 3px;
+}
+
+.sp-cpt-archives__toggle-copy strong {
+	color: var(--sp-admin-text, #1d2327);
+	font-size: 13px;
+}
+
+.sp-cpt-archives__toggle-copy small {
+	color: var(--sp-admin-muted, #646970);
+}
+
+.sp-favorite-ios-toggle {
+	display: inline-block;
+	position: relative;
+	cursor: pointer;
+}
+
+.sp-favorite-ios-toggle input {
+	position: absolute;
+	width: 0;
+	height: 0;
+	opacity: 0;
+}
+
+.sp-favorite-ios-track {
+	position: relative;
+	display: block;
+	width: 40px;
+	height: 22px;
+	border-radius: 22px;
+	background: var(--sp-admin-border-strong, #d6dbe1);
+	transition: background .25s;
+}
+
+.sp-favorite-ios-thumb {
+	position: absolute;
+	top: 2px;
+	left: 2px;
+	width: 18px;
+	height: 18px;
+	border-radius: 50%;
+	background: var(--sp-admin-surface, #fff);
+	box-shadow: 0 1px 3px rgb(0 0 0 / 25%);
+	transition: left .25s;
+}
+
+.sp-favorite-ios-toggle input:checked ~ .sp-favorite-ios-track {
+	background: var(--sp-admin-accent, #3858e9);
+}
+
+.sp-favorite-ios-toggle input:checked ~ .sp-favorite-ios-track .sp-favorite-ios-thumb {
+	left: 20px;
+}
+
+.sp-favorite-ios-toggle input:focus-visible ~ .sp-favorite-ios-track {
+	outline: 2px solid var(--sp-admin-accent, #3858e9);
+	outline-offset: 2px;
+}
+
+@media (max-width: 782px) {
+	.sp-cpt-archives__assignment {
+		align-items: flex-start;
+		flex-direction: column;
+		gap: 16px;
+	}
+
+	.sp-cpt-archives__assignment > select {
+		width: 100%;
+	}
+}

@@ -2,7 +2,7 @@
 	/**
 	 * Plugin Name: SP Content Manager
 	 * Description: Duplicate posts/pages/CPTs and reorder posts + terms + admin menu via drag and drop.
-	 * Version: 1.3.0
+	 * Version: 1.3.1
 	 */
 
 	if ( ! defined( 'ABSPATH' ) ) {
@@ -14,7 +14,7 @@
 			private const OPT_KEY        = 'sp_content_manager_cfg';
 			private const PAGE_SLUG      = 'sp-content-manager';
 			private const NONCE_ACTION   = 'sp_content_manager_admin';
-			private const VERSION        = '1.3.0';
+			private const VERSION        = '1.3.1';
 			private const TERM_ORDER_KEY = '_sp_cm_order';
 
 			private static ?self $instance = null;
@@ -1874,7 +1874,7 @@ CSS;
 		if ($rows.length < 2) return;
 
 		$rows.each(function () {
-			addHandle($(this), 'td.column-title');
+			addHandle($(this), 'td.column-title, th.column-title');
 		});
 
 		if ($list.data('sp-cm-sortable-ready')) return;
@@ -1909,7 +1909,7 @@ CSS;
 		if ($rows.length < 2) return;
 
 		$rows.each(function () {
-			addHandle($(this), 'td.column-name');
+			addHandle($(this), 'td.column-name, th.column-name');
 		});
 
 		if ($list.data('sp-cm-sortable-ready')) return;
