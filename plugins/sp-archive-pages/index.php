@@ -138,6 +138,55 @@
 		return array_values( array_filter( is_array( $list ) ? $list : [] ) );
 	}
 
+	function fa_get_archive_post_type_for_taxonomy_objects( array $object_types ): string {
+		$supported = array_map( 'sanitize_key', get_supported_fake_archive_post_types() );
+		$matches   = [];
+
+		foreach ( $object_types as $object_type ) {
+			$post_type = sanitize_key( (string) $object_type );
+			if ( $post_type === '' || ! in_array( $post_type, $supported, true ) ) {
+				continue;
+			}
+
+			$archive_page = fa_get_fake_archive_page_for_language( $post_type, fa_default_lang() );
+			if ( ! ( $archive_page instanceof WP_Post ) ) {
+				$archive_page = fa_get_fake_archive_page_for_language( $post_type, fa_current_lang() );
+			}
+			if ( $archive_page instanceof WP_Post ) {
+				$matches[] = $post_type;
+			}
+		}
+
+		$matches = array_values( array_unique( $matches ) );
+
+		// A shared taxonomy cannot have two different canonical archive bases.
+		return count( $matches ) === 1 ? $matches[0] : '';
+	}
+
+	add_filter( 'register_taxonomy_args', function ( array $args, string $taxonomy, array $object_types ): array {
+		if (
+			empty( $args['public'] )
+			|| ( array_key_exists( 'publicly_queryable', $args ) && $args['publicly_queryable'] === false )
+			|| ( array_key_exists( 'rewrite', $args ) && $args['rewrite'] === false )
+			|| ( array_key_exists( 'query_var', $args ) && $args['query_var'] === false )
+		) {
+			return $args;
+		}
+
+		$post_type = fa_get_archive_post_type_for_taxonomy_objects( $object_types );
+		$base      = $post_type !== '' ? fa_get_post_type_rewrite_base( $post_type ) : '';
+		if ( $base === '' ) {
+			return $args;
+		}
+
+		$rewrite                 = is_array( $args['rewrite'] ?? null ) ? $args['rewrite'] : [];
+		$rewrite['slug']         = $base;
+		$rewrite['hierarchical'] = ! empty( $args['hierarchical'] );
+		$args['rewrite']         = $rewrite;
+
+		return $args;
+	}, 20, 3 );
+
 	function fa_individual_archive_option_name( ?string $lang = null ): string {
 		$lang = sanitize_key( (string) ( $lang ?: fa_current_lang() ) );
 
@@ -729,6 +778,175 @@
 		return $cache;
 	}
 
+	function fa_get_public_archive_taxonomies( string $post_type ): array {
+		$post_type = sanitize_key( $post_type );
+		if ( $post_type === '' ) {
+			return [];
+		}
+
+		$taxonomies = get_object_taxonomies( $post_type, 'objects' );
+		$out        = [];
+		foreach ( is_array( $taxonomies ) ? $taxonomies : [] as $taxonomy ) {
+			if (
+				! is_object( $taxonomy )
+				|| empty( $taxonomy->name )
+				|| empty( $taxonomy->public )
+				|| $taxonomy->publicly_queryable === false
+				|| $taxonomy->rewrite === false
+				|| $taxonomy->query_var === false
+			) {
+				continue;
+			}
+
+			$out[ sanitize_key( (string) $taxonomy->name ) ] = $taxonomy;
+		}
+
+		return $out;
+	}
+
+	function fa_get_taxonomy_term_route_path( $term, string $taxonomy ): string {
+		if ( ! is_object( $term ) || empty( $term->slug ) ) {
+			return '';
+		}
+
+		$segments = [];
+		$ancestors = ! empty( $term->term_id ) && function_exists( 'get_ancestors' )
+			? array_reverse( (array) get_ancestors( (int) $term->term_id, $taxonomy, 'taxonomy' ) )
+			: [];
+
+		foreach ( $ancestors as $ancestor_id ) {
+			$ancestor = get_term( (int) $ancestor_id, $taxonomy );
+			if ( is_object( $ancestor ) && ! is_wp_error( $ancestor ) && ! empty( $ancestor->slug ) ) {
+				$segments[] = sanitize_title( (string) $ancestor->slug );
+			}
+		}
+		$segments[] = sanitize_title( (string) $term->slug );
+
+		return implode( '/', array_filter( $segments ) );
+	}
+
+	function fa_get_primary_archive_term_for_post( $post ): ?object {
+		$post = get_post( $post );
+		if ( ! ( $post instanceof WP_Post ) ) {
+			return null;
+		}
+
+		foreach ( fa_get_public_archive_taxonomies( (string) $post->post_type ) as $taxonomy_name => $taxonomy ) {
+			$terms = get_the_terms( (int) $post->ID, $taxonomy_name );
+			if ( ! is_array( $terms ) || ! $terms ) {
+				continue;
+			}
+
+			$term = reset( $terms );
+			$term = apply_filters( 'fa_archive_primary_term', $term, $post, $taxonomy_name );
+			if ( is_object( $term ) && ! is_wp_error( $term ) && ! empty( $term->slug ) ) {
+				return $term;
+			}
+		}
+
+		return null;
+	}
+
+	function fa_get_primary_archive_term_path_for_post( $post ): string {
+		$post = get_post( $post );
+		$term = fa_get_primary_archive_term_for_post( $post );
+		if ( ! ( $post instanceof WP_Post ) || ! is_object( $term ) || empty( $term->taxonomy ) ) {
+			return '';
+		}
+
+		return fa_get_taxonomy_term_route_path( $term, sanitize_key( (string) $term->taxonomy ) );
+	}
+
+	function fa_get_archive_single_route_path( $post, bool $leavename = false ): string {
+		$post = get_post( $post );
+		if ( ! ( $post instanceof WP_Post ) ) {
+			return '';
+		}
+
+		$base = fa_get_archive_base_for_post( $post );
+		$slug = $leavename ? '%postname%' : trim( (string) $post->post_name, '/' );
+		if ( $base === '' || $slug === '' ) {
+			return '';
+		}
+
+		return implode( '/', array_filter( [
+			trim( $base, '/' ),
+			fa_get_primary_archive_term_path_for_post( $post ),
+			$slug,
+		] ) );
+	}
+
+	function fa_resolve_archive_taxonomy_route_from_path( string $path, string $post_type ): array {
+		$requested = trim( rawurldecode( $path ), '/' );
+		$post_type = sanitize_key( $post_type );
+		if ( $requested === '' || $post_type === '' ) {
+			return [];
+		}
+
+		foreach ( fa_get_all_archive_assignments() as $assignment ) {
+			if ( $assignment['post_type'] !== $post_type ) {
+				continue;
+			}
+
+			$base = fa_get_archive_route_base( $assignment['page_id'] );
+			if ( $base === '' || ! str_starts_with( $requested, $base . '/' ) ) {
+				continue;
+			}
+
+			$term_path = trim( substr( $requested, strlen( $base ) + 1 ), '/' );
+			$parts     = array_values( array_filter( explode( '/', $term_path ) ) );
+			$term_slug = sanitize_title( (string) end( $parts ) );
+			if ( $term_slug === '' ) {
+				continue;
+			}
+
+			foreach ( fa_get_public_archive_taxonomies( $post_type ) as $taxonomy_name => $taxonomy ) {
+				$term = get_term_by( 'slug', $term_slug, $taxonomy_name );
+				if ( ! is_object( $term ) || is_wp_error( $term ) ) {
+					continue;
+				}
+
+				$canonical_path = ! empty( $taxonomy->hierarchical )
+					? fa_get_taxonomy_term_route_path( $term, $taxonomy_name )
+					: sanitize_title( (string) $term->slug );
+				if ( $canonical_path !== $term_path ) {
+					continue;
+				}
+
+				$query_var = is_string( $taxonomy->query_var ) && $taxonomy->query_var !== ''
+					? sanitize_key( $taxonomy->query_var )
+					: $taxonomy_name;
+
+				return [
+					'taxonomy'  => $taxonomy_name,
+					'term'      => sanitize_title( (string) $term->slug ),
+					'term_path' => $canonical_path,
+					'query_var' => $query_var,
+					'lang'      => sanitize_key( (string) $assignment['lang'] ),
+				];
+			}
+		}
+
+		return [];
+	}
+
+	function fa_get_archive_taxonomy_routes(): array {
+		$routes = [];
+		foreach ( fa_get_all_archive_assignments() as $assignment ) {
+			$base = fa_get_archive_route_base( (int) $assignment['page_id'] );
+			foreach ( fa_get_public_archive_taxonomies( (string) $assignment['post_type'] ) as $taxonomy_name => $taxonomy ) {
+				$routes[] = [
+					'lang'      => sanitize_key( (string) $assignment['lang'] ),
+					'post_type' => sanitize_key( (string) $assignment['post_type'] ),
+					'taxonomy'  => $taxonomy_name,
+					'base'      => $base,
+				];
+			}
+		}
+
+		return $routes;
+	}
+
 	function fa_resolve_archive_single_post_id_from_path( string $path, string $post_type = '' ): int {
 		$requested = trim( rawurldecode( $path ), '/' );
 		$post_type = sanitize_key( $post_type );
@@ -746,8 +964,10 @@
 				continue;
 			}
 
-			$slug = substr( $requested, strlen( $base ) + 1 );
-			if ( $slug === '' || str_contains( $slug, '/' ) ) {
+			$relative_path = trim( substr( $requested, strlen( $base ) + 1 ), '/' );
+			$parts         = array_values( array_filter( explode( '/', $relative_path ) ) );
+			$slug          = sanitize_title( (string) end( $parts ) );
+			if ( $slug === '' ) {
 				continue;
 			}
 
@@ -760,7 +980,10 @@
 			] );
 
 			foreach ( $candidates as $candidate ) {
-				if ( $candidate instanceof WP_Post && fa_get_archive_base_for_post( $candidate ) === $base ) {
+				if (
+					$candidate instanceof WP_Post
+					&& trim( fa_get_archive_single_route_path( $candidate ), '/' ) === $requested
+				) {
 					return (int) $candidate->ID;
 				}
 			}
@@ -867,18 +1090,12 @@
 			return $permalink;
 		}
 
-		$slug = $leavename ? '%postname%' : $post->post_name;
-		$slug = trim( (string) $slug, '/' );
-		if ( $slug === '' ) {
+		$route = fa_get_archive_single_route_path( $post, $leavename );
+		if ( $route === '' ) {
 			return $permalink;
 		}
 
-		$archive_url = get_permalink( $archive_page );
-		if ( ! is_string( $archive_url ) || $archive_url === '' ) {
-			return $permalink;
-		}
-
-		return trailingslashit( $archive_url ) . user_trailingslashit( $slug, 'single' );
+		return trailingslashit( home_url( '/' ) ) . user_trailingslashit( $route, 'single' );
 
 	}, 20, 3 );
 
@@ -930,6 +1147,19 @@
 
 		$post_id = fa_resolve_archive_single_post_id_from_path( $request_path, $post_type );
 		if ( $post_id <= 0 ) {
+			$term_route = fa_resolve_archive_taxonomy_route_from_path( $request_path, $post_type );
+			if ( $term_route ) {
+				$wp->query_vars = [
+					'taxonomy'                  => $term_route['taxonomy'],
+					'term'                      => $term_route['term'],
+					$term_route['query_var']    => $term_route['term_path'],
+				];
+				if ( $term_route['lang'] !== '' && $term_route['lang'] !== 'default' ) {
+					$wp->query_vars['lang'] = $term_route['lang'];
+				}
+				return;
+			}
+
 			$wp->query_vars = [ 'error' => '404' ];
 			return;
 		}
@@ -938,7 +1168,6 @@
 		$wp->query_vars = [
 			'post_type' => $post_type,
 			'p'         => (string) $post_id,
-			'name'      => (string) $wp->query_vars['name'],
 		];
 		if ( $post_lang !== 'default' ) {
 			$wp->query_vars['lang'] = $post_lang;
@@ -959,7 +1188,7 @@
 			}
 
 			add_rewrite_rule(
-				'^' . preg_quote( $base, '#' ) . '/([^/]+)/?$',
+				'^' . preg_quote( $base, '#' ) . '/(.+?)/?$',
 				$query,
 				'top'
 			);
@@ -987,9 +1216,10 @@
 		} );
 
 		return hash( 'sha256', (string) wp_json_encode( [
-			'version'             => 3,
+			'version'             => 5,
 			'permalink_structure' => get_option( 'permalink_structure' ),
 			'routes'              => $routes,
+			'taxonomy_routes'     => fa_get_archive_taxonomy_routes(),
 		] ) );
 	}
 

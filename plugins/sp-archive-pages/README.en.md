@@ -11,7 +11,8 @@ Open **Settings → CPT Archives** and assign a page to each supported post type
 - The selected page ID is stored in WordPress options, with language-aware keys when a multilingual integration is available.
 - `get_fake_archive_page()` exposes the assigned page to templates and helpers.
 - Assigned pages receive a visible post state and are protected from trash/deletion while active.
-- Archive and single permalinks use the selected page hierarchy and language as their base.
+- Archive and public taxonomy permalinks use the selected page hierarchy and language as their base.
+- Single permalinks use `archive / first public category / post`; hierarchical category ancestors are preserved.
 - An enabled post type gets an **Archive Page** metabox on every entry. Its selected published page overrides the type-level archive for that entry only.
 - Explicit rewrite rules are registered for every language assignment; `parse_request` preserves real child-page routes when they collide.
 - A post is resolved only below its own assigned base; the same slug below another entry's individual base returns 404.
@@ -39,8 +40,9 @@ The module changes several WordPress layers together:
 
 | Integration | Purpose |
 | --- | --- |
-| `post_type_link` | Rebuilds single permalinks using the selected archive page and its parent hierarchy. |
-| `parse_request` | Recognizes the fake archive route and populates the matching post-type query vars. |
+| `register_taxonomy_args` | Aligns public taxonomy rewrite bases with the assigned archive page. |
+| `post_type_link` | Rebuilds single permalinks using the archive page, the first public category and the post slug. |
+| `parse_request` | Recognizes archive, taxonomy and categorized single routes and populates the matching query vars. |
 | `init` | Registers rewrite rules for all assigned language-specific archive bases. |
 | `wp_loaded`, `post_updated` | Refreshes rules after an assignment, slug, parent or status change. |
 | `add_meta_boxes`, `save_post` | Displays and saves the per-entry archive override. |

@@ -196,7 +196,7 @@ add_action( 'acf/include_field_types', function (): void {
 				}
 				echo '</div>';
 				echo '<div class="sp-stax__list sp-stax__list--avail" data-empty="' . esc_attr__( 'No terms found', 'acf' ) . '" role="list" aria-busy="false"></div>';
-				echo '<button type="button" class="sp-stax__load-more" style="display:none">' . esc_html__( 'Load more', 'acf' ) . '</button>';
+				echo '<button type="button" class="sp-stax__load-more" style="display:none" tabindex="-1" aria-hidden="true">' . esc_html__( 'Load more', 'acf' ) . '</button>';
 				echo '<p class="sp-stax__status" role="status" aria-live="polite"></p>';
 				echo '</div>';
 
@@ -831,6 +831,7 @@ return <<<'CSS'
 /* load more */
 
 .sp-stax__load-more{
+    display:none!important;
     width:100%;
     border:none;
     border-top:1px solid var(--border);
@@ -1123,12 +1124,12 @@ function initWidget($root) {
 			}
 			var terms=r.data.terms||[];
 			hasMore=r.data.has_more||false;
-			$more.toggle(hasMore);
 			for(var i=0;i<terms.length;i++){
 				$avail.append(terms[i].html);
 			}
 			markDisabled();
-			setStatus(terms.length || append ? 'success' : 'empty', terms.length || append ? (i18n.updated || 'Results updated.') : (i18n.empty || 'No terms found'));
+			setStatus(terms.length || append ? '' : 'empty', terms.length || append ? '' : (i18n.empty || 'No terms found'));
+			window.setTimeout(maybeLoadNext, 0);
 		}).fail(function(_request, status){
 			if(currentRequest!==requestId || status==='abort') return;
 			setStatus('error', i18n.load_error || 'Could not load terms. Please try again.');
@@ -1136,6 +1137,15 @@ function initWidget($root) {
 			if(currentRequest!==requestId) return;
 			setBusy(false);
 		});
+	}
+
+	function maybeLoadNext(){
+		if(!hasMore||loading||!$avail.length||!$avail.is(':visible')) return;
+		var list=$avail.get(0);
+		if(list.scrollHeight-list.scrollTop-list.clientHeight<=160){
+			page++;
+			loadTerms(true);
+		}
 	}
 
 	/* Load only when the real field becomes visible or receives interaction. */
@@ -1167,8 +1177,8 @@ function initWidget($root) {
 	/* Tax filter */
 	$tax.on('change', function(){ page=1; loadTerms(false); });
 
-	/* Load more */
-	$more.on('click', function(){ page++; loadTerms(true); });
+	/* Infinite loading inside the available-terms list. */
+	$avail.on('scroll.spStaxInfinite', maybeLoadNext);
 
 	/* Add term */
 	$root.on('click', '.sp-stax__add', function(e){

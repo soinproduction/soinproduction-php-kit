@@ -238,7 +238,7 @@
 					}
 					echo '</div>';
 					echo '<div class="sp-srel__list sp-srel__list--avail" data-empty="' . esc_attr__( 'No posts found', 'acf' ) . '" role="list" aria-busy="false"></div>';
-					echo '<button type="button" class="sp-srel__load-more" style="display:none">' . esc_html__( 'Load more', 'acf' ) . '</button>';
+					echo '<button type="button" class="sp-srel__load-more" style="display:none" tabindex="-1" aria-hidden="true">' . esc_html__( 'Load more', 'acf' ) . '</button>';
 					echo '<p class="sp-srel__status" role="status" aria-live="polite"></p>';
 					echo '</div>';
 
@@ -943,6 +943,7 @@
 /* load more */
 
 .sp-srel__load-more{
+    display:none!important;
     width:100%;
     border:none;
     border-top:1px solid var(--border);
@@ -1241,12 +1242,12 @@ function initSmartRelationship(root){
 			}
 			var posts=r.data.posts||[];
 			hasMore=r.data.has_more||false;
-			$more.toggle(hasMore);
 			for(var i=0;i<posts.length;i++){
 				$avail.append(posts[i].html);
 			}
 			markDisabled();
-			setStatus(posts.length || append ? 'success' : 'empty', posts.length || append ? (i18n.updated || 'Results updated.') : (i18n.empty || 'No posts found'));
+			setStatus(posts.length || append ? '' : 'empty', posts.length || append ? '' : (i18n.empty || 'No posts found'));
+			window.setTimeout(maybeLoadNext, 0);
 		}).fail(function(_request, status){
 			if(currentRequest!==requestId || status==='abort') return;
 			setStatus('error', i18n.load_error || 'Could not load posts. Please try again.');
@@ -1254,6 +1255,15 @@ function initSmartRelationship(root){
 			if(currentRequest!==requestId) return;
 			setBusy(false);
 		});
+	}
+
+	function maybeLoadNext(){
+		if(!hasMore||loading||!$avail.length||!$avail.is(':visible')) return;
+		var list=$avail.get(0);
+		if(list.scrollHeight-list.scrollTop-list.clientHeight<=160){
+			page++;
+			loadPosts(true);
+		}
 	}
 
 	/* Load only when the real field becomes visible or receives interaction. */
@@ -1285,8 +1295,8 @@ function initSmartRelationship(root){
 	/* Tax filter */
 	$tax.on('change', function(){ page=1; loadPosts(false); });
 
-	/* Load more */
-	$more.on('click', function(){ page++; loadPosts(true); });
+	/* Infinite loading inside the available-posts list. */
+	$avail.on('scroll.spSrelInfinite', maybeLoadNext);
 
 	/* Add post */
 	$(document).on('click', '.sp-srel__add', function(e){

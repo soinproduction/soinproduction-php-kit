@@ -159,7 +159,7 @@ if (! defined('ABSPATH')) {
 
 if (! function_exists('sp_archive_allowed_sort_values')) {
     function sp_archive_allowed_sort_values(): array {
-        return ['newest', 'oldest', 'az', 'za', 'menu_order'];
+        return ['newest', 'oldest', 'az', 'za', 'menu_order', 'manual'];
     }
 }
 
@@ -216,6 +216,7 @@ if (! function_exists('sp_archive_current_language')) {
 if (! function_exists('sp_archive_sort_args')) {
     function sp_archive_sort_args(string $sort): array {
         switch ($sort) {
+            case 'manual':     return ['orderby' => 'post__in', 'order' => 'ASC'];
             case 'oldest':     return ['orderby' => 'date',  'order' => 'ASC'];
             case 'az':         return ['orderby' => 'title', 'order' => 'ASC'];
             case 'za':         return ['orderby' => 'title', 'order' => 'DESC'];
@@ -823,6 +824,7 @@ if (! function_exists('sp_archive_filter_availability')) {
             'sort'          => 'newest',
             'favorite_first' => false,
             'lang'          => '',
+            'post__in'      => null,
         ]);
 
         $filters = sp_archive_normalize_filters($args['filters']);
@@ -893,6 +895,7 @@ if (! function_exists('sp_archive_filter_availability')) {
                     'sort'          => $args['sort'],
                     'favorite_first' => ! empty($args['favorite_first']),
                     'lang'          => $args['lang'],
+                    'post__in'      => $args['post__in'],
                 ]);
 
                 $query_args['posts_per_page'] = 1;
@@ -911,7 +914,7 @@ if (! function_exists('sp_archive_filter_availability')) {
 
 if (! function_exists('sp_archive_query_args')) {
     function sp_archive_query_args(array $args = []): array {
-        $args      = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'term_scope' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'newest', 'favorite_first' => false, 'lang' => '']);
+        $args      = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'term_scope' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'newest', 'favorite_first' => false, 'lang' => '', 'post__in' => null]);
         $post_type = sanitize_key((string) $args['post_type']);
         $post_type = post_type_exists($post_type) ? $post_type : 'post';
         $per_page  = sp_archive_normalize_per_page($args['per_page']);
@@ -936,6 +939,14 @@ if (! function_exists('sp_archive_query_args')) {
         if ($language !== '') { $qa['lang'] = $language; }
         if (is_array($orderby)) { $qa['orderby'] = $orderby; } else { $qa['orderby'] = $orderby; $qa['order'] = $order['order']; }
         if ($tax_query) { $qa['tax_query'] = $tax_query; }
+
+        // An explicit array means the archive is in Manual mode. WordPress treats
+        // an empty post__in as "no restriction", so use [0] to correctly return
+        // no posts when Manual mode has no selected items.
+        if (is_array($args['post__in'])) {
+            $included_posts = array_values(array_unique(array_filter(array_map('absint', $args['post__in']))));
+            $qa['post__in'] = $included_posts ?: [0];
+        }
 
         if (! empty($args['favorite_first'])) {
             $qa['meta_query'] = [
@@ -964,7 +975,7 @@ if (! function_exists('sp_archive_query_args')) {
 
 if (! function_exists('sp_archive_prepare_query')) {
     function sp_archive_prepare_query(array $args = []): array {
-        $args = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'term_scope' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'menu_order', 'pagination_mode' => 'pagination', 'group_filter' => [], 'favorite_first' => false, 'lang' => '']);
+        $args = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'term_scope' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'menu_order', 'pagination_mode' => 'pagination', 'group_filter' => [], 'favorite_first' => false, 'lang' => '', 'post__in' => null]);
         $mode        = sp_archive_normalize_mode($args['pagination_mode']);
         $per_page    = sp_archive_normalize_per_page($args['per_page']);
         $paged       = $per_page === -1 ? 1 : max(1, (int) $args['paged']);
@@ -981,6 +992,7 @@ if (! function_exists('sp_archive_prepare_query')) {
                 'sort'          => sp_archive_normalize_sort($args['sort']),
                 'favorite_first' => ! empty($args['favorite_first']),
                 'lang'          => $args['lang'],
+                'post__in'      => $args['post__in'],
             ]);
 
             $query = new WP_Query($qa);
@@ -1021,7 +1033,7 @@ if (! function_exists('sp_archive_prepare_query')) {
             $query_page  = 1;
             $query_limit = $per_page * $paged;
         }
-        $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $filter_values, 'term_scope' => $args['term_scope'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang']]);
+        $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $filter_values, 'term_scope' => $args['term_scope'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang'], 'post__in' => $args['post__in']]);
         $query        = new WP_Query($qa);
         $total_found  = (int) $query->found_posts;
         $total_pages  = $per_page === -1 ? 1 : max(1, (int) ceil($total_found / $per_page));
@@ -1034,7 +1046,7 @@ if (! function_exists('sp_archive_prepare_query')) {
                 $query_page  = 1;
                 $query_limit = $per_page * $current_page;
             }
-            $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $filter_values, 'term_scope' => $args['term_scope'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang']]);
+            $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $filter_values, 'term_scope' => $args['term_scope'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang'], 'post__in' => $args['post__in']]);
             $query        = new WP_Query($qa);
             $total_found  = (int) $query->found_posts;
             $total_pages  = $per_page === -1 ? 1 : max(1, (int) ceil($total_found / $per_page));
@@ -1580,6 +1592,8 @@ function sp_archive_builder_defaults(): array
 
     return [
         'post_type'       => $post_types[0] ?? 'post',
+        'source_mode'     => 'all',
+        'manual_posts'    => ['mode' => 'manual', 'ids' => []],
         'filters_enabled' => 0,
         'confirm'         => 0,
         'reset'           => 0,
@@ -1607,6 +1621,13 @@ function sp_archive_builder_normalize($value): array
     $value = wp_parse_args($value, sp_archive_builder_defaults());
 
     $value['post_type']       = sanitize_key($value['post_type']);
+    $value['source_mode']     = ($value['source_mode'] ?? 'all') === 'manual' ? 'manual' : 'all';
+    $manual_value             = is_array($value['manual_posts'] ?? null) ? $value['manual_posts'] : [];
+    $manual_ids               = $manual_value['ids'] ?? $manual_value;
+    $value['manual_posts']    = [
+        'mode' => 'manual',
+        'ids'  => array_values(array_unique(array_filter(array_map('absint', is_array($manual_ids) ? $manual_ids : [])))),
+    ];
     $value['filters_enabled'] = ! empty($value['filters_enabled']) ? 1 : 0;
     $value['confirm']         = ! empty($value['confirm']) ? 1 : 0;
     $value['reset']           = ! empty($value['reset']) ? 1 : 0;
@@ -1686,6 +1707,10 @@ function sp_get_archive_builder_config($value): array
 
 function sp_archive_builder_order_args(array $config): array
 {
+    if (($config['source_mode'] ?? 'all') === 'manual') {
+        return ['orderby' => 'post__in', 'order' => 'ASC'];
+    }
+
     switch ($config['order_mode'] ?? 'newest') {
         case 'oldest':
             return ['orderby' => 'date', 'order' => 'ASC'];
@@ -1712,6 +1737,10 @@ function sp_archive_builder_query_args($value, array $selected_terms = [], int $
     ];
 
     $args = array_merge($args, sp_archive_builder_order_args($config));
+
+    if ($config['source_mode'] === 'manual') {
+        $args['post__in'] = $config['manual_posts']['ids'] ?: [0];
+    }
 
     $tax_query = [];
 
@@ -1835,6 +1864,8 @@ add_action('acf/include_field_types', function (): void {
             $this->category = 'layout';
             $this->defaults = [
                 'post_type'       => 'post',
+                'source_mode'     => 'all',
+                'manual_posts'    => ['mode' => 'manual', 'ids' => []],
                 'filters_enabled' => 0,
                 'confirm'         => 0,
                 'reset'           => 0,
@@ -2206,6 +2237,21 @@ add_action('acf/include_field_types', function (): void {
                 </div>
 
                 <div class="sp-archive-builder-card__grid">
+                    <!-- Content source -->
+                    <div class="sp-archive-builder-card__field sp-archive-builder-card__field--source">
+                        <label><?php esc_html_e('Content source', 'acf'); ?></label>
+                        <div class="sp-archive-builder-card__segmented sp-archive-builder-card__segmented--source">
+                            <label class="sp-archive-builder-card__segment">
+                                <input type="radio" name="<?php echo esc_attr($name); ?>[source_mode]" value="all" <?php checked($value['source_mode'], 'all'); ?>>
+                                <span><?php esc_html_e('All posts', 'acf'); ?></span>
+                            </label>
+                            <label class="sp-archive-builder-card__segment">
+                                <input type="radio" name="<?php echo esc_attr($name); ?>[source_mode]" value="manual" <?php checked($value['source_mode'], 'manual'); ?>>
+                                <span><?php esc_html_e('Manual', 'acf'); ?></span>
+                            </label>
+                        </div>
+                    </div>
+
                     <!-- Posts per page dropdown -->
                     <div class="sp-archive-builder-card__field">
                         <label for="<?php echo esc_attr($name); ?>-per-page"><?php esc_html_e('Number of posts', 'acf'); ?></label>
@@ -2242,7 +2288,7 @@ add_action('acf/include_field_types', function (): void {
                     </div>
 
                     <!-- Order dropdown -->
-                    <div class="sp-archive-builder-card__field">
+                    <div class="sp-archive-builder-card__field sp-archive-builder-card__field--sorting" <?php echo $value['source_mode'] === 'manual' ? 'hidden' : ''; ?>>
                         <label for="<?php echo esc_attr($name); ?>-order-mode"><?php esc_html_e('Sorting order', 'acf'); ?></label>
                         <select id="<?php echo esc_attr($name); ?>-order-mode" name="<?php echo esc_attr($name); ?>[order_mode]">
                             <option value="newest" <?php selected($value['order_mode'], 'newest'); ?>><?php esc_html_e('Newest first', 'acf'); ?></option>
@@ -2253,6 +2299,37 @@ add_action('acf/include_field_types', function (): void {
                         </select>
                     </div>
 
+                </div>
+
+                <div class="sp-archive-builder-card__manual" <?php echo $value['source_mode'] === 'manual' ? '' : 'hidden'; ?>>
+                    <div class="sp-archive-builder-card__manual-header">
+                        <strong><?php esc_html_e('Selected posts', 'acf'); ?></strong>
+                        <span><?php esc_html_e('Pagination and filters are applied only to this selection. Drag posts to set their display order.', 'acf'); ?></span>
+                    </div>
+                    <?php
+                    $smart_relationship = function_exists('acf_get_field_type')
+                        ? acf_get_field_type('smart_relationship')
+                        : null;
+
+                    if ($smart_relationship && method_exists($smart_relationship, 'render_field')) {
+                        $smart_relationship->render_field([
+                            'key'           => ($field['key'] ?? 'archive_builder') . '_manual_posts',
+                            'name'          => $name . '[manual_posts]',
+                            'type'          => 'smart_relationship',
+                            'value'         => $value['manual_posts'],
+                            'post_type'     => [$post_type],
+                            'taxonomy'      => array_values(get_object_taxonomies($post_type)),
+                            'return_format' => 'id',
+                            'modes'         => ['manual'],
+                            'default_mode'  => 'manual',
+                            'thumb_field'   => 'featured_image',
+                            'min'           => 0,
+                            'max'           => 0,
+                        ]);
+                    } else {
+                        echo '<p class="description">' . esc_html__('Enable the Smart Relationship component to use Manual mode.', 'acf') . '</p>';
+                    }
+                    ?>
                 </div>
             </div>
             <?php
@@ -2270,7 +2347,20 @@ add_action('acf/include_field_types', function (): void {
             }
 
             // Only save the editor-level choices to post meta
+            $source_mode = ($value['source_mode'] ?? 'all') === 'manual' ? 'manual' : 'all';
+            $manual_value = is_array($value['manual_posts'] ?? null) ? $value['manual_posts'] : [];
+            $manual_ids = array_values(array_unique(array_filter(array_map(
+                'absint',
+                is_array($manual_value['ids'] ?? null) ? $manual_value['ids'] : []
+            ))));
+            $post_type = sanitize_key((string) ($field['post_type'] ?? 'post'));
+            $manual_ids = array_values(array_filter($manual_ids, static function (int $post_id) use ($post_type): bool {
+                return get_post_type($post_id) === $post_type;
+            }));
+
             return [
+                'source_mode'     => $source_mode,
+                'manual_posts'    => ['mode' => 'manual', 'ids' => $manual_ids],
                 'per_page'        => $per_page,
                 'pagination_type' => in_array($value['pagination_type'] ?? '', ['pagination', 'load_more', 'infinity_scroll'], true) ? $value['pagination_type'] : 'pagination',
                 'order_mode'      => in_array($value['order_mode'] ?? '', ['newest', 'oldest', 'az', 'za', 'menu_order'], true) ? $value['order_mode'] : 'newest',
@@ -2401,12 +2491,22 @@ add_action('acf/include_field_types', function (): void {
     color: #475467;
     font-size: 13px;
 }
+.sp-archive-builder-card__header .dashicons {
+    color: var(--sp-media-brand);
+    font-size: 18px;
+    margin-right: 6px;
+}
 .sp-archive-builder-card__grid {
     display: grid;
-    grid-template-columns: 200px minmax(0, 1fr) 200px;
+    grid-template-columns: minmax(220px, 280px) minmax(150px, 200px) minmax(390px, 1fr) minmax(170px, 220px);
     gap: 20px;
     padding: 16px;
     align-items: flex-end;
+}
+@media (max-width: 1300px) {
+    .sp-archive-builder-card__grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 @media (max-width: 900px) {
     .sp-archive-builder-card__grid {
@@ -2417,6 +2517,9 @@ add_action('acf/include_field_types', function (): void {
     display: flex;
     flex-direction: column;
     gap: 6px;
+}
+.sp-archive-builder-card__field[hidden] {
+    display: none;
 }
 .sp-archive-builder-card__field > label {
     font-weight: 600;
@@ -2481,6 +2584,24 @@ add_action('acf/include_field_types', function (): void {
     background: #fff;
     color: var(--sp-media-brand);
     box-shadow: 0 1px 3px rgba(16, 24, 40, .1);
+}
+.sp-archive-builder-card__manual {
+    border-top: 1px solid var(--sp-media-border);
+    padding: 16px;
+}
+.sp-archive-builder-card__manual[hidden] {
+    display: none;
+}
+.sp-archive-builder-card__manual-header {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    margin-bottom: 12px;
+    color: #475467;
+    font-size: 13px;
+}
+.sp-archive-builder-card__manual-header span {
+    color: #667085;
 }
 
 
@@ -2700,6 +2821,12 @@ CSS;
         {
             return <<<'JS'
 (function ($) {
+    function syncContentSource($card) {
+        var mode = $card.find('input[name$="[source_mode]"]:checked').val() || 'all';
+        $card.find('.sp-archive-builder-card__manual').prop('hidden', mode !== 'manual');
+        $card.find('.sp-archive-builder-card__field--sorting').prop('hidden', mode === 'manual');
+    }
+
     function taxonomies($field) {
         try {
             return JSON.parse($field.attr('data-taxonomies') || '{}');
@@ -3007,6 +3134,10 @@ CSS;
         markArchiveBuilderFieldDirty($(this));
     });
 
+    $(document).on('change', '.sp-archive-builder-card input[name$="[source_mode]"]', function () {
+        syncContentSource($(this).closest('.sp-archive-builder-card'));
+    });
+
     $(document).on('mousedown click', '#publish, .acf-btn-publish, button[type="submit"], input[type="submit"]', function () {
         $('.sp-archive-builder-scope').each(function () {
             markArchiveBuilderFieldDirty($(this));
@@ -3020,6 +3151,9 @@ CSS;
     if (window.acf) {
         acf.addAction('ready_field_object', function (field) {
             var $el = $(field.$el || field);
+            $el.find('.sp-archive-builder-card').each(function () {
+                syncContentSource($(this));
+            });
             var $settings = $el.find('.sp-archive-builder-settings');
             if ($settings.length) {
                 syncTaxonomyOptions($settings);
@@ -3031,6 +3165,12 @@ CSS;
             }
         });
     }
+
+    $(function () {
+        $('.sp-archive-builder-card').each(function () {
+            syncContentSource($(this));
+        });
+    });
 })(jQuery);
 JS;
         }
@@ -3252,12 +3392,23 @@ if (! function_exists('sp_archive_setup')) {
     {
         $config = sp_archive_builder_normalize($config);
 
+        $is_manual = $config['source_mode'] === 'manual';
+        if ($is_manual) {
+            // Manual selection order is authoritative. Grouping/favorites and
+            // public sorting would otherwise reorder the editor's selection.
+            $config['group_on_all']   = 0;
+            $config['favorite_first'] = 0;
+        }
+
         $action         = $opts['action']         ?? ($config['action'] ?? 'sp_archive_query');
         $page_arg       = $opts['page_arg']       ?? ($config['page_arg'] ?? 'sp_page');
         $url_page_arg   = $opts['url_page_arg']   ?? ($config['url_page_arg'] ?? 'page');
-        $sort_arg       = $opts['sort_arg']       ?? ($config['sort_arg'] ?? '');
+        $sort_arg       = $is_manual ? '' : ($opts['sort_arg'] ?? ($config['sort_arg'] ?? ''));
         $per_page_arg   = $opts['per_page_arg']   ?? ($config['per_page_arg'] ?? 'per_page');
-        $favorite_first = ! empty($opts['favorite_first'] ?? ($config['favorite_first'] ?? false));
+        $favorite_first = ! $is_manual && ! empty($opts['favorite_first'] ?? ($config['favorite_first'] ?? false));
+        $manual_post_ids = $is_manual
+            ? $config['manual_posts']['ids']
+            : null;
         $template_args  = isset($opts['template_args']) && is_array($opts['template_args'])
             ? $opts['template_args']
             : [];
@@ -3284,8 +3435,8 @@ if (! function_exists('sp_archive_setup')) {
 
         $current_filters = sp_archive_filter_values($archive_filters, wp_unslash($_GET));
 
-        $default_sort = $config['order_mode'];
-        $current_sort = isset($_GET[$sort_arg]) && $sort_arg !== ''
+        $default_sort = $is_manual ? 'manual' : $config['order_mode'];
+        $current_sort = ! $is_manual && isset($_GET[$sort_arg]) && $sort_arg !== ''
             ? sp_archive_normalize_sort(wp_unslash($_GET[$sort_arg]), $default_sort)
             : $default_sort;
         $current_per_page = isset($_GET[$per_page_arg])
@@ -3312,6 +3463,7 @@ if (! function_exists('sp_archive_setup')) {
             'group_filter'    => ! empty($config['group_on_all']) ? ($archive_filters[0] ?? []) : [],
             'favorite_first'  => $favorite_first,
             'lang'            => $language,
+            'post__in'        => $manual_post_ids,
         ]);
 
         $filter_availability = ! empty($config['disable_empty'])
@@ -3323,6 +3475,7 @@ if (! function_exists('sp_archive_setup')) {
                 'sort'          => $current_sort,
                 'favorite_first' => $favorite_first,
                 'lang'          => $language,
+                'post__in'      => $manual_post_ids,
             ])
             : [];
 
@@ -3332,12 +3485,13 @@ if (! function_exists('sp_archive_setup')) {
             'load_more_label'  => $config['load_more_label'],
             'all_label'        => $config['all_label'],
             'pagination_type'  => $config['pagination_type'],
-            'order_mode'       => $config['order_mode'],
+            'order_mode'       => $default_sort,
             'confirm'          => $config['confirm'],
             'reset'            => $config['reset'],
             'disable_empty'    => $config['disable_empty'],
             'group_on_all'     => $config['group_on_all'],
             'favorite_first'   => $favorite_first,
+            'post__in'         => $manual_post_ids,
             'lang'             => $language,
             'term_scope'       => $config['term_scope'],
             'filters'          => $archive_filters,
@@ -3813,11 +3967,15 @@ if (! function_exists('sp_archive_ajax_query')) {
         $action           = sanitize_key((string) ($config['action'] ?? 'sp_archive_query')) ?: 'sp_archive_query';
         $page_arg         = $config['page_arg'];
         $url_page_arg     = $config['url_page_arg'];
-        $sort_arg     = $config['sort_arg'] ?? '';
-        $default_sort = $config['order_mode'];
+        $is_manual = is_array($config['post__in'] ?? null);
+        $sort_arg     = $is_manual ? '' : ($config['sort_arg'] ?? '');
+        $default_sort = $is_manual ? 'manual' : $config['order_mode'];
         $disable_empty = ! empty($config['disable_empty']);
         $term_scope = sp_archive_normalize_term_scope($config['term_scope'] ?? []);
-        $favorite_first = ! empty($config['favorite_first']) || $card_template === 'template_parts/section-archive-blog/card';
+        $favorite_first = ! $is_manual && (! empty($config['favorite_first']) || $card_template === 'template_parts/section-archive-blog/card');
+        $manual_post_ids = is_array($config['post__in'] ?? null)
+            ? array_values(array_unique(array_filter(array_map('absint', $config['post__in']))))
+            : null;
 
         // Client provides: paged, sort (only if sort_arg configured), and filter values
         $paged         = max(1, (int) ($source['paged'] ?? 1));
@@ -3839,6 +3997,7 @@ if (! function_exists('sp_archive_ajax_query')) {
             'group_filter'    => ! empty($config['group_on_all']) ? ($archive_filters[0] ?? []) : [],
             'favorite_first'  => $favorite_first,
             'lang'            => $language,
+            'post__in'        => $manual_post_ids,
         ]);
 
         $query        = $query_data['query'];
@@ -3853,6 +4012,7 @@ if (! function_exists('sp_archive_ajax_query')) {
                 'sort'          => $sort,
                 'favorite_first' => $favorite_first,
                 'lang'          => $language,
+                'post__in'      => $manual_post_ids,
             ])
             : [];
 
@@ -3916,3 +4076,7 @@ if (! function_exists('sp_archive_ajax_query')) {
 
 add_action('wp_ajax_sp_archive_query',        'sp_archive_ajax_query');
 add_action('wp_ajax_nopriv_sp_archive_query', 'sp_archive_ajax_query');
+
+// Taxonomy archives share the same field module, rendering contract and
+// frontend runtime as post archives.
+require_once __DIR__ . '/taxonomy.php';

@@ -11,7 +11,8 @@
 - ID выбранной страницы хранится в WordPress options; при наличии multilingual integration используются language-aware keys.
 - `get_fake_archive_page()` отдаёт назначенную страницу templates и helpers.
 - Назначенная страница получает видимый post state и защищается от trash/delete.
-- Archive и single permalinks используют иерархию и язык выбранной страницы как URL base.
+- Archive и публичные taxonomy permalinks используют иерархию и язык выбранной страницы как URL base.
+- Single permalinks строятся как `archive / первая публичная категория / post`; parent hierarchy категории сохраняется.
 - Для включённого post type каждая запись получает metabox **Archive Page**; выбранная там опубликованная page переопределяет общий archive только для этой записи.
 - Явные rewrite rules регистрируются для каждого языкового assignment; `parse_request` сохраняет реальные child-page routes при конфликте.
 - Запись открывается только под собственным назначенным base; тот же slug под чужим individual base возвращает 404.
@@ -39,8 +40,9 @@ Default фильтра `fake_archive_supported_post_types` берётся из t
 
 | Integration | Назначение |
 | --- | --- |
-| `post_type_link` | Перестраивает single permalink через назначенную archive page и её parent hierarchy. |
-| `parse_request` | Распознаёт fake archive route и заполняет query vars post type. |
+| `register_taxonomy_args` | Привязывает rewrite base публичной taxonomy к назначенной archive page. |
+| `post_type_link` | Перестраивает single permalink через archive page, первую публичную категорию и slug записи. |
+| `parse_request` | Распознаёт archive, taxonomy и categorized single routes и заполняет нужные query vars. |
 | `init` | Регистрирует rewrite rules всех языковых archive bases. |
 | `wp_loaded`, `post_updated` | Обновляет rules после изменения assignment, slug, parent или status. |
 | `add_meta_boxes`, `save_post` | Показывает и сохраняет индивидуальный archive override записи. |

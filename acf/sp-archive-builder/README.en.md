@@ -1,14 +1,17 @@
 # SP Archive Builder
 
-`archive_builder` is an ACF field type for configurable post archives with taxonomy filters, sorting, posts-per-page controls, AJAX pagination, load more / infinite scroll, empty states, confirm/reset buttons, and reusable granular render helpers.
+`archive_builder` and `taxonomy_archive_builder` are ACF field types for configurable post and taxonomy-term archives. Both use the same editor UI and frontend archive runtime, including filters, sorting, per-page controls, AJAX pagination, load more / infinite scroll, empty states, confirm/reset buttons, and reusable granular render helpers.
 
 The active field implementation lives in:
 
 ```text
 acf/sp-archive-builder/index.php
+acf/sp-archive-builder/taxonomy.php
 ```
 
 PHP Kit loads this entrypoint when `archive-builder` is enabled in the `acf` configuration.
+
+The taxonomy implementation is required by the main entrypoint, so both builders are distributed as one module.
 
 ## Field Config
 
@@ -18,6 +21,7 @@ Use the field in section `fields.php`:
 ->addFields( archive_builder( 'archive', [
     'label'           => __( 'Archive Settings', 'ACF' ),
     'post_type'       => 'case_study',
+    'source_mode'     => 'all', // `all` or `manual`.
     'filters_enabled' => 1,
     'confirm'         => 1,
     'reset'           => 1,
@@ -46,6 +50,27 @@ Use the field in section `fields.php`:
     'per_page_arg'    => 'case_per_page',
 ] ) )
 ```
+
+In Manual mode, editors select and drag posts into the required order with Smart Relationship. Pagination and filters stay limited to that selection. Public and editor sorting controls are disabled because the manual order is authoritative.
+
+## Taxonomy Archive Field
+
+```php
+->addFields( taxonomy_archive_builder( 'industries', [
+    'label'             => __( 'Industry Archive Settings', 'ACF' ),
+    'taxonomy'          => 'case_study_industry',
+    'source_mode'       => 'all', // `all` or `manual`.
+    'hide_empty'        => 1,
+    'top_level_only'    => 0,
+    'filters_enabled'   => 1,
+    'filter_ui'         => 'select',
+    'per_page'          => 9,
+    'pagination_type'   => 'infinity_scroll',
+    'order_mode'        => 'az',
+] ) )
+```
+
+Manual taxonomy mode uses Smart Taxonomy for selection and drag ordering. Pagination and filtering operate only inside the selected term IDs.
 
 ## Config Options
 
