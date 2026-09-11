@@ -18,6 +18,35 @@ if ( ! defined( 'ABSPATH' ) ) {
  * - archive_term_ids (int[])
  */
 
+if ( ! function_exists( 'sp_taxonomy_archive_builder_choice_label' ) ) {
+	function sp_taxonomy_archive_builder_choice_label( string $taxonomy, object $object ): string {
+		$taxonomy_label = (string) ( $object->labels->menu_name ?? $object->label ?? $taxonomy );
+		$post_type_labels = [];
+
+		foreach ( (array) ( $object->object_type ?? [] ) as $post_type ) {
+			$post_type = sanitize_key( (string) $post_type );
+			if ( $post_type === '' ) {
+				continue;
+			}
+
+			$post_type_object = function_exists( 'get_post_type_object' ) ? get_post_type_object( $post_type ) : null;
+			$post_type_labels[] = is_object( $post_type_object )
+				? (string) ( $post_type_object->labels->name ?? $post_type_object->label ?? $post_type )
+				: $post_type;
+		}
+
+		$post_type_labels = array_values( array_unique( array_filter( $post_type_labels ) ) );
+		$context          = implode( ', ', $post_type_labels );
+
+		return sprintf(
+			'%s%s (%s)',
+			$context !== '' ? $context . ' — ' : '',
+			$taxonomy_label,
+			$taxonomy
+		);
+	}
+}
+
 if ( ! function_exists( 'sp_taxonomy_archive_builder_choices' ) ) {
 	function sp_taxonomy_archive_builder_choices(): array {
 		$choices = [];
@@ -31,7 +60,7 @@ if ( ! function_exists( 'sp_taxonomy_archive_builder_choices' ) ) {
 				continue;
 			}
 
-			$choices[ $taxonomy ] = $object->labels->menu_name ?? $object->label ?? $taxonomy;
+			$choices[ $taxonomy ] = sp_taxonomy_archive_builder_choice_label( $taxonomy, $object );
 		}
 
 		natcasesort( $choices );

@@ -35,6 +35,11 @@ function sanitize_title( string $value ): string { return strtolower( preg_repla
 function absint( $value ): int { return abs( (int) $value ); }
 function taxonomy_exists( string $taxonomy ): bool { return in_array( $taxonomy, [ 'category', 'service_category' ], true ); }
 function get_taxonomies( array $args = [], string $output = 'names' ): array { return []; }
+function get_post_type_object( string $post_type ) {
+	return $post_type === 'services'
+		? (object) [ 'labels' => (object) [ 'name' => 'Services' ] ]
+		: null;
+}
 function wp_parse_args( $args, array $defaults = [] ): array { return array_merge( $defaults, is_array( $args ) ? $args : [] ); }
 function is_wp_error( $value ): bool { return false; }
 function get_term_meta( int $term_id, string $key, bool $single = false ) { return $GLOBALS['term_order'][ $term_id ] ?? ''; }
@@ -81,6 +86,14 @@ $GLOBALS['terms'] = [
 $GLOBALS['term_order'] = [ 7 => 2, 2 => 1 ];
 
 require dirname( __DIR__ ) . '/acf/sp-archive-builder/taxonomy.php';
+
+$readable_choice = sp_taxonomy_archive_builder_choice_label(
+	'service_category',
+	(object) [
+		'labels'      => (object) [ 'menu_name' => 'Categories' ],
+		'object_type' => [ 'services' ],
+	]
+);
 
 foreach ( $GLOBALS['actions']['acf/include_field_types'] ?? [] as $callback ) {
 	$callback();
@@ -171,6 +184,7 @@ $formatted_field = $field_type->format_value( array_merge( $saved_field, [
 ] );
 
 $checks = [
+	'taxonomy choice includes post type, label and slug' => $readable_choice === 'Services — Categories (service_category)',
 	'all normalizes to unlimited'          => $normalized['per_page'] === -1,
 	'invalid pagination uses pagination'   => $normalized['pagination_type'] === 'pagination',
 	'invalid sort uses alphabetical order' => $normalized['order_mode'] === 'az',
