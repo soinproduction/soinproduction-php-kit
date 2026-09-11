@@ -145,13 +145,19 @@
 			bool $allow_video,
 			string $instance_id
 		): void {
-			$attachment_id = absint( $variant['attachment_id'] ?? 0 );
-			$poster_id     = absint( $variant['poster_id'] ?? 0 );
-			$mime          = $attachment_id ? (string) get_post_mime_type( $attachment_id ) : '';
-			$is_video      = str_starts_with( $mime, 'video/' );
-			$preview_url   = $attachment_id && ! $is_video ? wp_get_attachment_image_url( $attachment_id, 'medium' ) : '';
-			$poster_url    = $poster_id ? wp_get_attachment_image_url( $poster_id, 'medium' ) : '';
-			$file_name     = $attachment_id ? basename( (string) get_attached_file( $attachment_id ) ) : '';
+			$sources       = sp_background_media_variant_source_ids( $variant );
+			$media_type    = $allow_video ? $sources['media_type'] : 'image';
+			$image_id      = absint( $sources['image_id'] );
+			$mp4_id        = absint( $sources['mp4_id'] );
+			$webm_id       = absint( $sources['webm_id'] );
+			$poster_id     = absint( $sources['poster_id'] );
+			$attachment_id = 'video' === $media_type ? ( $mp4_id ?: $webm_id ) : $image_id;
+			$preview_url   = $image_id ? wp_get_attachment_image_url( $image_id, 'full' ) : '';
+			$poster_url    = $poster_id ? wp_get_attachment_image_url( $poster_id, 'full' ) : '';
+			$mp4_name      = $mp4_id ? basename( (string) get_attached_file( $mp4_id ) ) : '';
+			$webm_name     = $webm_id ? basename( (string) get_attached_file( $webm_id ) ) : '';
+			$has_media     = $attachment_id > 0;
+			$has_visual    = ( 'image' === $media_type && ! empty( $preview_url ) ) || ( 'video' === $media_type && ! empty( $poster_url ) );
 			$fit           = sanitize_key( (string) ( $variant['fit'] ?? 'cover' ) );
 			$fit           = in_array( $fit, [ 'cover', 'contain' ], true ) ? $fit : 'cover';
 			$position_x    = sp_background_media_number( $variant['position_x'] ?? 50, 0, 100, 50 );
@@ -169,23 +175,36 @@
 				</div>
 
 				<input type="hidden" name="<?php echo esc_attr( $name . '[attachment_id]' ); ?>" value="<?php echo esc_attr( (string) $attachment_id ); ?>" data-sp-background-media-id>
-				<input type="hidden" value="<?php echo $is_video ? 'video' : 'image'; ?>" data-sp-background-media-type>
+				<input type="hidden" name="<?php echo esc_attr( $name . '[media_type]' ); ?>" value="<?php echo esc_attr( $media_type ); ?>" data-sp-background-media-type>
+				<input type="hidden" name="<?php echo esc_attr( $name . '[image_id]' ); ?>" value="<?php echo esc_attr( (string) $image_id ); ?>" data-sp-background-image-id data-preview-url="<?php echo esc_attr( (string) $preview_url ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $name . '[mp4_id]' ); ?>" value="<?php echo esc_attr( (string) $mp4_id ); ?>" data-sp-background-video-id="mp4" data-file-name="<?php echo esc_attr( $mp4_name ); ?>">
+				<input type="hidden" name="<?php echo esc_attr( $name . '[webm_id]' ); ?>" value="<?php echo esc_attr( (string) $webm_id ); ?>" data-sp-background-video-id="webm" data-file-name="<?php echo esc_attr( $webm_name ); ?>">
+
+				<?php if ( $allow_video ) : ?>
+					<div class="sp-background-field__media-types" role="group" aria-label="<?php esc_attr_e( 'Background media type', 'acf' ); ?>">
+						<label><input type="radio" name="<?php echo esc_attr( $name . '[media_type_choice]' ); ?>" value="image" <?php checked( $media_type, 'image' ); ?> data-sp-background-type-choice><span><?php esc_html_e( 'Image', 'acf' ); ?></span></label>
+						<label><input type="radio" name="<?php echo esc_attr( $name . '[media_type_choice]' ); ?>" value="video" <?php checked( $media_type, 'video' ); ?> data-sp-background-type-choice><span><?php esc_html_e( 'Video', 'acf' ); ?></span></label>
+					</div>
+				<?php endif; ?>
 
 				<div class="sp-background-field__stage">
-					<div class="sp-background-field__preview<?php echo $attachment_id ? ' is-filled' : ''; ?>"
+					<div class="sp-background-field__preview<?php echo $has_media ? ' is-filled' : ''; ?><?php echo $has_visual ? ' has-visual' : ''; ?>"
 						role="button"
-						tabindex="0"
+						tabindex="<?php echo $has_visual ? '0' : '-1'; ?>"
+						aria-disabled="<?php echo $has_visual ? 'false' : 'true'; ?>"
 						aria-label="<?php esc_attr_e( 'Set focal point on the preview', 'acf' ); ?>"
 						data-sp-background-preview
 						data-sp-background-focal-surface
 						style="--sp-preview-fit:<?php echo esc_attr( $fit ); ?>;--sp-preview-x:<?php echo esc_attr( (string) $position_x ); ?>%;--sp-preview-y:<?php echo esc_attr( (string) $position_y ); ?>%;--sp-focal-x:<?php echo esc_attr( (string) $position_x ); ?>%;--sp-focal-y:<?php echo esc_attr( (string) $position_y ); ?>%;">
 						<span class="sp-background-field__preview-content" data-sp-background-preview-content>
-							<?php if ( $preview_url ) : ?>
+							<?php if ( 'image' === $media_type && $preview_url ) : ?>
 								<img src="<?php echo esc_url( $preview_url ); ?>" alt="">
-							<?php elseif ( $attachment_id && $is_video ) : ?>
-								<span class="sp-background-field__file"><span class="sp-background-field__empty-icon" aria-hidden="true">▶</span><span><?php echo esc_html( $file_name ); ?></span></span>
+							<?php elseif ( 'video' === $media_type && $poster_url ) : ?>
+								<img src="<?php echo esc_url( $poster_url ); ?>" alt="">
+							<?php elseif ( 'video' === $media_type && $has_media ) : ?>
+								<span class="sp-background-field__file"><span class="sp-background-field__empty-icon" aria-hidden="true">▶</span><span><?php echo esc_html( implode( ' · ', array_filter( [ $webm_name, $mp4_name ] ) ) ); ?></span></span>
 							<?php else : ?>
-								<span class="sp-background-field__empty"><span class="sp-background-field__empty-icon" aria-hidden="true">+</span><span><?php esc_html_e( 'Select an image or video', 'acf' ); ?></span></span>
+								<span class="sp-background-field__empty"><span class="sp-background-field__empty-icon" aria-hidden="true">+</span><span><?php echo 'video' === $media_type ? esc_html__( 'Select MP4 or WEBM video', 'acf' ) : esc_html__( 'Select an image', 'acf' ); ?></span></span>
 							<?php endif; ?>
 						</span>
 						<span class="sp-background-field__focal-grid" aria-hidden="true"></span>
@@ -204,30 +223,51 @@
 							<label><span>Y</span><input type="number" min="0" max="100" step="1" name="<?php echo esc_attr( $name . '[position_y]' ); ?>" value="<?php echo esc_attr( (string) $position_y ); ?>" data-sp-background-position="y"><em>%</em></label>
 						</div>
 
-						<div class="sp-background-field__actions">
-							<button type="button" class="sp-background-field__button sp-background-field__button--primary" data-sp-background-select><span data-sp-background-select-label><?php echo $attachment_id ? esc_html__( 'Replace media', 'acf' ) : esc_html__( 'Select media', 'acf' ); ?></span></button>
-							<button type="button" class="sp-background-field__button sp-background-field__button--danger<?php echo $attachment_id ? '' : ' is-hidden'; ?>" data-sp-background-remove><?php esc_html_e( 'Remove', 'acf' ); ?></button>
+						<div class="sp-background-field__actions" data-sp-background-image-actions <?php echo 'image' === $media_type ? '' : 'hidden'; ?>>
+							<button type="button" class="sp-background-field__button sp-background-field__button--primary" data-sp-background-select><span data-sp-background-select-label><?php echo $image_id ? esc_html__( 'Replace image', 'acf' ) : esc_html__( 'Select image', 'acf' ); ?></span></button>
+							<button type="button" class="sp-background-field__button sp-background-field__button--danger<?php echo $image_id ? '' : ' is-hidden'; ?>" data-sp-background-remove><?php esc_html_e( 'Remove image', 'acf' ); ?></button>
 						</div>
 					</div>
 				</div>
 
 				<?php if ( $allow_video ) : ?>
-					<div class="sp-background-field__poster" data-sp-background-poster-panel <?php echo $is_video ? '' : 'hidden'; ?>>
-						<div>
-							<strong><?php esc_html_e( 'Video poster', 'acf' ); ?></strong>
-							<span><?php esc_html_e( 'Shown before playback and when reduced motion is enabled.', 'acf' ); ?></span>
+					<div class="sp-background-field__video-assets" data-sp-background-video-panel <?php echo 'video' === $media_type ? '' : 'hidden'; ?>>
+						<div class="sp-background-field__video-assets-heading">
+							<strong><?php esc_html_e( 'Video files', 'acf' ); ?></strong>
+							<span><?php esc_html_e( 'Add MP4 for broad compatibility, WEBM for modern browsers, and a high-quality poster.', 'acf' ); ?></span>
 						</div>
-						<input type="hidden" name="<?php echo esc_attr( $name . '[poster_id]' ); ?>" value="<?php echo esc_attr( (string) $poster_id ); ?>" data-sp-background-poster-id>
-						<div class="sp-background-field__poster-preview<?php echo $poster_url ? ' is-filled' : ''; ?>" data-sp-background-poster-preview>
-							<?php if ( $poster_url ) : ?>
-								<img src="<?php echo esc_url( $poster_url ); ?>" alt="">
-							<?php else : ?>
-								<span><?php esc_html_e( 'Optional poster image', 'acf' ); ?></span>
-							<?php endif; ?>
-						</div>
-						<div class="sp-background-field__actions">
-							<button type="button" class="sp-background-field__button" data-sp-background-poster-select><span data-sp-background-poster-select-label><?php echo $poster_id ? esc_html__( 'Replace poster', 'acf' ) : esc_html__( 'Select poster', 'acf' ); ?></span></button>
-							<button type="button" class="sp-background-field__button sp-background-field__button--danger<?php echo $poster_id ? '' : ' is-hidden'; ?>" data-sp-background-poster-remove><?php esc_html_e( 'Remove', 'acf' ); ?></button>
+						<div class="sp-background-field__video-assets-grid">
+							<div class="sp-background-field__asset-card">
+								<div><strong>MP4</strong><span><?php esc_html_e( 'Compatibility source', 'acf' ); ?></span></div>
+								<div class="sp-background-field__file-status<?php echo $mp4_id ? ' is-filled' : ''; ?>" data-sp-background-video-status="mp4"><?php echo esc_html( $mp4_name ?: __( 'Not selected', 'acf' ) ); ?></div>
+								<div class="sp-background-field__actions">
+									<button type="button" class="sp-background-field__button" data-sp-background-video-select="mp4"><?php echo $mp4_id ? esc_html__( 'Replace MP4', 'acf' ) : esc_html__( 'Select MP4', 'acf' ); ?></button>
+									<button type="button" class="sp-background-field__button sp-background-field__button--danger<?php echo $mp4_id ? '' : ' is-hidden'; ?>" data-sp-background-video-remove="mp4"><?php esc_html_e( 'Remove', 'acf' ); ?></button>
+								</div>
+							</div>
+							<div class="sp-background-field__asset-card">
+								<div><strong>WEBM</strong><span><?php esc_html_e( 'Optimized source', 'acf' ); ?></span></div>
+								<div class="sp-background-field__file-status<?php echo $webm_id ? ' is-filled' : ''; ?>" data-sp-background-video-status="webm"><?php echo esc_html( $webm_name ?: __( 'Not selected', 'acf' ) ); ?></div>
+								<div class="sp-background-field__actions">
+									<button type="button" class="sp-background-field__button" data-sp-background-video-select="webm"><?php echo $webm_id ? esc_html__( 'Replace WEBM', 'acf' ) : esc_html__( 'Select WEBM', 'acf' ); ?></button>
+									<button type="button" class="sp-background-field__button sp-background-field__button--danger<?php echo $webm_id ? '' : ' is-hidden'; ?>" data-sp-background-video-remove="webm"><?php esc_html_e( 'Remove', 'acf' ); ?></button>
+								</div>
+							</div>
+							<div class="sp-background-field__asset-card sp-background-field__asset-card--poster">
+								<div><strong><?php esc_html_e( 'Poster', 'acf' ); ?></strong><span><?php esc_html_e( 'Before playback and for reduced motion', 'acf' ); ?></span></div>
+								<input type="hidden" name="<?php echo esc_attr( $name . '[poster_id]' ); ?>" value="<?php echo esc_attr( (string) $poster_id ); ?>" data-sp-background-poster-id data-preview-url="<?php echo esc_attr( (string) $poster_url ); ?>">
+								<div class="sp-background-field__poster-preview<?php echo $poster_url ? ' is-filled' : ''; ?>" data-sp-background-poster-preview>
+									<?php if ( $poster_url ) : ?>
+										<img src="<?php echo esc_url( $poster_url ); ?>" alt="">
+									<?php else : ?>
+										<span><?php esc_html_e( 'Not selected', 'acf' ); ?></span>
+									<?php endif; ?>
+								</div>
+								<div class="sp-background-field__actions">
+									<button type="button" class="sp-background-field__button" data-sp-background-poster-select><span data-sp-background-poster-select-label><?php echo $poster_id ? esc_html__( 'Replace poster', 'acf' ) : esc_html__( 'Select poster', 'acf' ); ?></span></button>
+									<button type="button" class="sp-background-field__button sp-background-field__button--danger<?php echo $poster_id ? '' : ' is-hidden'; ?>" data-sp-background-poster-remove><?php esc_html_e( 'Remove', 'acf' ); ?></button>
+								</div>
+							</div>
 						</div>
 					</div>
 				<?php endif; ?>
@@ -390,10 +430,20 @@
 
 			foreach ( $breakpoints as $breakpoint ) {
 				$variant = is_array( $value[ $breakpoint ] ?? null ) ? $value[ $breakpoint ] : [];
+				$sources = sp_background_media_variant_source_ids( $variant );
+				$media_type = in_array( $sources['media_type'], [ 'image', 'video' ], true ) ? $sources['media_type'] : 'image';
+				$image_id = absint( $sources['image_id'] );
+				$mp4_id = absint( $sources['mp4_id'] );
+				$webm_id = absint( $sources['webm_id'] );
+				$attachment_id = 'video' === $media_type ? ( $mp4_id ?: $webm_id ) : $image_id;
 				$fit = sanitize_key( (string) ( $variant['fit'] ?? 'cover' ) );
 				$clean[ $breakpoint ] = [
-					'attachment_id' => absint( $variant['attachment_id'] ?? 0 ),
-					'poster_id'     => absint( $variant['poster_id'] ?? 0 ),
+					'media_type'    => $media_type,
+					'attachment_id' => $attachment_id,
+					'image_id'      => $image_id,
+					'mp4_id'        => $mp4_id,
+					'webm_id'       => $webm_id,
+					'poster_id'     => absint( $sources['poster_id'] ),
 					'fit'           => in_array( $fit, [ 'cover', 'contain' ], true ) ? $fit : 'cover',
 					'position_x'    => sp_background_media_number( $variant['position_x'] ?? 50, 0, 100, 50 ),
 					'position_y'    => sp_background_media_number( $variant['position_y'] ?? 50, 0, 100, 50 ),
@@ -429,14 +479,16 @@
 			}
 
 			$value = $this->submitted_value( $value );
-			$desktop_id = absint( $value['desktop']['attachment_id'] ?? 0 );
+			$desktop_sources = sp_background_media_variant_source_ids( $value['desktop'] ?? [] );
+			$desktop_id = absint( $desktop_sources['attachment_id'] );
 			$responsive = ! array_key_exists( 'responsive', $field ) || ! empty( $field['responsive'] );
 			$breakpoints = $responsive ? [ 'desktop', 'tablet', 'mobile' ] : [ 'desktop' ];
 
 			if ( ! $desktop_id ) {
 				$has_responsive_media = false;
 				foreach ( [ 'tablet', 'mobile' ] as $breakpoint ) {
-					$has_responsive_media = $has_responsive_media || ! empty( $value[ $breakpoint ]['attachment_id'] );
+					$variant_sources = sp_background_media_variant_source_ids( $value[ $breakpoint ] ?? [] );
+					$has_responsive_media = $has_responsive_media || ! empty( $variant_sources['attachment_id'] );
 				}
 
 				if ( $has_responsive_media ) {
@@ -452,20 +504,23 @@
 			}
 
 			foreach ( $breakpoints as $breakpoint ) {
-				$attachment_id = absint( $value[ $breakpoint ]['attachment_id'] ?? 0 );
-				$poster_id = absint( $value[ $breakpoint ]['poster_id'] ?? 0 );
+				$sources = sp_background_media_variant_source_ids( $value[ $breakpoint ] ?? [] );
+				$attachment_id = absint( $sources['attachment_id'] );
+				$poster_id = absint( $sources['poster_id'] );
 
 				if ( $attachment_id ) {
-					$mime = (string) get_post_mime_type( $attachment_id );
-					$is_image = str_starts_with( $mime, 'image/' );
-					$is_video = str_starts_with( $mime, 'video/' );
-
-					if ( ! $is_image && ! $is_video ) {
-						return __( 'Background media must be an image or video.', 'acf' );
+					if ( 'image' === $sources['media_type'] && ! str_starts_with( (string) get_post_mime_type( $sources['image_id'] ), 'image/' ) ) {
+						return __( 'Background image must be an image attachment.', 'acf' );
 					}
 
-					if ( $is_video && empty( $field['allow_video'] ) && array_key_exists( 'allow_video', $field ) ) {
+					if ( 'video' === $sources['media_type'] && empty( $field['allow_video'] ) && array_key_exists( 'allow_video', $field ) ) {
 						return __( 'Video is not allowed for this background field.', 'acf' );
+					}
+					if ( $sources['mp4_id'] && 'video/mp4' !== (string) get_post_mime_type( $sources['mp4_id'] ) ) {
+						return __( 'The MP4 source must be an MP4 video.', 'acf' );
+					}
+					if ( $sources['webm_id'] && 'video/webm' !== (string) get_post_mime_type( $sources['webm_id'] ) ) {
+						return __( 'The WEBM source must be a WEBM video.', 'acf' );
 					}
 				}
 

@@ -1,7 +1,8 @@
 # Responsive Background ACF field
 
 `sp_background_media` is a reusable PHP Kit ACF field for image/video backgrounds with
-responsive variants, per-breakpoint positioning, and solid or gradient overlays.
+responsive variants, per-breakpoint positioning, and solid or gradient overlays. Video
+mode accepts separate MP4 and WEBM sources plus a full-resolution poster image.
 
 ## Field declaration
 
@@ -32,7 +33,11 @@ When the theme exposes `sp_theme_breakpoint()`, breakpoints come from its config
 ```php
 [
 	'desktop' => [
-		'attachment_id' => 123,
+		'media_type'    => 'video',
+		'attachment_id' => 123, // Active compatibility ID.
+		'image_id'      => 0,
+		'mp4_id'        => 123,
+		'webm_id'       => 124,
 		'poster_id'     => 456,
 		'fit'           => 'cover',
 		'position_x'    => 50,
@@ -106,7 +111,9 @@ Place the rendered background as the first child of a positioned container:
 Use `sp_get_background_media( $value )` when normalized structured data is
 needed without HTML. Background images and videos are loaded only for the
 active breakpoint; images retain WordPress responsive `srcset` data. Videos are
-muted and looped. By default they stay on their poster when the visitor
+muted and looped. WEBM is listed first and MP4 is used as the compatibility
+fallback. Existing values that stored one video in `attachment_id` are migrated
+automatically. By default videos stay on their poster when the visitor
 requests reduced motion; pass `respect_reduced_motion => false` to override.
 
 For a text-theme class, `sp_background_media_overlay_color()` returns the solid

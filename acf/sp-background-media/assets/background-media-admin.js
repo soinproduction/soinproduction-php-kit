@@ -22,17 +22,55 @@
 	}
 
 	function previewUrl(attachment) {
-		return attachment.sizes && attachment.sizes.medium ? attachment.sizes.medium.url : attachment.url;
+		return attachment.url || (attachment.sizes && attachment.sizes.full ? attachment.sizes.full.url : '');
 	}
 
-	function emptyMediaPreview() {
+	function emptyMediaPreview(type) {
 		return $('<span>', { class: 'sp-background-field__empty' })
 			.append($('<span>', { class: 'sp-background-field__empty-icon', 'aria-hidden': 'true' }).text('+'))
-			.append($('<span>').text('Select an image or video'));
+			.append($('<span>').text(type === 'video' ? 'Select MP4 or WEBM video' : 'Select an image'));
 	}
 
 	function emptyPosterPreview() {
-		return $('<span>').text('Optional poster image');
+		return $('<span>').text('Not selected');
+	}
+
+	function panelMediaType($panel) {
+		return $panel.find('[data-sp-background-media-type]').val() === 'video' ? 'video' : 'image';
+	}
+
+	function renderPreview($panel) {
+		var type = panelMediaType($panel);
+		var $preview = $panel.find('[data-sp-background-preview]');
+		var $content = $panel.find('[data-sp-background-preview-content]');
+		var $image = $panel.find('[data-sp-background-image-id]');
+		var $poster = $panel.find('[data-sp-background-poster-id]');
+		var imageId = Number($image.val()) || 0;
+		var mp4Id = Number($panel.find('[data-sp-background-video-id="mp4"]').val()) || 0;
+		var webmId = Number($panel.find('[data-sp-background-video-id="webm"]').val()) || 0;
+		var posterId = Number($poster.val()) || 0;
+		var hasMedia = type === 'video' ? Boolean(mp4Id || webmId) : Boolean(imageId);
+		var visualUrl = type === 'video' ? (posterId ? $poster.attr('data-preview-url') : '') : $image.attr('data-preview-url');
+		var fileNames = ['webm', 'mp4'].map(function (format) {
+			return $panel.find('[data-sp-background-video-id="' + format + '"]').attr('data-file-name') || '';
+		}).filter(Boolean);
+
+		$panel.find('[data-sp-background-media-id]').val(type === 'video' ? (mp4Id || webmId) : imageId);
+		$preview
+			.toggleClass('is-filled', hasMedia)
+			.toggleClass('has-visual', Boolean(hasMedia && visualUrl))
+			.attr('aria-disabled', hasMedia && visualUrl ? 'false' : 'true')
+			.attr('tabindex', hasMedia && visualUrl ? '0' : '-1');
+		$content.empty();
+		if (hasMedia && visualUrl) {
+			$('<img>', { src: visualUrl, alt: '' }).appendTo($content);
+		} else if (type === 'video' && hasMedia) {
+			$('<span>', { class: 'sp-background-field__file' })
+				.append($('<span>', { class: 'sp-background-field__empty-icon', 'aria-hidden': 'true' }).text('▶'))
+				.append($('<span>').text(fileNames.join(' · ') || 'Video selected')).appendTo($content);
+		} else {
+			$content.append(emptyMediaPreview(type));
+		}
 	}
 
 	function hexToRgba(hex, opacity) {
@@ -58,7 +96,11 @@
 		$field.find('[data-sp-background-panel]').each(function () {
 			var $panel = $(this);
 			state[$panel.attr('data-sp-background-panel')] = {
+				media_type: panelMediaType($panel),
 				attachment_id: Number($panel.find('[data-sp-background-media-id]').val()) || 0,
+				image_id: Number($panel.find('[data-sp-background-image-id]').val()) || 0,
+				mp4_id: Number($panel.find('[data-sp-background-video-id="mp4"]').val()) || 0,
+				webm_id: Number($panel.find('[data-sp-background-video-id="webm"]').val()) || 0,
 				poster_id: Number($panel.find('[data-sp-background-poster-id]').val()) || 0,
 				fit: $panel.find('[data-sp-background-fit]:checked').val() || 'cover',
 				position_x: Math.round(clamp($panel.find('[data-sp-background-position="x"]').val(), 0, 100, 50)),
@@ -96,11 +138,12 @@
 	}
 
 	function syncPanel($panel) {
-		var type = $panel.find('[data-sp-background-media-type]').val() || 'image';
+		var type = panelMediaType($panel);
 		var fit = $panel.find('[data-sp-background-fit]:checked').val() || 'cover';
 		var x = Math.round(clamp($panel.find('[data-sp-background-position="x"]').val(), 0, 100, 50));
 		var y = Math.round(clamp($panel.find('[data-sp-background-position="y"]').val(), 0, 100, 50));
-		$panel.find('[data-sp-background-poster-panel]').prop('hidden', type !== 'video');
+		$panel.find('[data-sp-background-video-panel]').prop('hidden', type !== 'video');
+		$panel.find('[data-sp-background-image-actions]').prop('hidden', type !== 'image');
 		$panel.find('[data-sp-background-preview]').css({
 			'--sp-preview-fit': fit,
 			'--sp-preview-x': x + '%',
@@ -109,6 +152,7 @@
 			'--sp-focal-y': y + '%'
 		});
 		$panel.find('[data-sp-background-position-output]').text(x + '% / ' + y + '%');
+		renderPreview($panel);
 		syncState($panel.closest('[data-sp-background-field]'));
 	}
 
@@ -186,32 +230,45 @@
 
 	function updateMedia($panel, attachment) {
 		var $field = $panel.closest('[data-sp-background-field]');
-		var $content = $panel.find('[data-sp-background-preview-content]');
-		var type = attachment.type === 'video' ? 'video' : 'image';
-		$panel.find('[data-sp-background-media-id]').val(attachment.id).trigger('change');
-		$panel.find('[data-sp-background-media-type]').val(type);
+		var $image = $panel.find('[data-sp-background-image-id]');
+		$image.val(attachment.id).attr('data-preview-url', previewUrl(attachment)).trigger('change');
+		$panel.find('[data-sp-background-media-type]').val('image');
+		$panel.find('[data-sp-background-type-choice][value="image"]').prop('checked', true);
 		$panel.find('[data-sp-background-remove]').removeClass('is-hidden');
-		$panel.find('[data-sp-background-select-label]').text('Replace media');
-		$panel.find('[data-sp-background-preview]').addClass('is-filled');
-		$content.empty();
-		if (type === 'image') {
-			$('<img>', { src: previewUrl(attachment), alt: '' }).appendTo($content);
-		} else {
-			$('<span>', { class: 'sp-background-field__file' })
-				.append($('<span>', { class: 'sp-background-field__empty-icon', 'aria-hidden': 'true' }).text('▶'))
-				.append($('<span>').text(attachment.filename || attachment.title || 'Video selected')).appendTo($content);
-		}
+		$panel.find('[data-sp-background-select-label]').text('Replace image');
 		syncPanel($panel);
-		announce($field, (type === 'video' ? 'Video selected: ' : 'Image selected: ') + (attachment.filename || attachment.title || 'media'));
+		announce($field, 'Image selected: ' + (attachment.filename || attachment.title || 'image'));
+	}
+
+	function updateVideo($panel, attachment, format) {
+		var mime = attachment.mime || (attachment.type && attachment.subtype ? attachment.type + '/' + attachment.subtype : '');
+		var expected = format === 'webm' ? 'video/webm' : 'video/mp4';
+		var upper = format.toUpperCase();
+		var $field = $panel.closest('[data-sp-background-field]');
+		if (mime !== expected) {
+			announce($field, 'Please select a ' + upper + ' video.');
+			return;
+		}
+
+		var fileName = attachment.filename || attachment.title || upper + ' video';
+		var $input = $panel.find('[data-sp-background-video-id="' + format + '"]');
+		$input.val(attachment.id).attr('data-file-name', fileName).trigger('change');
+		$panel.find('[data-sp-background-video-status="' + format + '"]').addClass('is-filled').text(fileName);
+		$panel.find('[data-sp-background-video-select="' + format + '"]').text('Replace ' + upper);
+		$panel.find('[data-sp-background-video-remove="' + format + '"]').removeClass('is-hidden');
+		$panel.find('[data-sp-background-media-type]').val('video');
+		$panel.find('[data-sp-background-type-choice][value="video"]').prop('checked', true);
+		syncPanel($panel);
+		announce($field, upper + ' selected: ' + fileName);
 	}
 
 	function updatePoster($panel, attachment) {
 		var $preview = $panel.find('[data-sp-background-poster-preview]');
-		$panel.find('[data-sp-background-poster-id]').val(attachment.id).trigger('change');
+		$panel.find('[data-sp-background-poster-id]').val(attachment.id).attr('data-preview-url', previewUrl(attachment)).trigger('change');
 		$panel.find('[data-sp-background-poster-remove]').removeClass('is-hidden');
 		$panel.find('[data-sp-background-poster-select-label]').text('Replace poster');
 		$preview.addClass('is-filled').empty().append($('<img>', { src: previewUrl(attachment), alt: '' }));
-		syncState($panel.closest('[data-sp-background-field]'));
+		syncPanel($panel);
 	}
 
 	$(document).on('click', '[data-sp-background-tab]', function (event) {
@@ -228,11 +285,10 @@
 	$(document).on('click', '[data-sp-background-select]', function (event) {
 		event.preventDefault();
 		var $panel = $(this).closest('[data-sp-background-panel]');
-		var allowVideo = $panel.closest('[data-sp-background-field]').attr('data-allow-video') !== 'false';
 		var frame = wp.media({
-			title: allowVideo ? 'Select background image or video' : 'Select background image',
+			title: 'Select background image',
 			button: { text: 'Use as background' },
-			library: { type: allowVideo ? ['image', 'video'] : 'image' },
+			library: { type: 'image' },
 			multiple: false
 		});
 		frame.on('select', function () { updateMedia($panel, frame.state().get('selection').first().toJSON()); });
@@ -242,14 +298,39 @@
 	$(document).on('click', '[data-sp-background-remove]', function (event) {
 		event.preventDefault();
 		var $panel = $(this).closest('[data-sp-background-panel]');
-		$panel.find('[data-sp-background-media-id], [data-sp-background-poster-id]').val('');
-		$panel.find('[data-sp-background-media-type]').val('image');
-		$panel.find('[data-sp-background-preview]').removeClass('is-filled');
-		$panel.find('[data-sp-background-preview-content]').empty().append(emptyMediaPreview());
-		$panel.find('[data-sp-background-select-label]').text('Select media');
-		$panel.find('[data-sp-background-remove], [data-sp-background-poster-remove]').addClass('is-hidden');
-		$panel.find('[data-sp-background-poster-preview]').removeClass('is-filled').empty().append(emptyPosterPreview());
-		$panel.find('[data-sp-background-poster-select-label]').text('Select poster');
+		$panel.find('[data-sp-background-image-id]').val('').attr('data-preview-url', '');
+		$panel.find('[data-sp-background-select-label]').text('Select image');
+		$(this).addClass('is-hidden');
+		syncPanel($panel);
+	});
+
+	$(document).on('change', '[data-sp-background-type-choice]', function () {
+		var $panel = $(this).closest('[data-sp-background-panel]');
+		$panel.find('[data-sp-background-media-type]').val($(this).val());
+		syncPanel($panel);
+	});
+
+	$(document).on('click', '[data-sp-background-video-select]', function (event) {
+		event.preventDefault();
+		var $button = $(this);
+		var $panel = $button.closest('[data-sp-background-panel]');
+		var format = $button.attr('data-sp-background-video-select') === 'webm' ? 'webm' : 'mp4';
+		var upper = format.toUpperCase();
+		var frame = wp.media({ title: 'Select ' + upper + ' background video', button: { text: 'Use ' + upper }, library: { type: 'video' }, multiple: false });
+		frame.on('select', function () { updateVideo($panel, frame.state().get('selection').first().toJSON(), format); });
+		frame.open();
+	});
+
+	$(document).on('click', '[data-sp-background-video-remove]', function (event) {
+		event.preventDefault();
+		var $button = $(this);
+		var $panel = $button.closest('[data-sp-background-panel]');
+		var format = $button.attr('data-sp-background-video-remove') === 'webm' ? 'webm' : 'mp4';
+		var upper = format.toUpperCase();
+		$panel.find('[data-sp-background-video-id="' + format + '"]').val('').attr('data-file-name', '');
+		$panel.find('[data-sp-background-video-status="' + format + '"]').removeClass('is-filled').text('Not selected');
+		$panel.find('[data-sp-background-video-select="' + format + '"]').text('Select ' + upper);
+		$button.addClass('is-hidden');
 		syncPanel($panel);
 	});
 
@@ -264,11 +345,11 @@
 	$(document).on('click', '[data-sp-background-poster-remove]', function (event) {
 		event.preventDefault();
 		var $panel = $(this).closest('[data-sp-background-panel]');
-		$panel.find('[data-sp-background-poster-id]').val('');
+		$panel.find('[data-sp-background-poster-id]').val('').attr('data-preview-url', '');
 		$panel.find('[data-sp-background-poster-preview]').removeClass('is-filled').empty().append(emptyPosterPreview());
 		$panel.find('[data-sp-background-poster-select-label]').text('Select poster');
 		$(this).addClass('is-hidden');
-		syncState($panel.closest('[data-sp-background-field]'));
+		syncPanel($panel);
 	});
 
 	$(document).on('change', '[data-sp-background-fit]', function () { syncPanel($(this).closest('[data-sp-background-panel]')); });
@@ -278,6 +359,7 @@
 	});
 
 	$(document).on('pointerdown', '[data-sp-background-focal-surface]', function (event) {
+		if (!$(this).hasClass('has-visual')) { return; }
 		event.preventDefault();
 		this.setPointerCapture(event.originalEvent.pointerId);
 		$(this).attr('data-dragging', 'true');
@@ -286,6 +368,7 @@
 	$(document).on('pointermove', '[data-sp-background-focal-surface][data-dragging="true"]', function (event) { updateFocalFromEvent($(this), event.originalEvent); });
 	$(document).on('pointerup pointercancel', '[data-sp-background-focal-surface]', function () { $(this).removeAttr('data-dragging'); });
 	$(document).on('keydown', '[data-sp-background-focal-surface]', function (event) {
+		if (!$(this).hasClass('has-visual')) { return; }
 		var movement = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[event.key];
 		if (!movement) { return; }
 		event.preventDefault();

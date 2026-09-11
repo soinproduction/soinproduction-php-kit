@@ -33,11 +33,17 @@
 	}
 
 	function activateVideo(video, shouldPlay) {
-		var source = video.querySelector('source[data-src]');
+		var sources = Array.prototype.slice.call(video.querySelectorAll('source[data-src]'));
+		var needsLoad = false;
 		video.muted = true;
 
-		if (source && !source.getAttribute('src')) {
-			source.setAttribute('src', source.getAttribute('data-src'));
+		sources.forEach(function (source) {
+			if (!source.getAttribute('src')) {
+				source.setAttribute('src', source.getAttribute('data-src'));
+				needsLoad = true;
+			}
+		});
+		if (needsLoad) {
 			video.load();
 		}
 

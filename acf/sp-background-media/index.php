@@ -104,27 +104,63 @@
 	}
 
 	/**
+	 * Resolve the active image/video IDs and transparently migrate the former
+	 * single attachment_id shape.
+	 */
+	function sp_background_media_variant_source_ids( mixed $value ): array {
+		$value         = is_array( $value ) ? $value : [];
+		$attachment_id = absint( $value['attachment_id'] ?? 0 );
+		$legacy_mime   = $attachment_id ? (string) get_post_mime_type( $attachment_id ) : '';
+		$explicit_type = sanitize_key( (string) ( $value['media_type'] ?? '' ) );
+		$media_type    = in_array( $explicit_type, [ 'image', 'video' ], true )
+			? $explicit_type
+			: ( str_starts_with( $legacy_mime, 'video/' ) ? 'video' : 'image' );
+		$image_id = absint( $value['image_id'] ?? 0 );
+		$mp4_id   = absint( $value['mp4_id'] ?? 0 );
+		$webm_id  = absint( $value['webm_id'] ?? 0 );
+
+		if ( ! $image_id && str_starts_with( $legacy_mime, 'image/' ) ) {
+			$image_id = $attachment_id;
+		}
+		if ( ! $mp4_id && 'video/mp4' === $legacy_mime ) {
+			$mp4_id = $attachment_id;
+		}
+		if ( ! $webm_id && 'video/webm' === $legacy_mime ) {
+			$webm_id = $attachment_id;
+		}
+
+		return [
+			'media_type'   => $media_type,
+			'image_id'     => $image_id,
+			'mp4_id'       => $mp4_id,
+			'webm_id'      => $webm_id,
+			'poster_id'    => absint( $value['poster_id'] ?? 0 ),
+			'attachment_id' => 'video' === $media_type ? ( $mp4_id ?: $webm_id ) : $image_id,
+		];
+	}
+
+	/**
 	 * Normalize one responsive background variant, inheriting missing media.
 	 */
 	function sp_background_media_normalize_variant( mixed $value, array $fallback = [] ): array {
-		$value         = is_array( $value ) ? $value : [];
-		$attachment_id = absint( $value['attachment_id'] ?? 0 );
-		$inherited     = false;
+		$value     = is_array( $value ) ? $value : [];
+		$sources   = sp_background_media_variant_source_ids( $value );
+		$inherited = false;
 
-		if ( ! $attachment_id && ! empty( $fallback['attachment_id'] ) ) {
-			$attachment_id = absint( $fallback['attachment_id'] );
-			$inherited     = true;
+		if ( ! $sources['attachment_id'] && [] !== $fallback ) {
+			$sources   = sp_background_media_variant_source_ids( $fallback );
+			$inherited = ! empty( $sources['attachment_id'] );
 		}
 
-		if ( ! $attachment_id ) {
+		if ( ! $sources['attachment_id'] ) {
 			return [];
 		}
 
-		$url  = wp_get_attachment_url( $attachment_id );
-		$mime = (string) get_post_mime_type( $attachment_id );
-		$type = str_starts_with( $mime, 'video/' ) ? 'video' : ( str_starts_with( $mime, 'image/' ) ? 'image' : '' );
-
-		if ( ! $url || '' === $type ) {
+		$type = $sources['media_type'];
+		if ( 'image' === $type && 'image/' !== substr( (string) get_post_mime_type( $sources['image_id'] ), 0, 6 ) ) {
+			return [];
+		}
+		if ( 'video' === $type && ! $sources['mp4_id'] && ! $sources['webm_id'] ) {
 			return [];
 		}
 
@@ -144,19 +180,47 @@
 			50
 		);
 
-		$poster_id = $inherited
-			? absint( $fallback['poster_id'] ?? 0 )
-			: absint( $value['poster_id'] ?? 0 );
+		$poster_id = absint( $sources['poster_id'] );
 		$poster_url = $poster_id && str_starts_with( (string) get_post_mime_type( $poster_id ), 'image/' )
 			? wp_get_attachment_image_url( $poster_id, 'full' )
 			: '';
+		$video_sources = [];
+		foreach ( [ 'webm_id' => 'video/webm', 'mp4_id' => 'video/mp4' ] as $id_key => $expected_mime ) {
+			$source_id = absint( $sources[ $id_key ] );
+			if ( ! $source_id || $expected_mime !== (string) get_post_mime_type( $source_id ) ) {
+				continue;
+			}
+			$source_url = wp_get_attachment_url( $source_id );
+			if ( $source_url ) {
+				$video_sources[] = [
+					'attachment_id' => $source_id,
+					'url'           => $source_url,
+					'mime_type'     => $expected_mime,
+				];
+			}
+		}
+		if ( 'video' === $type && [] === $video_sources ) {
+			return [];
+		}
+
+		$attachment_id = absint( $sources['attachment_id'] );
+		$url = 'image' === $type
+			? wp_get_attachment_url( $sources['image_id'] )
+			: ( $video_sources[0]['url'] ?? '' );
+		$mime = 'image' === $type
+			? (string) get_post_mime_type( $sources['image_id'] )
+			: ( $video_sources[0]['mime_type'] ?? '' );
 
 		return [
 			'attachment_id' => $attachment_id,
+			'image_id'      => absint( $sources['image_id'] ),
+			'mp4_id'        => absint( $sources['mp4_id'] ),
+			'webm_id'       => absint( $sources['webm_id'] ),
 			'poster_id'     => $poster_id,
 			'poster_url'    => is_string( $poster_url ) ? $poster_url : '',
 			'url'           => $url,
 			'mime_type'     => $mime,
+			'video_sources' => $video_sources,
 			'media_type'    => $type,
 			'fit'           => $fit,
 			'position_x'    => $position_x,
@@ -372,9 +436,11 @@
 			} else {
 				echo '<video class="sp-background-media__asset sp-background-media__video" data-sp-background-video'
 					. ( $variant['poster_url'] ? ' poster="' . esc_url( $variant['poster_url'] ) . '"' : '' )
-					. ' muted loop playsinline preload="none">'
-					. '<source data-src="' . esc_url( $variant['url'] ) . '" type="' . esc_attr( $variant['mime_type'] ) . '">'
-					. '</video>';
+					. ' muted loop playsinline preload="none">';
+				foreach ( $variant['video_sources'] as $source ) {
+					echo '<source data-src="' . esc_url( $source['url'] ) . '" type="' . esc_attr( $source['mime_type'] ) . '">';
+				}
+				echo '</video>';
 			}
 
 			echo '</div>';
