@@ -20,7 +20,9 @@
 
 Для вывода используйте `display_background_media( $value )`, для нормализованных данных — `sp_get_background_media( $value )`, для выбора светлой/тёмной темы текста — `sp_background_media_overlay_color( $value )`.
 
-В video mode WEBM выводится первым, MP4 служит совместимым fallback, а полноразмерный poster показывается до воспроизведения и при `prefers-reduced-motion`. Старые значения с одним video attachment мигрируют автоматически.
+Если все responsive-варианты — изображения, браузер выбирает их нативно из одного `<picture>` с `<source media>` для Mobile и Tablet. Video/mixed-варианты выводятся отдельными слоями и переключаются CSS media queries. Frontend-JavaScript для этого поля не подключается.
+
+В video mode WEBM выводится первым, MP4 служит совместимым fallback, видео использует нативный muted autoplay, а полноразмерный poster показывается при `prefers-reduced-motion` средствами CSS. Старые значения с одним video attachment мигрируют автоматически.
 
 Если тема определяет `sp_theme_breakpoint()`, модуль использует её breakpoint-конфигурацию. В остальных проектах значения можно передать фильтром `sp_background_media_breakpoints`; fallback — `576px` и `1024px`.
 

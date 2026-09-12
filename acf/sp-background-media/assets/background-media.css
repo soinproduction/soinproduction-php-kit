@@ -17,6 +17,18 @@
 	width: 100%;
 }
 
+.sp-background-media__picture {
+	--sp-background-fit: var(--sp-background-desktop-fit);
+	--sp-background-x: var(--sp-background-desktop-x);
+	--sp-background-y: var(--sp-background-desktop-y);
+
+	display: block;
+	height: 100%;
+	inset: 0;
+	position: absolute;
+	width: 100%;
+}
+
 .sp-background-media__variant--desktop {
 	display: block;
 }
@@ -37,6 +49,10 @@
 	background: transparent;
 }
 
+.sp-background-media__reduced-motion-poster {
+	display: none;
+}
+
 .sp-background-media__overlay {
 	inset: 0;
 	pointer-events: none;
@@ -45,7 +61,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-	.sp-background-media__video {
-		animation: none !important;
+	.sp-background-media--respect-reduced-motion .sp-background-media__video {
+		display: none;
+	}
+
+	.sp-background-media--respect-reduced-motion .sp-background-media__reduced-motion-poster {
+		display: block;
 	}
 }

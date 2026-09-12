@@ -109,12 +109,15 @@ Place the rendered background as the first child of a positioned container:
 ```
 
 Use `sp_get_background_media( $value )` when normalized structured data is
-needed without HTML. Background images and videos are loaded only for the
-active breakpoint; images retain WordPress responsive `srcset` data. Videos are
-muted and looped. WEBM is listed first and MP4 is used as the compatibility
-fallback. Existing values that stored one video in `attachment_id` are migrated
-automatically. By default videos stay on their poster when the visitor
-requests reduced motion; pass `respect_reduced_motion => false` to override.
+needed without HTML. When all variants are images, the browser selects them
+natively from one `<picture>` with breakpoint-specific `<source media>` and
+WordPress `srcset` data. Video and mixed variants are rendered as separate
+breakpoint layers and switched by CSS media queries; no frontend JavaScript is
+loaded by this field. Videos use native muted autoplay and looping. WEBM is
+listed first and MP4 is used as the compatibility fallback. Existing values
+that stored one video in `attachment_id` are migrated automatically. By default
+CSS replaces videos with their poster when the visitor requests reduced motion;
+pass `respect_reduced_motion => false` to override.
 
 For a text-theme class, `sp_background_media_overlay_color()` returns the solid
 overlay color or the interpolated gradient color at a requested position:

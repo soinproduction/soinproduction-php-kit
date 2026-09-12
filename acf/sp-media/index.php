@@ -133,11 +133,113 @@
         }
     }
 
+    if (! function_exists('sp_universal_media_breakpoint_config')) {
+        /**
+         * Match the three semantic ranges used by SP Background Media.
+         */
+        function sp_universal_media_breakpoint_config(): array
+        {
+            $configured = apply_filters('sp_universal_media_breakpoints', [
+                    'mobile' => 576,
+                    'tablet' => 1024,
+            ]);
+            $configured = is_array($configured) ? $configured : [];
+            $mobile = function_exists('sp_theme_breakpoint')
+                    ? (float) sp_theme_breakpoint('mobile')
+                    : (is_numeric($configured['mobile'] ?? null) ? (float) $configured['mobile'] : 576.0);
+            $tablet = function_exists('sp_theme_breakpoint')
+                    ? (float) sp_theme_breakpoint('tablet')
+                    : (is_numeric($configured['tablet'] ?? null) ? (float) $configured['tablet'] : 1024.0);
+            $mobile = max(1, $mobile);
+            $tablet = max($mobile + 0.02, $tablet);
+
+            return [
+                    'desktop' => ['min' => $tablet, 'max' => null],
+                    'tablet'  => ['min' => $mobile, 'max' => $tablet - 0.02],
+                    'mobile'  => ['min' => null, 'max' => $mobile - 0.02],
+            ];
+        }
+    }
+
+    if (! function_exists('sp_universal_media_breakpoint_definitions')) {
+        function sp_universal_media_breakpoint_definitions(): array
+        {
+            return [
+                    'desktop' => ['label' => __('Desktop', 'wardlaw')],
+                    'tablet'  => ['label' => __('Tablet', 'wardlaw')],
+                    'mobile'  => ['label' => __('Mobile', 'wardlaw')],
+            ];
+        }
+    }
+
+    if (! function_exists('sp_universal_media_is_responsive_value')) {
+        function sp_universal_media_is_responsive_value($value): bool
+        {
+            return is_array($value)
+                   && (array_key_exists('desktop', $value) || array_key_exists('tablet', $value) || array_key_exists('mobile', $value));
+        }
+    }
+
+    if (! function_exists('sp_universal_media_responsive_variants')) {
+        /**
+         * Normalize Desktop, then inherit it through Tablet and Mobile.
+         */
+        function sp_universal_media_responsive_variants(array $value): array
+        {
+            $desktop = sp_get_universal_media($value['desktop'] ?? []);
+
+            if ($desktop === []) {
+                return [];
+            }
+
+            $tablet = sp_get_universal_media($value['tablet'] ?? []);
+            $tablet = $tablet !== [] ? $tablet : $desktop;
+            $mobile = sp_get_universal_media($value['mobile'] ?? []);
+            $mobile = $mobile !== [] ? $mobile : $tablet;
+
+            return compact('desktop', 'tablet', 'mobile');
+        }
+    }
+
+    if (! function_exists('sp_universal_media_responsive_values')) {
+        /**
+         * Resolve empty Tablet/Mobile values to the closest wider raw value.
+         */
+        function sp_universal_media_responsive_values(array $value): array
+        {
+            $desktop = is_array($value['desktop'] ?? null) ? $value['desktop'] : [];
+
+            if (sp_get_universal_media($desktop) === []) {
+                return [];
+            }
+
+            $tablet_value = is_array($value['tablet'] ?? null) ? $value['tablet'] : [];
+            $tablet = sp_get_universal_media($tablet_value) !== [] ? $tablet_value : $desktop;
+            $mobile_value = is_array($value['mobile'] ?? null) ? $value['mobile'] : [];
+            $mobile = sp_get_universal_media($mobile_value) !== [] ? $mobile_value : $tablet;
+
+            return compact('desktop', 'tablet', 'mobile');
+        }
+    }
+
     if (! function_exists('sp_get_universal_media')) {
         function sp_get_universal_media($value): array
         {
             if (! is_array($value)) {
                 return [];
+            }
+
+            if (sp_universal_media_is_responsive_value($value)) {
+                $variants = sp_universal_media_responsive_variants($value);
+
+                if ($variants === []) {
+                    return [];
+                }
+
+                return array_merge($variants['desktop'], [
+                        'responsive'  => true,
+                        'breakpoints' => $variants,
+                ]);
             }
 
             $source  = sanitize_key((string) ($value['source'] ?? 'library'));
@@ -194,12 +296,127 @@
 
     if (! function_exists('display_universal_media')) {
         /**
+         * Render responsive library images with native browser source selection.
+         */
+        function sp_display_universal_media_picture(array $variants, array $args = []): void
+        {
+            $args = wp_parse_args($args, [
+                    'class'   => '',
+                    'loading' => 'lazy',
+            ]);
+            $desktop = $variants['desktop'];
+            $config  = sp_universal_media_breakpoint_config();
+            $extra_classes = preg_split('/\s+/', trim((string) $args['class'])) ?: [];
+            $extra_classes = array_filter(array_map('sanitize_html_class', $extra_classes));
+            $class = trim('universal-media ' . implode(' ', $extra_classes));
+            $picture = static function (string $picture_class, string $image_class) use ($variants, $config, $args): void {
+                echo '<picture class="' . esc_attr($picture_class) . '">';
+
+                foreach (['mobile', 'tablet'] as $breakpoint) {
+                    $variant = $variants[$breakpoint];
+                    $srcset  = wp_get_attachment_image_srcset($variant['attachment_id'], 'full');
+                    $srcset  = $srcset ?: wp_get_attachment_image_url($variant['attachment_id'], 'full');
+                    $sizes   = wp_get_attachment_image_sizes($variant['attachment_id'], 'full');
+
+                    if (! $srcset) {
+                        continue;
+                    }
+
+                    echo '<source media="(max-width: ' . esc_attr((string) $config[$breakpoint]['max']) . 'px)"'
+                         . ' srcset="' . esc_attr($srcset) . '"'
+                         . ($sizes ? ' sizes="' . esc_attr($sizes) . '"' : '') . '>';
+                }
+
+                echo wp_get_attachment_image($variants['desktop']['attachment_id'], 'full', false, [
+                        'class'   => $image_class,
+                        'loading' => $args['loading'] === 'eager' ? 'eager' : 'lazy',
+                ]);
+                echo '</picture>';
+            };
+
+            if ($desktop['display'] === 'background') {
+                $picture(trim($class . ' universal-media--background'), 'universal-media__background-item universal-media__image');
+                return;
+            }
+
+            if ($desktop['display'] === 'fancybox') {
+                $fancybox_id = 'universal-media-' . wp_unique_id();
+                echo '<a class="' . esc_attr($class . ' universal-media--trigger') . '"'
+                     . ' href="' . esc_url($desktop['url']) . '" data-fancybox="' . esc_attr($fancybox_id) . '">';
+                $picture('universal-media__picture', 'universal-media__image');
+                echo '</a>';
+                return;
+            }
+
+            $picture($class, 'universal-media__image');
+        }
+
+        /**
+         * Render video/embed or mixed breakpoint values with CSS-only switching.
+         */
+        function sp_display_universal_media_responsive_values(array $values, array $args = []): void
+        {
+            $config = sp_universal_media_breakpoint_config();
+            $wrapper_id = wp_unique_id('sp-universal-media-responsive-');
+            $extra_classes = preg_split('/\s+/', trim((string) ($args['class'] ?? ''))) ?: [];
+            $extra_classes = array_filter(array_map('sanitize_html_class', $extra_classes));
+            $wrapper_class = trim('universal-media-responsive ' . implode(' ', $extra_classes));
+            $child_args = $args;
+            $child_args['class'] = '';
+
+            echo '<div id="' . esc_attr($wrapper_id) . '" class="' . esc_attr($wrapper_class) . '">';
+            echo '<style>'
+                 . '#' . esc_attr($wrapper_id) . '>.universal-media-responsive__variant{display:none}'
+                 . '#' . esc_attr($wrapper_id) . '>.universal-media-responsive__variant--desktop{display:block}'
+                 . '@media(max-width:' . esc_attr((string) $config['tablet']['max']) . 'px){'
+                 . '#' . esc_attr($wrapper_id) . '>.universal-media-responsive__variant--desktop{display:none}'
+                 . '#' . esc_attr($wrapper_id) . '>.universal-media-responsive__variant--tablet{display:block}'
+                 . '}'
+                 . '@media(max-width:' . esc_attr((string) $config['mobile']['max']) . 'px){'
+                 . '#' . esc_attr($wrapper_id) . '>.universal-media-responsive__variant--tablet{display:none}'
+                 . '#' . esc_attr($wrapper_id) . '>.universal-media-responsive__variant--mobile{display:block}'
+                 . '}'
+                 . '</style>';
+
+            foreach (['desktop', 'tablet', 'mobile'] as $breakpoint) {
+                echo '<div class="universal-media-responsive__variant universal-media-responsive__variant--' . esc_attr($breakpoint) . '">';
+                display_universal_media($values[$breakpoint], $child_args);
+                echo '</div>';
+            }
+
+            echo '</div>';
+        }
+
+        /**
          * Render the Universal Media ACF field value.
          *
          * Example: display_universal_media(get_sub_field('media'), ['class' => 'hero__media']);
          */
         function display_universal_media($value, array $args = []): void
         {
+            if (sp_universal_media_is_responsive_value($value)) {
+                $variants = sp_universal_media_responsive_variants($value);
+
+                if ($variants === []) {
+                    return;
+                }
+
+                $all_images = count(array_filter($variants, static function (array $variant): bool {
+                    return $variant['source'] === 'library' && $variant['media_type'] === 'image';
+                })) === count($variants);
+
+                if ($all_images) {
+                    sp_display_universal_media_picture($variants, $args);
+                    return;
+                }
+
+                $responsive_values = sp_universal_media_responsive_values($value);
+                if ($responsive_values !== []) {
+                    sp_display_universal_media_responsive_values($responsive_values, $args);
+                }
+                return;
+            }
+
             $media = sp_get_universal_media($value);
 
             if (empty($media)) {
@@ -367,6 +584,7 @@
                 $this->defaults = [
                         'sources'  => ['library', 'youtube', 'vimeo'],
                         'displays' => ['inline', 'fancybox', 'background'],
+                        'responsive' => 0,
                 ];
             }
 
@@ -397,9 +615,70 @@
                         ],
                         'layout'       => 'horizontal',
                 ]);
+
+                acf_render_field_setting($field, [
+                        'label'        => __('Responsive Media', 'wardlaw'),
+                        'instructions' => '',
+                        'type'         => 'true_false',
+                        'name'         => 'responsive',
+                        'ui'           => 1,
+                        'default_value' => 0,
+                ]);
             }
 
             public function render_field($field): void
+            {
+                $responsive = ! empty($field['responsive']);
+
+                if (! $responsive) {
+                    $this->render_media_variant($field);
+                    return;
+                }
+
+                $value       = is_array($field['value']) ? $field['value'] : [];
+                $definitions = sp_universal_media_breakpoint_definitions();
+                $variants    = sp_universal_media_is_responsive_value($value)
+                        ? $value
+                        : ['desktop' => $value];
+                $instance_id = wp_unique_id('sp-universal-media-responsive-');
+                ?>
+                <div class="sp-universal-media-responsive" data-sp-universal-media-breakpoints>
+                    <div class="sp-universal-media-responsive__tabs" role="tablist" aria-label="<?php esc_attr_e('Media breakpoint', 'wardlaw'); ?>">
+                        <?php $tab_index = 0; ?>
+                        <?php foreach ($definitions as $breakpoint => $definition) : ?>
+                            <button type="button"
+                                    id="<?php echo esc_attr($instance_id . '-tab-' . $breakpoint); ?>"
+                                    class="sp-universal-media-responsive__tab<?php echo $tab_index === 0 ? ' is-active' : ''; ?>"
+                                    role="tab"
+                                    aria-selected="<?php echo $tab_index === 0 ? 'true' : 'false'; ?>"
+                                    aria-controls="<?php echo esc_attr($instance_id . '-panel-' . $breakpoint); ?>"
+                                    data-sp-universal-media-breakpoint-tab="<?php echo esc_attr($breakpoint); ?>">
+                                <span><?php echo esc_html($definition['label']); ?></span>
+                            </button>
+                            <?php $tab_index++; ?>
+                        <?php endforeach; ?>
+                    </div>
+
+                    <?php $panel_index = 0; ?>
+                    <?php foreach ($definitions as $breakpoint => $definition) :
+                        $variant_field = $field;
+                        $variant_field['name'] = $field['name'] . '[' . $breakpoint . ']';
+                        $variant_field['value'] = is_array($variants[$breakpoint] ?? null) ? $variants[$breakpoint] : [];
+                        ?>
+                        <div id="<?php echo esc_attr($instance_id . '-panel-' . $breakpoint); ?>"
+                             class="sp-universal-media-responsive__panel"
+                             role="tabpanel"
+                             aria-labelledby="<?php echo esc_attr($instance_id . '-tab-' . $breakpoint); ?>"
+                             data-sp-universal-media-breakpoint-panel="<?php echo esc_attr($breakpoint); ?>"<?php echo $panel_index === 0 ? '' : ' hidden'; ?>>
+                            <?php $this->render_media_variant($variant_field); ?>
+                        </div>
+                        <?php $panel_index++; ?>
+                    <?php endforeach; ?>
+                </div>
+                <?php
+            }
+
+            private function render_media_variant($field): void
             {
                 $value         = is_array($field['value']) ? $field['value'] : [];
                 $sources       = ! empty($field['sources']) ? (array) $field['sources'] : ['library', 'youtube', 'vimeo'];
@@ -424,11 +703,12 @@
                 $poster_url    = $poster_id ? wp_get_attachment_image_url($poster_id, 'full') : '';
                 $playback      = sp_universal_media_settings($value);
                 $display_name  = $field['name'] . '[display]';
+                $image_only    = ! empty($field['image_only']);
                 $has_sources   = count($sources) > 1;
                 $has_displays  = count($displays) > 1;
                 $tabs_class    = $has_sources && $has_displays ? ' has-two-groups' : ' has-one-group';
                 ?>
-				<div class="sp-universal-media sp-admin-component sp-acf-component" data-sp-universal-media data-sp-admin-component="universal-media" aria-busy="false">
+					<div class="sp-universal-media sp-admin-component sp-acf-component" data-sp-universal-media data-sp-admin-component="universal-media" data-sp-media-image-only="<?php echo $image_only ? 'true' : 'false'; ?>" aria-busy="false">
 					<input type="hidden" name="<?php echo esc_attr($field['name']); ?>[source]" value="<?php echo esc_attr($source); ?>" data-sp-media-source>
 					<span class="screen-reader-text" data-sp-media-status aria-live="polite" aria-atomic="true"></span>
 
@@ -496,7 +776,7 @@
                             <?php else : ?>
                                 <span class="sp-universal-media__empty">
 									<span class="dashicons dashicons-upload" aria-hidden="true"></span>
-								<span><?php esc_html_e('Image or video from Media Library', 'wardlaw'); ?></span>
+									<span><?php echo $image_only ? esc_html__('Image from Media Library', 'wardlaw') : esc_html__('Image or video from Media Library', 'wardlaw'); ?></span>
 							</span>
                             <?php endif; ?>
                         </div>
@@ -568,6 +848,25 @@
             public function update_value($value, $post_id, $field)
             {
                 $value   = is_array($value) ? $value : [];
+
+                if (! empty($field['responsive']) && sp_universal_media_is_responsive_value($value)) {
+                    $clean = [];
+
+                    foreach (sp_universal_media_breakpoint_definitions() as $breakpoint => $definition) {
+                        $variant = $this->update_value(
+                                $value[$breakpoint] ?? [],
+                                $post_id,
+                                array_merge($field, ['responsive' => 0])
+                        );
+
+                        if (is_array($variant) && $variant !== []) {
+                            $clean[$breakpoint] = $variant;
+                        }
+                    }
+
+                    return $clean;
+                }
+
                 $source  = sanitize_key((string) ($value['source'] ?? 'library'));
                 $display = sanitize_key((string) ($value['display'] ?? 'inline'));
                 $display = in_array($display, ['inline', 'fancybox', 'background'], true) ? $display : 'inline';
@@ -605,6 +904,46 @@
                 }
 
                 $value  = is_array($value) ? $value : [];
+
+                if (! empty($field['responsive']) && sp_universal_media_is_responsive_value($value)) {
+                    $has_responsive_media = false;
+                    foreach (['desktop', 'tablet', 'mobile'] as $candidate) {
+                        $candidate_value = is_array($value[$candidate] ?? null) ? $value[$candidate] : [];
+                        $has_responsive_media = $has_responsive_media
+                                                || absint($candidate_value['attachment_id'] ?? 0) > 0
+                                                || ! empty($candidate_value['url']);
+                    }
+
+                    $desktop_value = is_array($value['desktop'] ?? null) ? $value['desktop'] : [];
+                    $has_desktop = absint($desktop_value['attachment_id'] ?? 0) > 0 || ! empty($desktop_value['url']);
+                    if ($has_responsive_media && ! $has_desktop) {
+                        return __('Please select Desktop media as the responsive fallback.', 'wardlaw');
+                    }
+
+                    foreach (sp_universal_media_breakpoint_definitions() as $breakpoint => $definition) {
+                        $variant_field = $field;
+                        $variant_field['responsive'] = 0;
+                        $variant_field['required'] = $breakpoint === 'desktop' ? ! empty($field['required']) : 0;
+                        $variant_valid = $this->validate_value(
+                                true,
+                                $value[$breakpoint] ?? [],
+                                $variant_field,
+                                $input
+                        );
+
+                        if ($variant_valid !== true) {
+                            return sprintf(
+                                    __('%1$s breakpoint: %2$s', 'wardlaw'),
+                                    (string) ($definition['label'] ?? $breakpoint),
+                                    (string) $variant_valid
+                            );
+                        }
+
+                    }
+
+                    return true;
+                }
+
                 $source = sanitize_key((string) ($value['source'] ?? 'library'));
                 $poster_id = absint($value['poster_id'] ?? 0);
 
@@ -655,8 +994,74 @@
             public function input_admin_head(): void
             {
                 ?>
-				<style id="sp-acf-universal-media-css">
-					.sp-universal-media {
+					<style id="sp-acf-universal-media-css">
+							.sp-universal-media-responsive {
+								--sp-media-responsive-accent: var(--sp-acf-accent, #3858e9);
+								--sp-media-responsive-border: var(--sp-acf-border, #d4d9e2);
+								--sp-media-responsive-muted: var(--sp-acf-text-2, #667085);
+								background: var(--sp-acf-surface, #fff);
+								border: 1px solid var(--sp-media-responsive-border);
+								box-shadow: 0 1px 2px rgb(16 24 40 / 4%);
+								box-sizing: border-box;
+							max-width: 100%;
+							min-width: 0;
+							overflow: hidden;
+							width: 100%;
+						}
+
+							.sp-universal-media-responsive__tabs {
+								background: #edf0f5;
+								border-bottom: 1px solid var(--sp-media-responsive-border);
+								display: grid;
+								gap: 4px;
+								grid-template-columns: repeat(3, minmax(0, 1fr));
+								padding: 5px;
+								width: 100%;
+							}
+
+						.sp-universal-media-responsive__tab {
+								appearance: none;
+								background: transparent;
+								border: 0;
+								color: var(--sp-media-responsive-muted);
+								cursor: pointer;
+								font-size: 13px;
+								font-weight: 650;
+								min-height: 38px;
+								padding: 7px 14px;
+								white-space: nowrap;
+								width: 100%;
+							}
+
+							.sp-universal-media-responsive__tab:hover { color: var(--sp-media-responsive-accent); }
+
+							.sp-universal-media-responsive__tab.is-active {
+								background: #fff;
+								box-shadow: 0 1px 3px rgb(16 24 40 / 12%);
+								color: var(--sp-media-responsive-accent);
+						}
+
+						.sp-universal-media-responsive__tab:focus-visible {
+							box-shadow: var(--sp-acf-focus, 0 0 0 2px #3858e9);
+							outline: 0;
+							position: relative;
+							z-index: 1;
+						}
+
+							.sp-universal-media-responsive__panel {
+								padding: 18px;
+							}
+
+						.sp-universal-media-responsive__panel[hidden] {
+							display: none !important;
+						}
+
+						.sp-universal-media-responsive__panel > .sp-universal-media {
+							border: 0;
+							box-shadow: none;
+						}
+
+						.sp-universal-media {
 						--sp-media-border: var(--sp-acf-border, #d0d5dd);
 						--sp-media-brand: var(--sp-acf-accent, #3858e9);
 						--sp-media-soft: var(--sp-acf-surface-soft, #f7f8fc);
@@ -1314,10 +1719,11 @@
                             $field.find('[data-sp-poster-empty]').text(isUploadedVideo ? 'Required cover image' : 'Optional cover image');
                         }
 
-						function emptyPreview() {
+						function emptyPreview($field) {
+							var imageOnly = $field && $field.attr('data-sp-media-image-only') === 'true';
 							return $('<span>', {'class': 'sp-universal-media__empty'})
 								.append($('<span>', {'class': 'dashicons dashicons-upload', 'aria-hidden': 'true'}))
-								.append($('<span>').text('Image or video from Media Library'));
+								.append($('<span>').text(imageOnly ? 'Image from Media Library' : 'Image or video from Media Library'));
                         }
 
                         function updatePreview($field, attachment) {
@@ -1351,8 +1757,30 @@
                             $field.find('[data-sp-poster-remove]').removeClass('is-hidden');
 							$field.find('[data-sp-poster-select]').text('Replace cover');
 							$preview.addClass('is-filled').empty().append($('<img>', {src: previewUrl, alt: ''}));
-							announce($field, 'Cover image selected: ' + (attachment.filename || attachment.title || 'image'));
+								announce($field, 'Cover image selected: ' + (attachment.filename || attachment.title || 'image'));
                         }
+
+							function activateBreakpoint($wrapper, breakpoint) {
+								$wrapper.find('[data-sp-universal-media-breakpoint-tab]').each(function () {
+									var active = $(this).data('sp-universal-media-breakpoint-tab') === breakpoint;
+									$(this)
+										.toggleClass('is-active', active)
+										.attr('aria-selected', active ? 'true' : 'false');
+								});
+
+								$wrapper.find('[data-sp-universal-media-breakpoint-panel]').each(function () {
+									$(this).prop('hidden', $(this).data('sp-universal-media-breakpoint-panel') !== breakpoint);
+								});
+							}
+
+							$(document).on('click', '[data-sp-universal-media-breakpoint-tab]', function (event) {
+								event.preventDefault();
+
+								activateBreakpoint(
+									$(this).closest('[data-sp-universal-media-breakpoints]'),
+									$(this).data('sp-universal-media-breakpoint-tab')
+								);
+							});
 
                         $(document).on('click', '[data-sp-media-source-option]', function (event) {
                             event.preventDefault();
@@ -1367,10 +1795,11 @@
 
 							var $control = $(this);
 							var $field = $(this).closest('[data-sp-universal-media]');
+                            var imageOnly = $field.attr('data-sp-media-image-only') === 'true';
                             var frame = wp.media({
-                                title: 'Select image or video',
+                                title: imageOnly ? 'Select image' : 'Select image or video',
                                 button: {text: 'Use this media'},
-                                library: {type: ['image', 'video']},
+                                library: {type: imageOnly ? 'image' : ['image', 'video']},
                                 multiple: false
                             });
 
@@ -1408,7 +1837,7 @@
                             var $field = $(this).closest('[data-sp-universal-media]');
                             $field.find('[data-sp-media-id]').val('').trigger('change');
                             $field.find('[data-sp-media-type]').val('image');
-                            $field.find('[data-sp-media-preview]').removeClass('is-filled').empty().append(emptyPreview());
+							$field.find('[data-sp-media-preview]').removeClass('is-filled').empty().append(emptyPreview($field));
 							$field.find('[data-sp-media-select]').text('Select media');
 							$(this).addClass('is-hidden');
 							syncField($field);

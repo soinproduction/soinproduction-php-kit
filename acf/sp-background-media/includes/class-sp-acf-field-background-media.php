@@ -54,30 +54,10 @@
 			$allow_video   = ! array_key_exists( 'allow_video', $field ) || ! empty( $field['allow_video'] );
 			$allow_overlay = ! array_key_exists( 'allow_overlay', $field ) || ! empty( $field['allow_overlay'] );
 			$breakpoints   = $responsive ? [ 'desktop', 'tablet', 'mobile' ] : [ 'desktop' ];
-			$config        = sp_background_media_breakpoint_config();
-			$format_px     = static fn( float $number ): string => rtrim( rtrim( number_format( $number, 2, '.', '' ), '0' ), '.' );
 			$labels        = [
 				'desktop' => __( 'Desktop', 'acf' ),
 				'tablet'  => __( 'Tablet', 'acf' ),
 				'mobile'  => __( 'Mobile', 'acf' ),
-			];
-			$hints         = [
-				'desktop' => sprintf(
-					/* translators: %s: minimum viewport width. */
-					__( 'Optional media from %spx and wider.', 'acf' ),
-					$format_px( (float) $config['desktop']['min'] )
-				),
-				'tablet'  => sprintf(
-					/* translators: 1: minimum viewport width, 2: maximum viewport width. */
-					__( '%1$s–%2$spx. Optional media inherits Desktop.', 'acf' ),
-					$format_px( (float) $config['tablet']['min'] ),
-					$format_px( (float) $config['tablet']['max'] )
-				),
-				'mobile'  => sprintf(
-					/* translators: %s: maximum viewport width. */
-					__( 'Up to %spx. Optional media inherits Tablet/Desktop.', 'acf' ),
-					$format_px( (float) $config['mobile']['max'] )
-				),
 			];
 			$this->palette = function_exists( 'color_palette_config' )
 				? array_keys( color_palette_config() )
@@ -118,8 +98,6 @@
 								(string) $field['name'],
 								$breakpoint,
 								$variant,
-								$labels[ $breakpoint ],
-								$hints[ $breakpoint ],
 								0 === $index,
 								$allow_video,
 								$instance_id
@@ -139,8 +117,6 @@
 			string $field_name,
 			string $breakpoint,
 			array $variant,
-			string $label,
-			string $hint,
 			bool $active,
 			bool $allow_video,
 			string $instance_id
@@ -169,11 +145,6 @@
 				role="tabpanel"
 				<?php echo $active ? '' : 'hidden'; ?>
 				data-sp-background-panel="<?php echo esc_attr( $breakpoint ); ?>">
-				<div class="sp-background-field__variant-heading">
-					<strong><?php echo esc_html( $label ); ?></strong>
-					<span><?php echo esc_html( $hint ); ?></span>
-				</div>
-
 				<input type="hidden" name="<?php echo esc_attr( $name . '[attachment_id]' ); ?>" value="<?php echo esc_attr( (string) $attachment_id ); ?>" data-sp-background-media-id>
 				<input type="hidden" name="<?php echo esc_attr( $name . '[media_type]' ); ?>" value="<?php echo esc_attr( $media_type ); ?>" data-sp-background-media-type>
 				<input type="hidden" name="<?php echo esc_attr( $name . '[image_id]' ); ?>" value="<?php echo esc_attr( (string) $image_id ); ?>" data-sp-background-image-id data-preview-url="<?php echo esc_attr( (string) $preview_url ); ?>">

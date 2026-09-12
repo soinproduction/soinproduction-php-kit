@@ -32,6 +32,9 @@ function wp_get_attachment_image_url( int $attachment_id, string $size = 'thumbn
 }
 function wp_get_attachment_image_srcset(): bool { return false; }
 function wp_get_attachment_image_sizes(): bool { return false; }
+function wp_get_attachment_image( int $attachment_id, string $size, bool $icon, array $attributes ): string {
+	return '<img src="' . esc_url( (string) wp_get_attachment_image_url( $attachment_id, $size ) ) . '" class="' . esc_attr( (string) ( $attributes['class'] ?? '' ) ) . '">';
+}
 
 require dirname( __DIR__ ) . '/acf/sp-background-media/index.php';
 
@@ -81,6 +84,9 @@ $checks = [
 	'invalid video source is rejected'           => $invalid === [],
 	'frontend renders full poster'               => str_contains( $html, 'poster="https://example.test/poster-full.png"' ),
 	'frontend renders WEBM before MP4'           => false !== $webm_position && false !== $mp4_position && $webm_position < $mp4_position,
+	'frontend uses native autoplay'              => str_contains( $html, 'autoplay muted loop playsinline preload="metadata"' ),
+	'frontend uses real source URLs'              => str_contains( $html, '<source src="https://example.test/background.webm"' ) && ! str_contains( $html, 'data-src=' ),
+	'reduced motion poster is rendered for CSS'  => str_contains( $html, 'sp-background-media__reduced-motion-poster' ),
 ];
 
 $failed = array_keys( array_filter( $checks, static fn( bool $passed ): bool => ! $passed ) );

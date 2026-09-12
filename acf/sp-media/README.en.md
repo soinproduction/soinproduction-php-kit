@@ -18,6 +18,7 @@ Use a raw ACF field:
     'required' => 0,
     'sources'  => [ 'library', 'youtube', 'vimeo' ],
     'displays' => [ 'inline', 'fancybox', 'background' ],
+    'responsive' => 1,
 ] )
 ```
 
@@ -51,7 +52,32 @@ Allowed display modes:
 'background'
 ```
 
+`responsive` defaults to `0`. It adds Desktop, Tablet, and Mobile tabs, matching
+SP Background Media. Empty Tablet/Mobile values inherit the closest wider
+media. All-image values use native `<picture><source media="…">` markup;
+video, embed, and mixed values use scoped CSS media queries without extra JS.
+
+```php
+add_filter( 'sp_universal_media_breakpoints', static fn() => [
+    'mobile'  => 576,
+    'tablet'  => 1024,
+] );
+```
+
 ## Saved Value
+
+Responsive fields use the same three-key shape as SP Background Media:
+
+```php
+[
+    'desktop' => [ /* required fallback image value */ ],
+    'tablet'  => [ /* optional image override */ ],
+    'mobile'  => [ /* optional image override */ ],
+]
+```
+
+Legacy single values remain valid and are moved into `desktop` when a field is
+switched to responsive mode and saved.
 
 Media Library image/video:
 
@@ -161,4 +187,3 @@ Renders a background media wrapper for image, video, or embed.
 ## Validation
 
 Uploaded library media must be image or video. Uploaded videos require a poster/cover image. Remote URLs must match the selected provider and produce a valid embed URL.
-

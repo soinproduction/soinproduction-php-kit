@@ -387,63 +387,102 @@
 		$class   = trim( 'sp-background-media ' . implode( ' ', $classes ) );
 		$loading = 'eager' === $args['loading'] ? 'eager' : 'lazy';
 		$breakpoint_config = sp_background_media_breakpoint_config();
-		$mobile_breakpoint = (float) $breakpoint_config['tablet']['min'];
-		$tablet_breakpoint = (float) $breakpoint_config['desktop']['min'];
 		$style = '--sp-background-z-index:' . (int) $args['z_index'] . ';';
+		$image_breakpoints = [ 'desktop', 'tablet', 'mobile' ];
+		$all_images = [] !== $background['desktop'];
+		$format_number = static fn( float $number ): string => rtrim( rtrim( number_format( $number, 2, '.', '' ), '0' ), '.' );
 
+		foreach ( $image_breakpoints as $breakpoint ) {
+			$variant = $background[ $breakpoint ];
+			$all_images = $all_images && 'image' === ( $variant['media_type'] ?? '' );
+
+			if ( $all_images || 'image' === ( $variant['media_type'] ?? '' ) ) {
+				$style .= '--sp-background-' . $breakpoint . '-fit:' . $variant['fit'] . ';'
+					. '--sp-background-' . $breakpoint . '-x:' . $format_number( (float) $variant['position_x'] ) . '%;'
+					. '--sp-background-' . $breakpoint . '-y:' . $format_number( (float) $variant['position_y'] ) . '%;';
+			}
+		}
+
+		$class .= $args['respect_reduced_motion'] ? ' sp-background-media--respect-reduced-motion' : '';
 		echo '<div class="' . esc_attr( $class ) . '" data-sp-background-media'
-			. ' data-mobile-breakpoint="' . esc_attr( (string) $mobile_breakpoint ) . '"'
-			. ' data-tablet-breakpoint="' . esc_attr( (string) $tablet_breakpoint ) . '"'
-			. ' data-respect-reduced-motion="' . ( $args['respect_reduced_motion'] ? 'true' : 'false' ) . '"'
 			. ' style="' . esc_attr( $style ) . '" aria-hidden="true">';
 
-		foreach ( [ 'desktop', 'tablet', 'mobile' ] as $breakpoint ) {
-			$variant = $background[ $breakpoint ];
+		if ( $all_images ) {
+			echo '<picture class="sp-background-media__picture">';
 
-			if ( [] === $variant ) {
-				continue;
+			foreach ( [ 'mobile', 'tablet' ] as $breakpoint ) {
+				$variant = $background[ $breakpoint ];
+				$srcset = wp_get_attachment_image_srcset( $variant['attachment_id'], 'full' );
+				$srcset = $srcset ?: wp_get_attachment_image_url( $variant['attachment_id'], 'full' );
+				$sizes = wp_get_attachment_image_sizes( $variant['attachment_id'], 'full' );
+
+				if ( ! $srcset ) {
+					continue;
+				}
+
+				echo '<source media="(max-width: ' . esc_attr( $format_number( (float) $breakpoint_config[ $breakpoint ]['max'] ) ) . 'px)"'
+					. ' srcset="' . esc_attr( $srcset ) . '"'
+					. ( $sizes ? ' sizes="' . esc_attr( $sizes ) . '"' : '' ) . '>';
 			}
 
-			$variant_style = sprintf(
-				'--sp-background-fit:%s;--sp-background-x:%s%%;--sp-background-y:%s%%;',
-				$variant['fit'],
-				rtrim( rtrim( number_format( (float) $variant['position_x'], 2, '.', '' ), '0' ), '.' ),
-				rtrim( rtrim( number_format( (float) $variant['position_y'], 2, '.', '' ), '0' ), '.' )
-			);
+			echo wp_get_attachment_image( $background['desktop']['attachment_id'], 'full', false, [
+				'alt'         => '',
+				'aria-hidden' => 'true',
+				'class'       => 'sp-background-media__asset sp-background-media__image',
+				'loading'     => $loading,
+			] );
+			echo '</picture>';
+		} else {
+			foreach ( $image_breakpoints as $breakpoint ) {
+				$variant = $background[ $breakpoint ];
 
-			echo '<div class="sp-background-media__variant sp-background-media__variant--' . esc_attr( $breakpoint ) . '"'
-				. ' data-sp-background-variant="' . esc_attr( $breakpoint ) . '" style="' . esc_attr( $variant_style ) . '">';
-
-			if ( 'image' === $variant['media_type'] ) {
-				$image_url = wp_get_attachment_image_url( $variant['attachment_id'], 'full' );
-				$srcset    = wp_get_attachment_image_srcset( $variant['attachment_id'], 'full' );
-				$sizes     = wp_get_attachment_image_sizes( $variant['attachment_id'], 'full' );
-				$placeholder = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-
-				if ( $image_url ) {
-					echo '<img class="sp-background-media__asset sp-background-media__image"'
-						. ' src="' . esc_attr( $placeholder ) . '" data-src="' . esc_url( $image_url ) . '"'
-						. ( $srcset ? ' data-srcset="' . esc_attr( $srcset ) . '"' : '' )
-						. ( $sizes ? ' data-sizes="' . esc_attr( $sizes ) . '"' : '' )
-						. ' data-sp-background-image alt="" aria-hidden="true" loading="' . esc_attr( $loading ) . '">';
-					echo '<noscript>' . wp_get_attachment_image( $variant['attachment_id'], 'full', false, [
-						'alt'         => '',
-						'aria-hidden' => 'true',
-						'class'       => 'sp-background-media__asset sp-background-media__image',
-						'loading'     => $loading,
-					] ) . '</noscript>';
+				if ( [] === $variant ) {
+					continue;
 				}
-			} else {
-				echo '<video class="sp-background-media__asset sp-background-media__video" data-sp-background-video'
-					. ( $variant['poster_url'] ? ' poster="' . esc_url( $variant['poster_url'] ) . '"' : '' )
-					. ' muted loop playsinline preload="none">';
-				foreach ( $variant['video_sources'] as $source ) {
-					echo '<source data-src="' . esc_url( $source['url'] ) . '" type="' . esc_attr( $source['mime_type'] ) . '">';
+
+				$variant_style = sprintf(
+					'--sp-background-fit:%s;--sp-background-x:%s%%;--sp-background-y:%s%%;',
+					$variant['fit'],
+					rtrim( rtrim( number_format( (float) $variant['position_x'], 2, '.', '' ), '0' ), '.' ),
+					rtrim( rtrim( number_format( (float) $variant['position_y'], 2, '.', '' ), '0' ), '.' )
+				);
+
+				echo '<div class="sp-background-media__variant sp-background-media__variant--' . esc_attr( $breakpoint ) . '"'
+					. ' data-sp-background-variant="' . esc_attr( $breakpoint ) . '" style="' . esc_attr( $variant_style ) . '">';
+
+				if ( 'image' === $variant['media_type'] ) {
+					$image_url = wp_get_attachment_image_url( $variant['attachment_id'], 'full' );
+					$srcset    = wp_get_attachment_image_srcset( $variant['attachment_id'], 'full' );
+					$sizes     = wp_get_attachment_image_sizes( $variant['attachment_id'], 'full' );
+
+					if ( $image_url ) {
+						echo '<img class="sp-background-media__asset sp-background-media__image"'
+							. ' src="' . esc_url( $image_url ) . '"'
+							. ( $srcset ? ' srcset="' . esc_attr( $srcset ) . '"' : '' )
+							. ( $sizes ? ' sizes="' . esc_attr( $sizes ) . '"' : '' )
+							. ' alt="" aria-hidden="true" loading="' . esc_attr( $loading ) . '">';
+					}
+				} else {
+					echo '<video class="sp-background-media__asset sp-background-media__video" data-sp-background-video'
+						. ( $variant['poster_url'] ? ' poster="' . esc_url( $variant['poster_url'] ) . '"' : '' )
+						. ' autoplay muted loop playsinline preload="metadata">';
+					foreach ( $variant['video_sources'] as $source ) {
+						echo '<source src="' . esc_url( $source['url'] ) . '" type="' . esc_attr( $source['mime_type'] ) . '">';
+					}
+					echo '</video>';
+
+					if ( $variant['poster_id'] ) {
+						echo wp_get_attachment_image( $variant['poster_id'], 'full', false, [
+							'alt'         => '',
+							'aria-hidden' => 'true',
+							'class'       => 'sp-background-media__asset sp-background-media__reduced-motion-poster',
+							'loading'     => $loading,
+						] );
+					}
 				}
-				echo '</video>';
+
+				echo '</div>';
 			}
-
-			echo '</div>';
 		}
 
 		$overlay_css = sp_background_media_overlay_css( $background['overlay'] );
@@ -455,7 +494,7 @@
 	}
 
 	/**
-	 * Load the small standalone frontend assets and keep media queries in sync
+	 * Load the standalone frontend styles and keep media queries in sync
 	 * with the theme breakpoint configuration.
 	 */
 	function sp_background_media_enqueue_frontend_assets(): void {
@@ -469,7 +508,6 @@
 		}
 
 		$css_path  = $base_path . 'background-media.css';
-		$js_path   = $base_path . 'background-media.js';
 
 		wp_enqueue_style(
 			'sp-background-media',
@@ -485,18 +523,13 @@
 			'sp-background-media',
 			'@media (max-width:' . number_format( $tablet - 0.02, 2, '.', '' ) . 'px){'
 			. '.sp-background-media__variant--desktop{display:none}.sp-background-media__variant--tablet{display:block}'
+			. '.sp-background-media__picture{--sp-background-fit:var(--sp-background-tablet-fit);--sp-background-x:var(--sp-background-tablet-x);--sp-background-y:var(--sp-background-tablet-y)}'
 			. '}@media (max-width:' . number_format( $mobile - 0.02, 2, '.', '' ) . 'px){'
 			. '.sp-background-media__variant--tablet{display:none}.sp-background-media__variant--mobile{display:block}'
+			. '.sp-background-media__picture{--sp-background-fit:var(--sp-background-mobile-fit);--sp-background-x:var(--sp-background-mobile-x);--sp-background-y:var(--sp-background-mobile-y)}'
 			. '}'
 		);
 
-		wp_enqueue_script(
-			'sp-background-media',
-			$base_uri . 'background-media.js',
-			[],
-			is_readable( $js_path ) ? (string) filemtime( $js_path ) : null,
-			true
-		);
 	}
 	add_action( 'wp_enqueue_scripts', 'sp_background_media_enqueue_frontend_assets', 20 );
 
