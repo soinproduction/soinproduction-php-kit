@@ -7,6 +7,8 @@ if ( PHP_SAPI !== 'cli' ) {
 
 define( 'ABSPATH', __DIR__ . '/' );
 
+require dirname( __DIR__ ) . '/src/Html.php';
+
 $GLOBALS['background_attachments'] = [
 	11 => [ 'mime' => 'image/jpeg', 'url' => 'https://example.test/original.jpg', 'full' => 'https://example.test/full.jpg' ],
 	21 => [ 'mime' => 'video/mp4', 'url' => 'https://example.test/background.mp4' ],

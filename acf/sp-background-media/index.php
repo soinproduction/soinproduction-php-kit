@@ -382,9 +382,8 @@
 			'z_index'                => 0,
 			'respect_reduced_motion' => true,
 		] );
-		$classes = preg_split( '/\s+/', trim( (string) $args['class'] ) ) ?: [];
-		$classes = array_filter( array_map( 'sanitize_html_class', $classes ) );
-		$class   = trim( 'sp-background-media ' . implode( ' ', $classes ) );
+		$classes = \SoinProduction\Kit\Html::classNames( $args['class'] );
+		$class   = trim( 'sp-background-media ' . $classes );
 		$loading = 'eager' === $args['loading'] ? 'eager' : 'lazy';
 		$breakpoint_config = sp_background_media_breakpoint_config();
 		$style = '--sp-background-z-index:' . (int) $args['z_index'] . ';';

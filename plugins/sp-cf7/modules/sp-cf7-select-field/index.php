@@ -101,7 +101,7 @@
 			}
 
 			$classes    = (array) $tag->get_class_option();
-			$class_attr = trim( implode( ' ', array_map( 'sanitize_html_class', $classes ) ) );
+			$class_attr = \SoinProduction\Kit\Html::classNames( $classes );
 
 			$placeholder = ( (array) $tag->get_option( 'placeholder', '', true ) )[0] ?? '';
 			$type        = ( (array) $tag->get_option( 'type', '', true ) )[0] ?? 'single';

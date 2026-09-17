@@ -1138,9 +1138,7 @@ if (! function_exists('sp_archive_pagination_template')) {
 
 if (! function_exists('sp_archive_sanitize_class_string')) {
     function sp_archive_sanitize_class_string($classes): string {
-        $classes = preg_split('/\s+/', trim((string) $classes));
-        $classes = array_map('sanitize_html_class', is_array($classes) ? $classes : []);
-        return implode(' ', array_filter($classes));
+        return \SoinProduction\Kit\Html::classNames($classes);
     }
 }
 

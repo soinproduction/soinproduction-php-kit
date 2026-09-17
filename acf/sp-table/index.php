@@ -251,12 +251,9 @@ if (! function_exists('sp_acf_render_table')) {
 		if ($table['mode'] === 'table') {
 			$classes[] = 'sp-table--simple';
 		}
-		$extra   = preg_split('/\s+/', trim((string) $args['class'])) ?: [];
-		foreach ($extra as $class) {
-			$class = sanitize_html_class($class);
-			if ($class !== '') {
-				$classes[] = $class;
-			}
+		$extra = \SoinProduction\Kit\Html::classNames($args['class']);
+		if ($extra !== '') {
+			$classes = array_merge($classes, explode(' ', $extra));
 		}
 
 		ob_start();

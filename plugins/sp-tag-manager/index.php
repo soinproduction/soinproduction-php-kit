@@ -234,17 +234,7 @@
 			}
 
 			private function sanitize_class_list( string $value ): string {
-				$classes = preg_split( '/\s+/', trim( $value ) );
-				if ( ! is_array( $classes ) ) {
-					return '';
-				}
-
-				$classes = array_filter(
-					array_map( 'sanitize_html_class', $classes ),
-					static fn( $class ) => $class !== ''
-				);
-
-				return implode( ' ', array_unique( $classes ) );
+				return \SoinProduction\Kit\Html::classNames( $value );
 			}
 
 			private function sanitize_cfg( array $raw ): array {

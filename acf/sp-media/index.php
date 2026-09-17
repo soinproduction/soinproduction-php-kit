@@ -306,9 +306,8 @@
             ]);
             $desktop = $variants['desktop'];
             $config  = sp_universal_media_breakpoint_config();
-            $extra_classes = preg_split('/\s+/', trim((string) $args['class'])) ?: [];
-            $extra_classes = array_filter(array_map('sanitize_html_class', $extra_classes));
-            $class = trim('universal-media ' . implode(' ', $extra_classes));
+            $extra_classes = \SoinProduction\Kit\Html::classNames($args['class']);
+            $class = trim('universal-media ' . $extra_classes);
             $picture = static function (string $picture_class, string $image_class) use ($variants, $config, $args): void {
                 echo '<picture class="' . esc_attr($picture_class) . '">';
 
@@ -358,9 +357,8 @@
         {
             $config = sp_universal_media_breakpoint_config();
             $wrapper_id = wp_unique_id('sp-universal-media-responsive-');
-            $extra_classes = preg_split('/\s+/', trim((string) ($args['class'] ?? ''))) ?: [];
-            $extra_classes = array_filter(array_map('sanitize_html_class', $extra_classes));
-            $wrapper_class = trim('universal-media-responsive ' . implode(' ', $extra_classes));
+            $extra_classes = \SoinProduction\Kit\Html::classNames($args['class'] ?? '');
+            $wrapper_class = trim('universal-media-responsive ' . $extra_classes);
             $child_args = $args;
             $child_args['class'] = '';
 
@@ -429,9 +427,8 @@
                     'button_text' => __('Play video', 'LDW'),
             ]);
 
-            $extra_classes = preg_split('/\s+/', trim((string) $args['class'])) ?: [];
-            $extra_classes = array_filter(array_map('sanitize_html_class', $extra_classes));
-            $class         = trim('universal-media ' . implode(' ', $extra_classes));
+            $extra_classes = \SoinProduction\Kit\Html::classNames($args['class']);
+            $class         = trim('universal-media ' . $extra_classes);
             $playback      = $media['playback'];
 
             foreach (['autoplay', 'muted', 'loop', 'controls', 'playsinline', 'custom_play'] as $setting) {
