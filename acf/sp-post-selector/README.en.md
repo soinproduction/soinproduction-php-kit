@@ -1,6 +1,6 @@
 # SP Post Selector
 
-`smart_relationship` is an ACF relational field for selecting posts with a richer admin UI: tabs for manual/favorites/all modes, searchable available posts, selected ordering, optional taxonomy filtering, and optional thumbnails.
+`smart_relationship` is an ACF relational field for selecting posts with a richer admin UI: tabs for manual/favorites/related/all modes, searchable available posts, selected ordering, optional taxonomy and allowed-term filtering, and optional thumbnails.
 
 The field implementation lives in:
 
@@ -17,9 +17,11 @@ Use the Builder helper:
     'label'         => __( 'Team Members', 'ACF' ),
     'post_type'     => [ 'team' ],
     'taxonomy'      => [ 'department' ],
+    'taxonomy_terms' => [ 'department:12', 'department:18' ],
     'return_format' => 'id',
-    'modes'         => [ 'manual', 'favorites', 'all' ],
+    'modes'         => [ 'manual', 'favorites', 'related', 'all' ],
     'default_mode'  => 'manual',
+    'related_fields' => [ 'linked_team' ],
     'thumb_field'   => 'none',
     'min'           => 0,
     'max'           => 0,
@@ -34,6 +36,9 @@ Allowed post types. Empty means public post types in the picker, and `any` durin
 `taxonomy`:
 Optional taxonomy filters shown in the picker.
 
+`taxonomy_terms`:
+Optional allowed terms written as `taxonomy:term_id`. When configured, only posts assigned to one of the selected terms in each taxonomy are available and returned. Multiple terms from the same taxonomy use `IN` matching; restrictions from different taxonomies are combined with `AND`. The picker dropdown is limited to the allowed terms.
+
 `return_format`:
 `id` returns post IDs. `object` returns `WP_Post` objects.
 
@@ -43,8 +48,12 @@ Available editor modes:
 ```php
 'manual'
 'favorites'
+'related'
 'all'
 ```
+
+`related_fields`:
+ACF Relationship fields stored on the current post and used by `related` mode. They can be selected in the field settings. When empty, the field automatically reads `linked_{post_type}` for every configured post type, such as `linked_testimonials`.
 
 `default_mode`:
 Initial mode for a new value.
@@ -83,6 +92,9 @@ Returns the manually selected IDs in saved order.
 
 `favorites`:
 Returns posts marked as favorite. If `sp_get_favorite_post_ids()` exists, that helper is used. Otherwise the field queries posts with `_sp_favorite_post = 1`.
+
+`related`:
+Returns posts selected in the configured ACF Relationship fields on the current post. Source order is retained and duplicate IDs are removed. Results are limited to the Smart Relationship field's configured `post_type` and `taxonomy_terms` values.
 
 `all`:
 Returns all published posts for configured post types ordered by `menu_order ASC, date DESC`.

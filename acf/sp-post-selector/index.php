@@ -12,9 +12,11 @@
 	 *       'label'         => false,
 	 *       'post_type'     => ['team'],
 	 *       'return_format' => 'id',          // 'id' | 'object'
-	 *       'modes'         => ['favorites', 'manual', 'all'],
+	 *       'modes'         => ['favorites', 'manual', 'related', 'all'],
 	 *       'default_mode'  => 'manual',
+	 *       'related_fields' => [],            // optional ACF Relationship field names; empty = linked_{post_type}
 	 *       'taxonomy'      => [],            // optional taxonomy filter
+	 *       'taxonomy_terms' => [],            // optional allowed terms: ['taxonomy:term_id']
 	 *       'thumb_field'   => '',            // ACF image field name or ordered names, empty = featured image
 	 *       'min'           => 0,
 	 *       'max'           => 0,
@@ -39,9 +41,11 @@
 				$this->defaults = [
 					'post_type'     => [],
 					'taxonomy'      => [],
+					'taxonomy_terms' => [],
 					'return_format' => 'id',
 					'modes'         => [ 'manual', 'favorites', 'all' ],
 					'default_mode'  => 'manual',
+					'related_fields' => [],
 					'thumb_field'   => 'none',
 					'min'           => 0,
 					'max'           => 0,
@@ -75,14 +79,39 @@
 				] );
 
 				acf_render_field_setting( $field, [
+					'label'        => __( 'Allowed Terms', 'acf' ),
+					'instructions' => __( 'Optional. Only posts assigned to the selected terms are available. Select a taxonomy above first.', 'acf' ),
+					'type'         => 'select',
+					'name'         => 'taxonomy_terms',
+					'choices'      => self::get_taxonomy_term_choices( (array) ( $field['taxonomy'] ?? [] ) ),
+					'multiple'     => 1,
+					'ui'           => 1,
+					'allow_null'   => 1,
+					'placeholder'  => __( 'All terms', 'acf' ),
+				] );
+
+				acf_render_field_setting( $field, [
 					'label'   => __( 'Modes', 'acf' ),
 					'type'    => 'checkbox',
 					'name'    => 'modes',
 					'choices' => [
 						'manual'    => __( 'Manual', 'acf' ),
 						'favorites' => __( 'Favorites', 'acf' ),
+						'related'   => __( 'Related', 'acf' ),
 						'all'       => __( 'All', 'acf' ),
 					],
+				] );
+
+				acf_render_field_setting( $field, [
+					'label'        => __( 'Related Posts Fields', 'acf' ),
+					'instructions' => __( 'ACF Relationship fields stored on the current post. Leave empty to use linked_{post_type} automatically for every selected post type.', 'acf' ),
+					'type'         => 'select',
+					'name'         => 'related_fields',
+					'choices'      => self::get_relationship_field_choices(),
+					'multiple'     => 1,
+					'ui'           => 1,
+					'allow_null'   => 1,
+					'placeholder'  => __( 'Auto: linked_{post_type}', 'acf' ),
 				] );
 
 				acf_render_field_setting( $field, [
@@ -92,6 +121,7 @@
 					'choices' => [
 						'manual'    => 'Manual',
 						'favorites' => 'Favorites',
+						'related'   => 'Related',
 						'all'       => 'All',
 					],
 				] );
@@ -148,21 +178,145 @@
 				return $choices;
 			}
 
+			private static function get_taxonomy_term_choices( array $taxonomies ): array {
+				$choices = [];
+
+				foreach ( array_unique( array_filter( array_map( 'sanitize_key', $taxonomies ) ) ) as $taxonomy ) {
+					$taxonomy_object = get_taxonomy( $taxonomy );
+					if ( ! $taxonomy_object ) {
+						continue;
+					}
+
+					$terms = get_terms( [
+						'taxonomy'   => $taxonomy,
+						'hide_empty' => false,
+					] );
+					if ( is_wp_error( $terms ) ) {
+						continue;
+					}
+
+					$taxonomy_label = $taxonomy_object->labels->singular_name ?? $taxonomy_object->label ?? $taxonomy;
+					foreach ( $terms as $term ) {
+						$choices[ $taxonomy . ':' . (int) $term->term_id ] = $taxonomy_label . ': ' . $term->name;
+					}
+				}
+
+				return $choices;
+			}
+
+			private static function get_relationship_field_choices(): array {
+				$choices = [];
+
+				if ( ! function_exists( 'acf_get_field_groups' ) || ! function_exists( 'acf_get_fields' ) ) {
+					return $choices;
+				}
+
+				foreach ( (array) acf_get_field_groups() as $field_group ) {
+					$group_label = (string) ( $field_group['title'] ?? '' );
+
+					foreach ( (array) acf_get_fields( $field_group ) as $relationship_field ) {
+						if ( ( $relationship_field['type'] ?? '' ) !== 'relationship' || empty( $relationship_field['name'] ) ) {
+							continue;
+						}
+
+						$name  = sanitize_key( (string) $relationship_field['name'] );
+						$label = (string) ( $relationship_field['label'] ?? $name );
+						if ( $name === '' || isset( $choices[ $name ] ) ) {
+							continue;
+						}
+
+						$choices[ $name ] = trim( $group_label . ' — ' . $label, " \t\n\r\0\x0B—" ) . ' (' . $name . ')';
+					}
+				}
+
+				natcasesort( $choices );
+
+				return $choices;
+			}
+
+			public static function normalize_taxonomy_terms( $values, ?array $allowed_taxonomies = null ): array {
+				$restrict_taxonomies = $allowed_taxonomies !== null;
+				$allowed_taxonomies  = array_values( array_unique( array_filter( array_map( 'sanitize_key', $allowed_taxonomies ?? [] ) ) ) );
+				$terms = [];
+
+				foreach ( (array) $values as $value ) {
+					if ( ! is_scalar( $value ) ) {
+						continue;
+					}
+
+					$parts    = explode( ':', (string) $value, 2 );
+					$taxonomy = sanitize_key( $parts[0] ?? '' );
+					$term_id  = absint( $parts[1] ?? 0 );
+					if (
+						$taxonomy === ''
+						|| $term_id < 1
+						|| ( $restrict_taxonomies && ! in_array( $taxonomy, $allowed_taxonomies, true ) )
+					) {
+						continue;
+					}
+
+					$terms[ $taxonomy ][] = $term_id;
+				}
+
+				foreach ( $terms as $taxonomy => $term_ids ) {
+					$terms[ $taxonomy ] = array_values( array_unique( $term_ids ) );
+				}
+
+				return $terms;
+			}
+
+			public static function build_tax_query( array $term_map ): array {
+				$tax_query = [];
+
+				foreach ( $term_map as $taxonomy => $term_ids ) {
+					$taxonomy = sanitize_key( (string) $taxonomy );
+					$term_ids = array_values( array_unique( array_filter( array_map( 'absint', (array) $term_ids ) ) ) );
+					if ( $taxonomy === '' || $term_ids === [] ) {
+						continue;
+					}
+
+					$tax_query[] = [
+						'taxonomy' => $taxonomy,
+						'field'    => 'term_id',
+						'terms'    => $term_ids,
+						'operator' => 'IN',
+					];
+				}
+
+				if ( count( $tax_query ) > 1 ) {
+					$tax_query['relation'] = 'AND';
+				}
+
+				return $tax_query;
+			}
+
 			/* ── Render ────────────────────────────────────── */
 
 			public function render_field( array $field ): void {
-				$modes        = ! empty( $field['modes'] ) ? (array) $field['modes'] : [ 'manual' ];
+				$modes        = array_values( array_intersect(
+					[ 'manual', 'favorites', 'related', 'all' ],
+					array_map( 'sanitize_key', (array) ( $field['modes'] ?? [ 'manual' ] ) )
+				) );
+				if ( $modes === [] ) {
+					$modes = [ 'manual' ];
+				}
 				$value        = is_array( $field['value'] ) ? $field['value'] : [];
 				$current_mode = $value['mode'] ?? ( $field['default_mode'] ?: $modes[0] );
+				if ( ! in_array( $current_mode, $modes, true ) ) {
+					$current_mode = $modes[0];
+				}
 				$selected_ids = ! empty( $value['ids'] ) ? array_map( 'intval', (array) $value['ids'] ) : [];
 				$post_types   = ! empty( $field['post_type'] ) ? (array) $field['post_type'] : get_post_types( [ 'public' => true ] );
 				$taxonomies   = ! empty( $field['taxonomy'] ) ? (array) $field['taxonomy'] : [];
+				$allowed_terms = self::normalize_taxonomy_terms( $field['taxonomy_terms'] ?? [], $taxonomies );
+				$tax_query     = self::build_tax_query( $allowed_terms );
 				$max          = (int) ( $field['max'] ?? 0 );
 				$fname        = esc_attr( $field['name'] );
 
 				$mode_labels = [
 					'favorites' => __( 'Favorites', 'acf' ),
 					'manual'    => __( 'Manual', 'acf' ),
+					'related'   => __( 'Related', 'acf' ),
 					'all'       => __( 'All', 'acf' ),
 				];
 
@@ -171,6 +325,12 @@
 				$config = wp_json_encode( [
 					'post_type'   => array_values( $post_types ),
 					'taxonomy'    => array_values( $taxonomies ),
+					'taxonomy_terms' => array_reduce( array_keys( $allowed_terms ), static function ( array $values, string $taxonomy ) use ( $allowed_terms ): array {
+						foreach ( $allowed_terms[ $taxonomy ] as $term_id ) {
+							$values[] = $taxonomy . ':' . $term_id;
+						}
+						return $values;
+					}, [] ),
 					'max'         => $max,
 					'thumb_field' => $thumb_field,
 					'nonce'       => wp_create_nonce( 'sp_srel' ),
@@ -222,7 +382,11 @@
 						echo '<select class="sp-srel__tax-filter">';
 						echo '<option value="">' . esc_html__( 'All terms', 'acf' ) . '</option>';
 						foreach ( $taxonomies as $tax ) {
-							$terms = get_terms( [ 'taxonomy' => $tax, 'hide_empty' => false ] );
+							$term_args = [ 'taxonomy' => $tax, 'hide_empty' => false ];
+							if ( ! empty( $allowed_terms[ $tax ] ) ) {
+								$term_args['include'] = $allowed_terms[ $tax ];
+							}
+							$terms = get_terms( $term_args );
 							if ( is_wp_error( $terms ) ) {
 								continue;
 							}
@@ -258,6 +422,7 @@
 							'posts_per_page' => count( $selected_ids ),
 							'post_status'    => 'any',
 							'orderby'        => 'post__in',
+							'tax_query'      => $tax_query,
 						] );
 						foreach ( $posts_q as $p ) {
 							$posts_map[ $p->ID ] = $p;
@@ -288,6 +453,20 @@
 					echo '<div>';
 					echo '<strong>' . esc_html__( 'Favorites Mode', 'acf' ) . '</strong><br>';
 					echo '<span>' . esc_html__( 'Posts marked as Favorites will be displayed automatically.', 'acf' ) . '</span>';
+					echo '</div>';
+					echo '</div>';
+					echo '</div>';
+				}
+
+				/* ── Related Panel ── */
+				if ( in_array( 'related', $modes, true ) ) {
+					$hidden = ( $current_mode !== 'related' ) ? ' style="display:none"' : '';
+					echo '<div class="sp-srel__panel" data-panel="related"' . $hidden . '>';
+					echo '<div class="sp-srel__info">';
+					echo '<svg class="sp-srel__info-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10 13a5 5 0 0 0 7.07.07l2-2a5 5 0 0 0-7.07-7.07l-1.15 1.15"/><path d="M14 11a5 5 0 0 0-7.07-.07l-2 2A5 5 0 0 0 12 20l1.15-1.15"/></svg>';
+					echo '<div>';
+					echo '<strong>' . esc_html__( 'Related Posts Mode', 'acf' ) . '</strong><br>';
+					echo '<span>' . esc_html__( 'Posts selected in the configured ACF Relationship fields on the current post will be displayed automatically.', 'acf' ) . '</span>';
 					echo '</div>';
 					echo '</div>';
 					echo '</div>';
@@ -422,7 +601,7 @@
 
 			public function update_value( $value, $post_id, array $field ) {
 				$allowed_modes = array_values( array_intersect(
-					[ 'manual', 'favorites', 'all' ],
+					[ 'manual', 'favorites', 'related', 'all' ],
 					array_map( 'sanitize_key', (array) ( $field['modes'] ?? [] ) )
 				) );
 				if ( $allowed_modes === [] ) {
@@ -456,12 +635,94 @@
 						&& ( $allowed_post_types === [] || in_array( $post_type, $allowed_post_types, true ) );
 				} ) );
 
+				$taxonomies   = array_values( array_filter( array_map( 'sanitize_key', (array) ( $field['taxonomy'] ?? [] ) ) ) );
+				$allowed_terms = self::normalize_taxonomy_terms( $field['taxonomy_terms'] ?? [], $taxonomies );
+				$ids           = self::filter_ids_by_tax_query( $ids, $allowed_post_types ?: [ 'any' ], self::build_tax_query( $allowed_terms ), 'any' );
+
 				$max = max( 0, (int) ( $field['max'] ?? 0 ) );
 				if ( $max > 0 ) {
 					$ids = array_slice( $ids, 0, $max );
 				}
 
 				return [ 'mode' => $mode, 'ids' => $ids ];
+			}
+
+			private static function normalize_related_ids( $value ): array {
+				if ( $value instanceof WP_Post ) {
+					$value = [ $value ];
+				} elseif ( ! is_array( $value ) ) {
+					$value = is_numeric( $value ) ? [ $value ] : [];
+				}
+
+				$ids = [];
+				foreach ( $value as $item ) {
+					$id = $item instanceof WP_Post ? (int) $item->ID : absint( $item );
+					if ( $id > 0 && ! in_array( $id, $ids, true ) ) {
+						$ids[] = $id;
+					}
+				}
+
+				return $ids;
+			}
+
+			private static function get_related_ids( $post_id, array $field, array $post_types ): array {
+				$source_post_id = is_numeric( $post_id ) ? absint( $post_id ) : 0;
+				if ( $source_post_id < 1 ) {
+					return [];
+				}
+
+				$related_fields = array_values( array_unique( array_filter( array_map(
+					'sanitize_key',
+					(array) ( $field['related_fields'] ?? [] )
+				) ) ) );
+
+				if ( $related_fields === [] ) {
+					foreach ( $post_types as $post_type ) {
+						$post_type = sanitize_key( (string) $post_type );
+						if ( $post_type !== '' && $post_type !== 'any' ) {
+							$related_fields[] = 'linked_' . $post_type;
+						}
+					}
+				}
+
+				$result_ids = [];
+				foreach ( $related_fields as $related_field ) {
+					$raw_ids = function_exists( 'get_field' )
+						? get_field( $related_field, $source_post_id, false )
+						: get_post_meta( $source_post_id, $related_field, true );
+
+					foreach ( self::normalize_related_ids( $raw_ids ) as $related_id ) {
+						$related_post_type = get_post_type( $related_id );
+						if (
+							is_string( $related_post_type )
+							&& ( in_array( 'any', $post_types, true ) || in_array( $related_post_type, $post_types, true ) )
+							&& ! in_array( $related_id, $result_ids, true )
+						) {
+							$result_ids[] = $related_id;
+						}
+					}
+				}
+
+				return $result_ids;
+			}
+
+			private static function filter_ids_by_tax_query( array $ids, array $post_types, array $tax_query, $post_status = 'publish' ): array {
+				$ids = array_values( array_unique( array_filter( array_map( 'absint', $ids ) ) ) );
+				if ( $ids === [] || $tax_query === [] ) {
+					return $ids;
+				}
+
+				$query = new WP_Query( [
+					'post_type'      => $post_types,
+					'post_status'    => $post_status,
+					'post__in'       => $ids,
+					'posts_per_page' => count( $ids ),
+					'fields'         => 'ids',
+					'orderby'        => 'post__in',
+					'tax_query'      => $tax_query,
+				] );
+
+				return is_array( $query->posts ) ? array_map( 'intval', $query->posts ) : [];
 			}
 
 			/* ── Format for front-end ──────────────────────── */
@@ -475,6 +736,9 @@
 				$stored_ids = ! empty( $value['ids'] ) ? array_map( 'intval', (array) $value['ids'] ) : [];
 				$post_types = ! empty( $field['post_type'] ) ? (array) $field['post_type'] : [ 'any' ];
 				$format     = $field['return_format'] ?? 'id';
+				$taxonomies = array_values( array_filter( array_map( 'sanitize_key', (array) ( $field['taxonomy'] ?? [] ) ) ) );
+				$allowed_terms = self::normalize_taxonomy_terms( $field['taxonomy_terms'] ?? [], $taxonomies );
+				$tax_query     = self::build_tax_query( $allowed_terms );
 
 				$result_ids = [];
 
@@ -488,6 +752,7 @@
 							$result_ids = sp_get_favorite_post_ids( [
 								'post_type'      => $post_types,
 								'posts_per_page' => -1,
+								'tax_query'      => $tax_query,
 							] );
 						} else {
 							$q = new WP_Query( [
@@ -498,10 +763,15 @@
 								'meta_key'       => '_sp_favorite_post',
 								'meta_value'     => '1',
 								'orderby'        => [ 'menu_order' => 'ASC', 'date' => 'DESC' ],
+								'tax_query'      => $tax_query,
 							] );
 							$result_ids = is_array( $q->posts ) ? array_map( 'intval', $q->posts ) : [];
 							wp_reset_postdata();
 						}
+						break;
+
+					case 'related':
+						$result_ids = self::get_related_ids( $post_id, $field, $post_types );
 						break;
 
 					case 'all':
@@ -511,6 +781,7 @@
 							'posts_per_page' => -1,
 							'fields'         => 'ids',
 							'orderby'        => [ 'menu_order' => 'ASC', 'date' => 'DESC' ],
+							'tax_query'      => $tax_query,
 						] );
 						$result_ids = is_array( $q->posts ) ? array_map( 'intval', $q->posts ) : [];
 						wp_reset_postdata();
@@ -518,6 +789,9 @@
 				}
 
 				$result_ids = array_values( array_unique( array_filter( $result_ids ) ) );
+				if ( in_array( $mode, [ 'manual', 'favorites', 'related' ], true ) ) {
+					$result_ids = self::filter_ids_by_tax_query( $result_ids, $post_types, $tax_query );
+				}
 
 				if ( $format === 'object' && ! empty( $result_ids ) ) {
 					$posts = get_posts( [
@@ -1231,6 +1505,7 @@ function initSmartRelationship(root){
 			post_type: config.post_type||[],
 			taxonomy: taxParts[0]||'',
 			term_id: taxParts[1]||'',
+			taxonomy_terms: config.taxonomy_terms||[],
 			thumb_field: config.thumb_field||'',
 			page: page,
 			_wpnonce: config.nonce
@@ -1429,11 +1704,11 @@ JS;
 		if ( empty( $post_types ) ) {
 			wp_send_json_error( 'Permission denied', 403 );
 		}
+		$allowed_taxonomies = get_object_taxonomies( $post_types );
 		$taxonomy    = sanitize_key( $_POST['taxonomy'] ?? '' );
 		$term_id     = absint( $_POST['term_id'] ?? 0 );
 		if ( $taxonomy !== '' ) {
 			$taxonomy_object = get_taxonomy( $taxonomy );
-			$allowed_taxonomies = get_object_taxonomies( $post_types );
 			if (
 				! $taxonomy_object
 				|| ! in_array( $taxonomy, $allowed_taxonomies, true )
@@ -1442,6 +1717,24 @@ JS;
 			) {
 				wp_send_json_error( 'Permission denied', 403 );
 			}
+		}
+		$raw_taxonomy_terms = wp_unslash( $_POST['taxonomy_terms'] ?? [] );
+		$allowed_terms      = acf_field_smart_relationship::normalize_taxonomy_terms( $raw_taxonomy_terms, $allowed_taxonomies );
+		foreach ( array_keys( $allowed_terms ) as $allowed_taxonomy ) {
+			$taxonomy_object = get_taxonomy( $allowed_taxonomy );
+			if (
+				! $taxonomy_object
+				|| empty( $taxonomy_object->cap->assign_terms )
+				|| ! current_user_can( (string) $taxonomy_object->cap->assign_terms )
+			) {
+				wp_send_json_error( 'Permission denied', 403 );
+			}
+		}
+		if ( $taxonomy !== '' && $term_id > 0 ) {
+			if ( isset( $allowed_terms[ $taxonomy ] ) && ! in_array( $term_id, $allowed_terms[ $taxonomy ], true ) ) {
+				wp_send_json_success( [ 'posts' => [], 'has_more' => false ] );
+			}
+			$allowed_terms[ $taxonomy ] = [ $term_id ];
 		}
 		$page        = max( 1, absint( $_POST['page'] ?? 1 ) );
 		$raw_thumb_field = wp_unslash( $_POST['thumb_field'] ?? '' );
@@ -1463,12 +1756,9 @@ JS;
 			$args['s'] = $search;
 		}
 
-		if ( $taxonomy !== '' && $term_id > 0 ) {
-			$args['tax_query'] = [ [
-				'taxonomy' => $taxonomy,
-				'field'    => 'term_id',
-				'terms'    => $term_id,
-			] ];
+		$tax_query = acf_field_smart_relationship::build_tax_query( $allowed_terms );
+		if ( $tax_query !== [] ) {
+			$args['tax_query'] = $tax_query;
 		}
 
 		$q     = new WP_Query( $args );
@@ -1506,8 +1796,11 @@ JS;
 		 * Usage:
 		 *   ->addFields( smart_relationship( 'team_members', [
 		 *       'post_type'     => ['team'],
+		 *       'taxonomy'      => ['department'],
+		 *       'taxonomy_terms' => ['department:12', 'department:18'],
 		 *       'return_format' => 'id',
-		 *       'modes'         => ['favorites', 'manual', 'all'],
+		 *       'modes'         => ['favorites', 'manual', 'related', 'all'],
+		 *       'related_fields' => ['linked_team'], // empty = linked_{post_type}
 		 *       'thumb_field'   => 'image', // string or ordered array of fallback fields
 		 *   ]) )
 		 */
