@@ -34,10 +34,10 @@ Use the Builder helper:
 Allowed post types. Empty means public post types in the picker, and `any` during formatting fallback.
 
 `taxonomy`:
-Optional taxonomy filters shown in the picker.
+Taxonomies whose terms are available in the field settings. After changing this option, save the field group to refresh the `taxonomy_terms` choices.
 
 `taxonomy_terms`:
-Optional allowed terms written as `taxonomy:term_id`. When configured, only posts assigned to one of the selected terms in each taxonomy are available and returned. Multiple terms from the same taxonomy use `IN` matching; restrictions from different taxonomies are combined with `AND`. The picker dropdown is limited to the allowed terms.
+Optional allowed terms written as `taxonomy:term_id`. When configured, only posts assigned to one of the selected terms in each taxonomy are available and returned. Multiple terms from the same taxonomy use `IN` matching; restrictions from different taxonomies are combined with `AND`. Term restrictions are configured only in the field settings; the content picker does not render an additional taxonomy dropdown.
 
 `return_format`:
 `id` returns post IDs. `object` returns `WP_Post` objects.

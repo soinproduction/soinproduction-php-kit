@@ -167,6 +167,7 @@ $multiTaxQuery = acf_field_smart_relationship::build_tax_query([
     'testimonial_category' => [5],
     'language'             => [3],
 ]);
+$fieldSource = file_get_contents(dirname(__DIR__) . '/acf/sp-post-selector/index.php');
 
 $checks = [
     'automatic linked_{post_type} lookup retains source order' => $autoRelated === [21, 22],
@@ -178,6 +179,9 @@ $checks = [
     'tax query groups terms from one taxonomy into one IN clause' => ($taxQuery[0]['terms'] ?? []) === [5, 8] && ($taxQuery[0]['operator'] ?? '') === 'IN',
     'tax query requires matches across configured taxonomies' => ($multiTaxQuery['relation'] ?? '') === 'AND' && count($multiTaxQuery) === 3,
     'clearing the taxonomy setting disables stale allowed terms' => acf_field_smart_relationship::normalize_taxonomy_terms(['testimonial_category:5'], []) === [],
+    'term restrictions stay in field settings instead of the content picker' => is_string($fieldSource)
+        && !str_contains($fieldSource, 'sp-srel__tax-filter')
+        && str_contains($fieldSource, "'name'         => 'taxonomy_terms'"),
 ];
 
 $failed = array_keys(array_filter($checks, static fn(bool $passed): bool => !$passed));

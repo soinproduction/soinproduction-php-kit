@@ -15,7 +15,7 @@
 	 *       'modes'         => ['favorites', 'manual', 'related', 'all'],
 	 *       'default_mode'  => 'manual',
 	 *       'related_fields' => [],            // optional ACF Relationship field names; empty = linked_{post_type}
-	 *       'taxonomy'      => [],            // optional taxonomy filter
+	 *       'taxonomy'      => [],            // taxonomies used by the allowed-terms setting
 	 *       'taxonomy_terms' => [],            // optional allowed terms: ['taxonomy:term_id']
 	 *       'thumb_field'   => '',            // ACF image field name or ordered names, empty = featured image
 	 *       'min'           => 0,
@@ -68,7 +68,8 @@
 				] );
 
 				acf_render_field_setting( $field, [
-					'label'        => __( 'Taxonomy Filter', 'acf' ),
+					'label'        => __( 'Taxonomies', 'acf' ),
+					'instructions' => __( 'Choose taxonomies whose terms can be selected below. Save the field group after changing this setting to refresh the term choices.', 'acf' ),
 					'type'         => 'select',
 					'name'         => 'taxonomy',
 					'choices'      => function_exists( 'acf_get_taxonomy_labels' ) ? acf_get_taxonomy_labels() : self::get_taxonomy_choices(),
@@ -324,7 +325,6 @@
 
 				$config = wp_json_encode( [
 					'post_type'   => array_values( $post_types ),
-					'taxonomy'    => array_values( $taxonomies ),
 					'taxonomy_terms' => array_reduce( array_keys( $allowed_terms ), static function ( array $values, string $taxonomy ) use ( $allowed_terms ): array {
 						foreach ( $allowed_terms[ $taxonomy ] as $term_id ) {
 							$values[] = $taxonomy . ':' . $term_id;
@@ -376,30 +376,6 @@
 					echo '<div class="sp-srel__col sp-srel__col--available">';
 					echo '<div class="sp-srel__col-header">';
 					echo '<input type="search" class="sp-srel__search" placeholder="' . esc_attr__( 'Search…', 'acf' ) . '" autocomplete="off">';
-
-					/* Taxonomy filter dropdown */
-					if ( ! empty( $taxonomies ) ) {
-						echo '<select class="sp-srel__tax-filter">';
-						echo '<option value="">' . esc_html__( 'All terms', 'acf' ) . '</option>';
-						foreach ( $taxonomies as $tax ) {
-							$term_args = [ 'taxonomy' => $tax, 'hide_empty' => false ];
-							if ( ! empty( $allowed_terms[ $tax ] ) ) {
-								$term_args['include'] = $allowed_terms[ $tax ];
-							}
-							$terms = get_terms( $term_args );
-							if ( is_wp_error( $terms ) ) {
-								continue;
-							}
-							$tax_obj = get_taxonomy( $tax );
-							$tax_label = $tax_obj ? $tax_obj->labels->singular_name : $tax;
-							foreach ( $terms as $t ) {
-								echo '<option value="' . esc_attr( $tax . ':' . $t->term_id ) . '">'
-								     . esc_html( $tax_label . ': ' . $t->name )
-								     . '</option>';
-							}
-						}
-						echo '</select>';
-					}
 					echo '</div>';
 					echo '<div class="sp-srel__list sp-srel__list--avail" data-empty="' . esc_attr__( 'No posts found', 'acf' ) . '" role="list" aria-busy="false"></div>';
 					echo '<button type="button" class="sp-srel__load-more" style="display:none" tabindex="-1" aria-hidden="true">' . esc_html__( 'Load more', 'acf' ) . '</button>';
@@ -969,21 +945,6 @@
     box-shadow:inset 0 0 0 1px var(--blue)!important;
 }
 
-.sp-srel__tax-filter{
-    height:52px!important;
-    border:none!important;
-    border-left:1px solid var(--border)!important;
-    background:transparent!important;
-    box-shadow:none!important;
-    padding:0 14px!important;
-    color:var(--muted)!important;
-    max-width:180px;
-}
-.sp-srel__tax-filter:focus{
-    box-shadow:inset 0 0 0 1px var(--blue)!important;
-    color:var(--text)!important;
-}
-
 .sp-srel__count{
     padding:0 16px;
     font-size:13px;
@@ -1355,14 +1316,12 @@
     }
     .sp-srel__tab{ width:100%; }
     .sp-srel__col-header{ align-items:stretch; flex-direction:column; }
-    .sp-srel__search,
-    .sp-srel__tax-filter{
+    .sp-srel__search{
         width:100%;
         max-width:none;
         height:42px!important;
         border-left:0!important;
     }
-    .sp-srel__tax-filter{ border-top:1px solid var(--border)!important; }
 }
 
 @media (prefers-reduced-motion: reduce){
@@ -1429,7 +1388,6 @@ function initSmartRelationship(root){
 	var $avail = $root.find('.sp-srel__list--avail');
 	var $sel   = $root.find('.sp-srel__list--sel');
 	var $search= $root.find('.sp-srel__search');
-	var $tax   = $root.find('.sp-srel__tax-filter');
 	var $more  = $root.find('.sp-srel__load-more');
 	var $status= $root.find('.sp-srel__status');
 	var i18n   = config.i18n || {};
@@ -1496,15 +1454,10 @@ function initSmartRelationship(root){
 		setBusy(true);
 		setStatus('loading', i18n.loading || 'Loading posts…');
 
-		var taxVal=$tax.length?$tax.val():'';
-		var taxParts=taxVal?taxVal.split(':'):[];
-
 		xhr=sharedPostRequest({
 			action:'sp_srel_search',
 			s: $search.val()||'',
 			post_type: config.post_type||[],
-			taxonomy: taxParts[0]||'',
-			term_id: taxParts[1]||'',
 			taxonomy_terms: config.taxonomy_terms||[],
 			thumb_field: config.thumb_field||'',
 			page: page,
@@ -1566,9 +1519,6 @@ function initSmartRelationship(root){
 		clearTimeout(timer);
 		timer=setTimeout(function(){ page=1; loadPosts(false); }, 250);
 	});
-
-	/* Tax filter */
-	$tax.on('change', function(){ page=1; loadPosts(false); });
 
 	/* Infinite loading inside the available-posts list. */
 	$avail.on('scroll.spSrelInfinite', maybeLoadNext);
@@ -1705,19 +1655,6 @@ JS;
 			wp_send_json_error( 'Permission denied', 403 );
 		}
 		$allowed_taxonomies = get_object_taxonomies( $post_types );
-		$taxonomy    = sanitize_key( $_POST['taxonomy'] ?? '' );
-		$term_id     = absint( $_POST['term_id'] ?? 0 );
-		if ( $taxonomy !== '' ) {
-			$taxonomy_object = get_taxonomy( $taxonomy );
-			if (
-				! $taxonomy_object
-				|| ! in_array( $taxonomy, $allowed_taxonomies, true )
-				|| empty( $taxonomy_object->cap->assign_terms )
-				|| ! current_user_can( (string) $taxonomy_object->cap->assign_terms )
-			) {
-				wp_send_json_error( 'Permission denied', 403 );
-			}
-		}
 		$raw_taxonomy_terms = wp_unslash( $_POST['taxonomy_terms'] ?? [] );
 		$allowed_terms      = acf_field_smart_relationship::normalize_taxonomy_terms( $raw_taxonomy_terms, $allowed_taxonomies );
 		foreach ( array_keys( $allowed_terms ) as $allowed_taxonomy ) {
@@ -1729,12 +1666,6 @@ JS;
 			) {
 				wp_send_json_error( 'Permission denied', 403 );
 			}
-		}
-		if ( $taxonomy !== '' && $term_id > 0 ) {
-			if ( isset( $allowed_terms[ $taxonomy ] ) && ! in_array( $term_id, $allowed_terms[ $taxonomy ], true ) ) {
-				wp_send_json_success( [ 'posts' => [], 'has_more' => false ] );
-			}
-			$allowed_terms[ $taxonomy ] = [ $term_id ];
 		}
 		$page        = max( 1, absint( $_POST['page'] ?? 1 ) );
 		$raw_thumb_field = wp_unslash( $_POST['thumb_field'] ?? '' );
