@@ -25,7 +25,9 @@
 	];
 	$sp_cf7_config = \SoinProduction\Kit\Bootstrapper::moduleConfig( 'plugins', 'sp-cf7' );
 	if ( $sp_cf7_config !== null ) {
-		$sp_cf7_modules = $sp_cf7_config;
+		// Legacy numeric lists remain supported, including [] to disable all modules.
+		$has_options = array_key_exists('modules', $sp_cf7_config) || array_key_exists('submit_actions', $sp_cf7_config);
+		$sp_cf7_modules = $has_options ? ($sp_cf7_config['modules'] ?? $sp_cf7_modules) : $sp_cf7_config;
 	}
 
 	$sp_cf7_modules = apply_filters( 'sp_cf7_modules', $sp_cf7_modules );
@@ -48,4 +50,4 @@
 		}
 	}
 
-	unset( $sp_cf7_modules, $sp_cf7_aliases, $sp_cf7_config, $sp_cf7_module, $sp_cf7_module_file );
+	unset( $sp_cf7_modules, $sp_cf7_aliases, $sp_cf7_config, $has_options, $sp_cf7_module, $sp_cf7_module_file );

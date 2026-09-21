@@ -1,4 +1,24 @@
 <?php
+/** Available submit actions, restricted by project config after extension filters. */
+function sp_cf7_allowed_submit_actions(): array
+{
+    $types = apply_filters('sp_cf7_redirect_action_types', ['none', 'redirect', 'modal']);
+    $types = array_values(array_unique(array_filter(array_map('sanitize_key', (array) $types))));
+    $config = \SoinProduction\Kit\Bootstrapper::moduleConfig('plugins', 'sp-cf7');
+    if (is_array($config) && array_key_exists('submit_actions', $config)) {
+        $configured = array_filter((array) $config['submit_actions'], 'is_string');
+        $types = array_values(array_intersect($types, array_map('sanitize_key', $configured)));
+    }
+    // Default is always available as a safe fallback for disabled or unknown actions.
+    return array_values(array_unique(array_merge(['none'], $types)));
+}
+
+function sp_cf7_normalize_submit_action($action): string
+{
+    $action = sanitize_key((string) $action);
+    return in_array($action, sp_cf7_allowed_submit_actions(), true) ? $action : 'none';
+}
+
 /**
  * Determine whether the current request renders the Contact Form 7 editor.
  *
@@ -284,24 +304,25 @@ function cf7_custom_redirect_metabox($form_id)
         return;
     }
 
-    $action_type   = get_post_meta($form_id, '_cf7_action_type', true);
+    $action_type   = sp_cf7_normalize_submit_action(get_post_meta($form_id, '_cf7_action_type', true));
+    $allowed_actions = sp_cf7_allowed_submit_actions();
     $redirect_page = get_post_meta($form_id, '_cf7_redirect_page', true);
     $success_modal = get_post_meta($form_id, '_cf7_success_modal', true);
     $error_modal   = get_post_meta($form_id, '_cf7_error_modal', true);
 
-    $pages = get_posts(array(
+    $pages = in_array('redirect', $allowed_actions, true) ? get_posts(array(
         'post_type'      => 'page',
         'posts_per_page' => -1,
         'orderby'        => 'title',
         'order'          => 'ASC',
-    ));
+    )) : [];
 
-    $modals = get_posts(array(
+    $modals = in_array('modal', $allowed_actions, true) ? get_posts(array(
         'post_type'      => 'modals',
         'posts_per_page' => -1,
         'orderby'        => 'title',
         'order'          => 'ASC',
-    ));
+    )) : [];
 
     wp_nonce_field('cf7_redirect_settings', 'cf7_redirect_nonce');
 
@@ -320,6 +341,7 @@ function cf7_custom_redirect_metabox($form_id)
             'description' => 'Open popup',
         ),
     ), $form_id);
+    $action_choices = array_intersect_key((array) $action_choices, array_flip($allowed_actions));
 ?>
 
     <div id="cf7-submit-action-metabox" class="sp-admin-component" data-sp-admin-component>
@@ -358,6 +380,7 @@ function cf7_custom_redirect_metabox($form_id)
                 </div>
             </div>
 
+            <?php if (in_array('redirect', $allowed_actions, true)) : ?>
             <!-- Redirect Options -->
             <div class="cf7-conditional-fields cf7-redirect-fields <?php echo $action_type === 'redirect' ? 'active' : ''; ?>" data-cf7-action="redirect">
                 <div class="cf7-select-group">
@@ -373,6 +396,8 @@ function cf7_custom_redirect_metabox($form_id)
                 </div>
             </div>
 
+            <?php endif; ?>
+            <?php if (in_array('modal', $allowed_actions, true)) : ?>
             <!-- Modal Options -->
             <div class="cf7-conditional-fields cf7-modal-fields <?php echo $action_type === 'modal' ? 'active' : ''; ?>" data-cf7-action="modal">
                 <div class="cf7-select-group">
@@ -400,6 +425,7 @@ function cf7_custom_redirect_metabox($form_id)
                 </div>
             </div>
 
+            <?php endif; ?>
             <?php do_action('sp_cf7_redirect_action_fields', $form_id, $action_type); ?>
         </div>
     </div>
@@ -434,14 +460,8 @@ function cf7_save_redirect_settings($contact_form)
         return;
     }
 
-    $allowed_action_types = apply_filters('sp_cf7_redirect_action_types', array('none', 'redirect', 'modal'));
-    $allowed_action_types = array_values(array_filter(array_map('sanitize_key', (array) $allowed_action_types)));
-    $action_type = isset($_POST['cf7_action_type'])
-        ? sanitize_key(wp_unslash($_POST['cf7_action_type']))
-        : 'none';
-    if (! in_array($action_type, $allowed_action_types, true)) {
-        $action_type = 'none';
-    }
+    $action_type = sp_cf7_normalize_submit_action(isset($_POST['cf7_action_type'])
+        ? wp_unslash($_POST['cf7_action_type']) : 'none');
 
     $redirect_page = isset($_POST['cf7_redirect_page'])
         ? esc_url_raw(wp_unslash($_POST['cf7_redirect_page']))
@@ -454,9 +474,14 @@ function cf7_save_redirect_settings($contact_form)
         : 0;
 
     update_post_meta($form_id, '_cf7_action_type', $action_type);
-    update_post_meta($form_id, '_cf7_redirect_page', $redirect_page);
-    update_post_meta($form_id, '_cf7_success_modal', $success_modal);
-    update_post_meta($form_id, '_cf7_error_modal', $error_modal);
+    $allowed_actions = sp_cf7_allowed_submit_actions();
+    if (in_array('redirect', $allowed_actions, true)) {
+        update_post_meta($form_id, '_cf7_redirect_page', $redirect_page);
+    }
+    if (in_array('modal', $allowed_actions, true)) {
+        update_post_meta($form_id, '_cf7_success_modal', $success_modal);
+        update_post_meta($form_id, '_cf7_error_modal', $error_modal);
+    }
 }
 
 // ============================================
@@ -485,7 +510,7 @@ function cf7_add_data_attributes_to_forms()
             $data_attrs = 'data-loader="false" ';
 
             // Get form settings
-            $action_type = get_post_meta($form_id, '_cf7_action_type', true);
+            $action_type = sp_cf7_normalize_submit_action(get_post_meta($form_id, '_cf7_action_type', true));
 
             if ($action_type && $action_type !== 'none') {
                 $data_attrs .= 'data-action-type="' . esc_attr($action_type) . '" ';

@@ -40,6 +40,7 @@ $plugins = [
 		'sp-admin-ui-taxonomy-checklist',
 		'sp-admin-ui-taxonomy-radio',
 	],
+	// Alternatively: 'sp-cf7' => ['submit_actions' => ['none', 'redirect', 'modal', 'message']],
 	'sp-cf7' => [
 		'sp-cf7-core',
 		'sp-cf7-mail-viewer',

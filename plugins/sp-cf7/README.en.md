@@ -33,3 +33,22 @@ All submodules load by default. Configure them directly in the PHP Kit `plugins`
 ```
 
 An empty `sp-cf7` array loads no submodules. The `sp_cf7_modules` filter remains available for runtime customization.
+
+## Submit Action configuration
+
+```php
+'sp-cf7' => [
+    'submit_actions' => ['none', 'redirect', 'modal', 'message'],
+    // Optional: 'modules' => ['sp-cf7-core', 'sp-cf7-redirects', 'sp-cf7-messages'],
+],
+```
+
+Remove any unneeded action from `submit_actions`. `none` (Default) always remains
+as the safe fallback. Omitting `submit_actions` preserves all actions provided by
+loaded modules; `message` requires `sp-cf7-messages`. The restriction applies to
+the editor choices and fields, saving, and frontend behavior. Previously saved
+disabled actions behave as Default; their target metadata is retained.
+
+With this named configuration, omitting `modules` loads all default modules.
+`modules => []` disables all modules. Legacy numeric module lists, including an
+empty list, keep their original behavior.

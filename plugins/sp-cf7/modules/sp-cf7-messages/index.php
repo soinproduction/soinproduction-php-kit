@@ -118,6 +118,9 @@ final class SP_CF7_Messages
 
     public static function render_action_fields(int $form_id, string $action_type): void
     {
+        if (function_exists('sp_cf7_allowed_submit_actions') && ! in_array('message', sp_cf7_allowed_submit_actions(), true)) {
+            return;
+        }
         $message_post_id = self::find_settings_post_id($form_id);
         $editor_url = $message_post_id > 0 ? self::get_editor_url($form_id) : '';
         ?>
@@ -474,7 +477,7 @@ if (! function_exists('display_form')) {
     /**
      * Render a CF7 form together with its custom success and error messages.
      */
-    function display_form(int $form_id): void
+    function display_form(int $form_id, array $args = []): void
     {
         $form_id = absint($form_id);
         if ($form_id <= 0) return;
@@ -484,7 +487,9 @@ if (! function_exists('display_form')) {
         ?>
         <div class="form-box" data-cf7-message-wrapper data-cf7-form-id="<?php echo esc_attr($form_id); ?>">
             <div data-cf7-message-form class="w-[100%]">
+                <?php do_action('sp_cf7_before_form', $form_id, $args); ?>
                 <?php echo do_shortcode('[contact-form-7 id="' . $form_id . '"]'); ?>
+                <?php do_action('sp_cf7_after_form', $form_id, $args); ?>
             </div>
 
             <div

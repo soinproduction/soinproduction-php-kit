@@ -21,3 +21,25 @@ $settings_post_id = sp_cf7_messages_get_post_id($form_id);
 $success_html = sp_cf7_messages_get_message($form_id, 'success_message');
 $error_html = sp_cf7_messages_get_message($form_id, 'error_message');
 ```
+
+## Content inside the form state
+
+`display_form(int $form_id, array $args = [])` supports two WordPress actions:
+`sp_cf7_before_form` and `sp_cf7_after_form`. Both receive `$form_id` and `$args`.
+They run inside `[data-cf7-message-form]`, immediately before/after the CF7
+shortcode, so inserted content hides together with the form when a custom
+success/error message appears. Existing single-argument calls still work.
+
+```php
+add_action('sp_cf7_before_form', function ($form_id, $args) {
+    if (($args['context'] ?? '') === 'footer' && !empty($args['title'])) {
+        echo '<h2>' . esc_html($args['title']) . '</h2>';
+    }
+}, 10, 2);
+
+display_form($form_id, ['context' => 'footer', 'title' => 'Subscribe']);
+```
+
+Callbacks render their own HTML and must escape dynamic values. Use `context`
+to distinguish multiple instances of the same form. The helper does not add
+wrappers around hook output. Invalid/zero IDs do not invoke these actions.
