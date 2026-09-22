@@ -39,6 +39,50 @@
 	 * $services = get_field('linked_services', $market_id);
 	 * $projects = get_field('linked_projects', $market_id);
 	 *
+	 * Taxonomy options (post_types/types syntax; keys identify the TARGET type):
+	 * post_relationships([[
+	 *     'post_types'         => ['leadership', 'news_insights'],
+	 *     'field_prefix'       => 'linked_',
+	 *     'width'              => 100,
+	 *     'featured_image'     => true,
+	 *     'group_title'        => 'Related News & Insights',
+	 *     'split_by_taxonomy'  => ['news_insights' => 'news_insights_category'],
+	 *     'show_taxonomies'    => ['news_insights' => false],
+	 *     'show_uncategorized' => ['news_insights' => false],
+	 * ]]);
+	 *
+	 * On Leadership this creates one selection field per enabled category.
+	 * The reverse Leadership field on News & Insights remains a regular relationship.
+	 * Each category's add/edit screen gets a "Show Relationship field" toggle.
+	 * It defaults to on. Turning it off hides the field, preserving existing links.
+	 * The toggle is shared by all split configurations using that taxonomy.
+	 *
+	 * To show category labels in an ordinary, unsplit relationship:
+	 * post_relationships([[
+	 *     'post_types'      => ['leadership', 'news_insights'],
+	 *     'show_taxonomies' => ['news_insights' => ['news_insights_category']],
+	 * ]]);
+	 * These are alternative configurations; do not register the same pair twice.
+	 *
+	 * Defaults and behavior:
+	 * - split_by_taxonomy: off; one taxonomy slug per target type when enabled.
+	 * - show_taxonomies: no labels unless configured or splitting is enabled.
+	 *   false for a target hides labels even when split; top-level false hides all.
+	 * - show_uncategorized: true per target; false hides "Without category".
+	 * - Categories include empty terms, match exactly, and exclude descendants.
+	 * - A multi-category post appears in each matching field. Submitted selections
+	 *   are merged, so deselect it in all displayed categories to remove the link.
+	 * - These options control the editor UI, not the frontend display/query.
+	 * - Existing links are projected into the fields without a data migration.
+	 *   The canonical linked_* field remains the only relationship storage.
+	 *
+	 * Reading and updating the canonical relationship still works when split:
+	 * $news_ids = get_field('linked_news_insights', $leader_id) ?: [];
+	 * update_field('linked_news_insights', $news_ids, $leader_id);
+	 * For a first programmatic write, use the canonical ACF field key so ACF can
+	 * resolve it before reference metadata exists (same rule as ordinary fields).
+	 * See README.en.md / README.ru.md for configuration and verification examples.
+	 *
 	 * Example rendering:
 	 * foreach ((array)get_field('linked_projects', get_the_ID()) as $project_id) {
 	 *     echo esc_html(get_the_title($project_id));
@@ -288,7 +332,7 @@
 					$field_key     = $field_keys[ $post_type ][ $other_type ];
 					$reverse_key   = $field_keys[ $other_type ][ $post_type ];
 
-					$fields[] = [
+					$relationship_field = [
 						'key'           => $field_key,
 						'name'          => $field,
 						'label'         => $label,
@@ -302,6 +346,15 @@
 							'class' => 'pr-relationship-field',
 						],
 					];
+
+					require_once __DIR__ . '/taxonomy-fields.php';
+					$fields = array_merge( $fields, _pr_taxonomy_fields(
+						$relationship_field,
+						$post_type,
+						(string) ( $cfg['split_by_taxonomy'][ $other_type ] ?? '' ),
+						( $cfg['show_taxonomies'] ?? null ) === false ? false : ( $cfg['show_taxonomies'][ $other_type ] ?? [] ),
+						(bool) ( $cfg['show_uncategorized'][ $other_type ] ?? true )
+					) );
 
 					$columns[ $field ] = $label;
 
