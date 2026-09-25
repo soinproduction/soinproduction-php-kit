@@ -10,7 +10,7 @@ Render the form together with hidden success/error blocks using one helper:
 <?php display_form($form_id); ?>
 ```
 
-In `message` mode, the theme frontend handler reveals the corresponding block after a CF7 event.
+In `message` mode, the sp-cf7 frontend component reveals the corresponding block after a CF7 event.
 
 Relationships are stored in `_sp_cf7_message_post_id` on the CF7 form and `_sp_cf7_form_id` on the hidden settings post.
 
@@ -51,3 +51,7 @@ display_form($form_id, ['message_target' => '#contact-message']);
 ```
 
 `message_target` is a CSS selector for temporarily replacing a target's contents with the success message, then restoring them. PHP emits an escaped `data-cf7-message-target` attribute. The controller in `sp-cf7/assets/form-validate.js` implements replacement, a 5-second timer and restoration. It is declared in `sp-cf7/components.json` for lazy bundling. Use unique IDs per form instance. Omitting the argument preserves the existing markup. See the sp-cf7 README for frontend build dependencies.
+
+## Complete helper reference
+
+See [display_form()](../../README.en.md#rendering-forms-display_form) for its signature, all arguments, ordinary and ACF-based rendering, external heading replacement, restore timing, before/after hooks, markup structure, frontend setup and troubleshooting.
