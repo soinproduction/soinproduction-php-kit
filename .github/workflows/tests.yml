@@ -23,7 +23,7 @@ jobs:
       - name: Lint PHP
         run: find . -type f -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l
       - name: Run PHP checks
-        run: for test in tests/*.php; do php "$test"; done
+        run: for test in tests/*.php; do php "$test" || exit 1; done
 
   javascript:
     runs-on: ubuntu-latest
@@ -33,4 +33,4 @@ jobs:
         with:
           node-version: 20
       - name: Run JavaScript checks
-        run: for test in tests/*.js; do node "$test"; done
+        run: for test in tests/*.js tests/*.cjs; do node "$test" || exit 1; done

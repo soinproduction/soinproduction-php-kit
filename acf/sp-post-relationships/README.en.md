@@ -77,4 +77,4 @@ Use the canonical field, not virtual category field names. It includes all links
 
 ### Verification
 
-`php tests/post-relationships.php` checks ordinary field registration without WordPress. Run integration checks with `wp eval-file tests/post-relationships-taxonomy-wp.php` and `wp eval-file tests/post-relationships-taxonomy-toggle-wp.php` in a test WordPress using the Leadership / News & Insights configuration above (at least two enabled categories). They create temporary drafts/a category and remove them in `finally`.
+`php tests/post-relationships.php` checks ordinary field registration without WordPress. Run integration checks with `wp eval-file tests/integration/post-relationships-taxonomy-wp.php` and `wp eval-file tests/integration/post-relationships-taxonomy-toggle-wp.php` in a test WordPress using the Leadership / News & Insights configuration above (at least two enabled categories). They create temporary drafts/a category and remove them in `finally`.

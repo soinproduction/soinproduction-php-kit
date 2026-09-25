@@ -77,4 +77,4 @@ $news_ids = get_field('linked_news_insights', $leader_id) ?: [];
 
 ### Проверки
 
-`php tests/post-relationships.php` проверяет регистрацию обычных полей без WordPress. Интеграционные проверки запускаются через `wp eval-file tests/post-relationships-taxonomy-wp.php` и `wp eval-file tests/post-relationships-taxonomy-toggle-wp.php` в тестовом WordPress с конфигурацией Leadership / News & Insights из примера (минимум две включённые категории). Они создают временные черновики/категорию и удаляют их в `finally`.
+`php tests/post-relationships.php` проверяет регистрацию обычных полей без WordPress. Интеграционные проверки запускаются через `wp eval-file tests/integration/post-relationships-taxonomy-wp.php` и `wp eval-file tests/integration/post-relationships-taxonomy-toggle-wp.php` в тестовом WordPress с конфигурацией Leadership / News & Insights из примера (минимум две включённые категории). Они создают временные черновики/категорию и удаляют их в `finally`.
