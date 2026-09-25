@@ -43,3 +43,11 @@ display_form($form_id, ['context' => 'footer', 'title' => 'Subscribe']);
 Callbacks render their own HTML and must escape dynamic values. Use `context`
 to distinguish multiple instances of the same form. The helper does not add
 wrappers around hook output. Invalid/zero IDs do not invoke these actions.
+
+## Место вывода сообщения
+
+```php
+display_form($form_id, ['message_target' => '#contact-message']);
+```
+
+`message_target` — CSS-селектор блока для временного вывода успешного сообщения вместо его содержимого с последующим восстановлением. PHP выводит экранированный `data-cf7-message-target`. Сам перенос, таймер и восстановление реализует frontend-обработчик темы (в текущей интеграции — 5 секунд); модуль пока не поставляет этот JS. ID должен быть уникальным для каждого экземпляра. Без аргумента сохраняется прежняя разметка и поведение формы. См. корневой TODO по переносу обработчика в кит.

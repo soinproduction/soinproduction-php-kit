@@ -27,6 +27,7 @@ $acf = [
 	'_sp-table',
 	'_sp-term-links',
 	'_sp-media',
+	'_sp-interactive-map',
 	'_sp-archive-builder',
 ];
 

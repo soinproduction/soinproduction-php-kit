@@ -43,3 +43,11 @@ display_form($form_id, ['context' => 'footer', 'title' => 'Subscribe']);
 Callbacks render their own HTML and must escape dynamic values. Use `context`
 to distinguish multiple instances of the same form. The helper does not add
 wrappers around hook output. Invalid/zero IDs do not invoke these actions.
+
+## Message target
+
+```php
+display_form($form_id, ['message_target' => '#contact-message']);
+```
+
+`message_target` is a CSS selector for temporarily replacing a target's contents with the success message, then restoring them. PHP emits an escaped `data-cf7-message-target` attribute. The theme's frontend controller must implement the replacement, timer and restoration (5 seconds in the current integration); this module does not yet ship that JS. Use unique IDs per form instance. Omitting the argument preserves the existing markup. See the root TODO for the controller extraction.

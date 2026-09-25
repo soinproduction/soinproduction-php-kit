@@ -72,3 +72,10 @@ foreach ([null, [], ['sp-cf7-core'], ['submit_actions'=>['none']], ['modules'=>[
     $expected = $value === null || isset($value['submit_actions']) && !array_key_exists('modules', $value) ? 8 : ($value === ['sp-cf7-core'] ? 1 : 0);
     check(count($GLOBALS['loaded_modules']) === $expected, 'Module loader compatibility: ' . json_encode($value));
 }
+
+ob_start(); display_form(6, ['message_target' => '#contact-1']); $html = ob_get_clean();
+check(str_contains($html, 'data-cf7-message-target="#contact-1"'), 'Message target passed to frontend');
+ob_start(); display_form(6, ['message_target' => '[data-title="contact"]']); $html = ob_get_clean();
+check(str_contains($html, '&quot;contact&quot;'), 'Message selector attribute escaped');
+ob_start(); display_form(6); $html = ob_get_clean();
+check(!str_contains($html, 'data-cf7-message-target='), 'Message target remains opt-in');

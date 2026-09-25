@@ -485,7 +485,7 @@ if (! function_exists('display_form')) {
         $success_message = sp_cf7_messages_get_message($form_id, 'success_message');
         $error_message = sp_cf7_messages_get_message($form_id, 'error_message');
         ?>
-        <div class="form-box" data-cf7-message-wrapper data-cf7-form-id="<?php echo esc_attr($form_id); ?>">
+        <div class="form-box" data-cf7-message-wrapper data-cf7-form-id="<?php echo esc_attr($form_id); ?>"<?php if (!empty($args['message_target'])) : ?> data-cf7-message-target="<?php echo esc_attr($args['message_target']); ?>"<?php endif; ?>>
             <div data-cf7-message-form class="w-[100%]">
                 <?php do_action('sp_cf7_before_form', $form_id, $args); ?>
                 <?php echo do_shortcode('[contact-form-7 id="' . $form_id . '"]'); ?>
