@@ -34,7 +34,8 @@ if (! function_exists('display_interactive_map')) {
 
         $script = __DIR__ . '/assets/map-module.js';
         $script_url = \SoinProduction\Kit\Bootstrapper::pathToUrl($script);
-        if ($script_url !== '') {
+        $config = \SoinProduction\Kit\Bootstrapper::moduleConfig('acf', 'sp-interactive-map') ?? [];
+        if (($config['enqueue_script'] ?? true) && $script_url !== '') {
             wp_enqueue_script('sp-interactive-map', $script_url, [], (string) filemtime($script), true);
         }
 
@@ -42,7 +43,7 @@ if (! function_exists('display_interactive_map')) {
         $marker_class = $args['marker_class'] ?? '';
         $zoom_enabled = !empty($value['zoom_enabled']);
         ?>
-        <div class="<?php echo esc_attr($class); ?>"<?= $zoom_enabled ? ' data-map-zoom' : ''; ?>>
+        <div data-interactive-map class="<?php echo esc_attr($class); ?>"<?= $zoom_enabled ? ' data-map-zoom' : ''; ?>>
             <div data-map-zoom-viewport class="[--map-edge-fade:0px] [mask-image:linear-gradient(to_right,transparent,rgba(0,0,0,.15)_calc(var(--map-edge-fade)*.2),rgba(0,0,0,.5)_calc(var(--map-edge-fade)*.5),rgba(0,0,0,.85)_calc(var(--map-edge-fade)*.8),black_var(--map-edge-fade),black_calc(100%_-_var(--map-edge-fade)),rgba(0,0,0,.85)_calc(100%_-_var(--map-edge-fade)*.8),rgba(0,0,0,.5)_calc(100%_-_var(--map-edge-fade)*.5),rgba(0,0,0,.15)_calc(100%_-_var(--map-edge-fade)*.2),transparent),linear-gradient(to_bottom,transparent,rgba(0,0,0,.15)_calc(var(--map-edge-fade)*.2),rgba(0,0,0,.5)_calc(var(--map-edge-fade)*.5),rgba(0,0,0,.85)_calc(var(--map-edge-fade)*.8),black_var(--map-edge-fade),black_calc(100%_-_var(--map-edge-fade)),rgba(0,0,0,.85)_calc(100%_-_var(--map-edge-fade)*.8),rgba(0,0,0,.5)_calc(100%_-_var(--map-edge-fade)*.5),rgba(0,0,0,.15)_calc(100%_-_var(--map-edge-fade)*.2),transparent)] [mask-composite:intersect] <?= $zoom_enabled ? 'overflow-hidden data-[zoomed=true]:cursor-grab data-[zoomed=true]:touch-none data-[dragging=true]:cursor-grabbing data-[dragging=true]:select-none' : ''; ?>">
             <div class="position-[relative] origin-center"<?= $zoom_enabled ? ' data-map-zoom-layer' : ''; ?>>
                 <?php echo wp_get_attachment_image($map_id, 'full', false, ['class' => 'd-[block] w-full h-auto! object-contain text-[transparent]', 'loading' => $args['loading'] ?? 'lazy']); ?>

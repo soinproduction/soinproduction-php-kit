@@ -34,3 +34,19 @@ JS `assets/map-module.js` подключается автоматически в
 Тема должна поддерживать используемые utilities `d-[...]`, `position-[...]` и цветовую переменную `--bg-a`. Админские стили и JS встроены в поле и не требуют сборки темы.
 
 При переносе из темы удалите локальный PHP-регистратор поля и локальный `map-module.js`, сохранив шаблоны тултипов и ACF JSON. Имена полей и формат хранения не меняются; миграция записей не нужна.
+
+## Webpack chunk
+
+```php
+'acf' => [
+    'sp-interactive-map' => ['enqueue_script' => false],
+],
+```
+
+```js
+// source/js/components/map-module.js (theme)
+import '../../../vendor/soinproduction/php-kit/acf/sp-interactive-map/assets/map-module.js';
+export const ROOT_SELECTOR = '[data-interactive-map]';
+```
+
+Загрузчик компонентов темы определяет ROOT_SELECTOR и лениво импортирует этот адаптер. Webpack включает runtime кита в chunk компонента. Отдельный enqueue отключён, повторного запуска нет. После обновления пакета пересоберите JS темы.
