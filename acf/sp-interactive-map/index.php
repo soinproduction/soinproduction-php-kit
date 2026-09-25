@@ -3,6 +3,11 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
+// Capture configuration while this module is loaded; later Bootstrapper passes may load only plugins.
+if ((\SoinProduction\Kit\Bootstrapper::moduleConfig('acf', 'sp-interactive-map')['enqueue_script'] ?? true) === false) {
+    add_filter('sp_interactive_map_enqueue_script', '__return_false');
+}
+
 if (! function_exists('sp_interactive_map_points')) {
     function sp_interactive_map_points($value): array
     {
@@ -34,8 +39,7 @@ if (! function_exists('display_interactive_map')) {
 
         $script = __DIR__ . '/assets/map-module.js';
         $script_url = \SoinProduction\Kit\Bootstrapper::pathToUrl($script);
-        $config = \SoinProduction\Kit\Bootstrapper::moduleConfig('acf', 'sp-interactive-map') ?? [];
-        if (($config['enqueue_script'] ?? true) && $script_url !== '') {
+        if (apply_filters('sp_interactive_map_enqueue_script', true) && $script_url !== '') {
             wp_enqueue_script('sp-interactive-map', $script_url, [], (string) filemtime($script), true);
         }
 

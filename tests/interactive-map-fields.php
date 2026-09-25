@@ -18,6 +18,7 @@ function acf_update_value($v,$p,$f){$GLOBALS['db'][$p][$f['name']]=$v;}
 function acf_get_value($p,$f){return acf_get_metadata($p,$f['name']);}
 function acf_delete_value($p,$f){unset($GLOBALS['db'][$p][$f['name']]);}
 function acf_validate_value($v,$f,$input){$GLOBALS['validated'][]=$input;}
+require dirname(__DIR__) . '/src/Bootstrapper.php';
 require dirname(__DIR__) . '/acf/sp-interactive-map/index.php';
 function check($ok,$label){if(!$ok)throw new Exception($label);echo "PASS $label\n";}
 $m=$GLOBALS['map'];
