@@ -35,18 +35,14 @@ JS `assets/map-module.js` подключается автоматически в
 
 При переносе из темы удалите локальный PHP-регистратор поля и локальный `map-module.js`, сохранив шаблоны тултипов и ACF JSON. Имена полей и формат хранения не меняются; миграция записей не нужна.
 
-## Webpack chunk
+## Webpack lazy components
+
+`components.json` declares the module's frontend entry and root selectors. The theme build can discover `{acf,plugins,platform}/*/components.json` automatically and generate literal dynamic imports, with one named chunk per component. No theme adapter file is needed. Only load a chunk when one of its selectors exists on the page.
+
+Disable the standalone script when using this integration:
 
 ```php
-'acf' => [
-    'sp-interactive-map' => ['enqueue_script' => false],
-],
+'acf' => ['sp-interactive-map' => ['enqueue_script' => false]],
 ```
 
-```js
-// source/js/components/map-module.js (theme)
-import '../../../vendor/soinproduction/php-kit/acf/sp-interactive-map/assets/map-module.js';
-export const ROOT_SELECTOR = '[data-interactive-map]';
-```
-
-Загрузчик компонентов темы определяет ROOT_SELECTOR и лениво импортирует этот адаптер. Webpack включает runtime кита в chunk компонента. Отдельный enqueue отключён, повторного запуска нет. После обновления пакета пересоберите JS темы.
+Rebuild theme JS after updating Composer dependencies. The runtime source stays in the kit; do not copy it into the theme.

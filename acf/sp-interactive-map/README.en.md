@@ -26,18 +26,14 @@ Frontend styling uses Tailwind, with `d-[...]` / `position-[...]` utilities and 
 
 Admin assets are embedded and need no theme build. When migrating from a theme, remove its duplicate field PHP and map runtime, keep tooltip templates and ACF JSON, then rebuild Tailwind. Existing field names and storage stay unchanged.
 
-## Webpack chunk
+## Webpack lazy components
+
+`components.json` declares the module's frontend entry and root selectors. The theme build can discover `{acf,plugins,platform}/*/components.json` automatically and generate literal dynamic imports, with one named chunk per component. No theme adapter file is needed. Only load a chunk when one of its selectors exists on the page.
+
+Disable the standalone script when using this integration:
 
 ```php
-'acf' => [
-    'sp-interactive-map' => ['enqueue_script' => false],
-],
+'acf' => ['sp-interactive-map' => ['enqueue_script' => false]],
 ```
 
-```js
-// source/js/components/map-module.js (theme)
-import '../../../vendor/soinproduction/php-kit/acf/sp-interactive-map/assets/map-module.js';
-export const ROOT_SELECTOR = '[data-interactive-map]';
-```
-
-Use the theme component loader to discover ROOT_SELECTOR and import this adapter lazily. Webpack bundles the kit runtime in the component chunk. Do not also enqueue the standalone script. Rebuild theme JS after package updates.
+Rebuild theme JS after updating Composer dependencies. The runtime source stays in the kit; do not copy it into the theme.

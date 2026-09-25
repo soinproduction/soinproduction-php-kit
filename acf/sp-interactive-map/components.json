@@ -1,0 +1,6 @@
+{
+  "map-module": {
+    "entry": "assets/map-module.js",
+    "selectors": ["[data-interactive-map]"]
+  }
+}
