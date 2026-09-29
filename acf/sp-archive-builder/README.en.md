@@ -86,6 +86,9 @@ definition; ACF `format_value()` merges them into the returned archive config.
 Setup options override field-level relationship definitions for that instance.
 Use `sp_archive_filters()` to render the controls and `sp_archive_sort()` for
 sorting. Keep the usual cards, pagination and JSON config wrappers.
+For a Reset button, call `sp_archive_reset()` in the section template and enable
+`reset` in the ACF field. The ACF toggle allows rendering; it does not insert
+markup into a custom template automatically.
 
 - The key is the control name. Optional `name` overrides it; optional `query_arg`
   sets a different public URL parameter. Use unique names that do not collide
@@ -99,7 +102,13 @@ sorting. Keep the usual cards, pagination and JSON config wrappers.
   fields; other integrations must maintain their own reverse arrays.
 - `ui` accepts `select`, `multiselect`, `buttons`, `radio` and `checkbox`.
   Optional `label` is the control title; `all_label` is its empty-choice label.
-- Values are source post IDs. Multiple choices in one filter use OR; separate
+- Option labels use non-empty `short_title` post metadata, falling back to
+  `get_the_title()`. Values in controls, AJAX and URLs are source post slugs
+  (`post_name`), for example `?testimonial_service=energy-audits-for-buildings`.
+  Existing numeric-ID links remain accepted and are normalized to slugs in
+  the archive state; a real numeric slug takes precedence over a legacy ID.
+  The slug `all` is reserved for the empty choice.
+- Multiple choices in one filter use OR; separate
   filters use AND. Manual selection, taxonomy filters and `term_scope` further
   restrict that intersection. Manual order remains authoritative.
 - No selection means no relationship restriction. Empty matches return zero
@@ -109,7 +118,7 @@ sorting. Keep the usual cards, pagination and JSON config wrappers.
   infinite scroll, confirm/reset and `disable_empty` use the same constraints.
   `group_on_all` remains a taxonomy-only feature.
 - Definitions are stored in the server-side archive token. AJAX only supplies
-  selected IDs; client-provided source types and metadata keys are ignored.
+  selected slugs; client-provided source types and metadata keys are ignored.
 
 **Frontend compatibility:** the frontend controller lives in the consuming
 theme. A controller that previously admitted only taxonomy filters must accept

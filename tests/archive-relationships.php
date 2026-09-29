@@ -16,9 +16,11 @@ function get_posts(array $args): array {
         throw new RuntimeException('Unexpected source query');
     }
     $ids = $args['post_type'] === 'markets' ? [10] : [20, 21, 22];
-    return array_map(static fn(int $id) => (object) ['ID' => $id, 'post_title' => 'Source ' . $id], $ids);
+    return array_map(static fn(int $id) => (object) ['ID' => $id, 'post_title' => 'Source ' . $id, 'post_name' => 'source-' . $id], $ids);
 }
+function get_the_title($post): string { return $post->post_title; }
 function get_post_meta(int $id, string $key, bool $single) {
+    if ($key === 'short_title') { return [20 => 'Short service', 21 => '   '][$id] ?? ''; }
     if ($key !== 'linked_testimonials') { return []; }
     return [10 => [1, 2, 3], 20 => ['2', '3', '4'], 21 => [1], 22 => []][$id] ?? [];
 }
@@ -34,6 +36,11 @@ $args = static fn(array $values, array $extra = []) => sp_archive_query_args(arr
 $both = $args(['industry' => '10', 'service' => '20']);
 $manual = $args(['service' => '20'], ['post__in' => [4, 1, 3, 2], 'sort' => 'manual']);
 $checks = [
+    'slugs filter relationships' => $args(['industry' => 'source-10', 'service' => 'source-20'])['post__in'] === [2, 3],
+    'slug multiselect unions' => $args(['service' => 'source-20|source-21'])['post__in'] === [2, 3, 4, 1],
+    'short title takes precedence' => sp_archive_relationship_options($filters[1])['source-20'] === 'Short service',
+    'blank short title falls back' => sp_archive_relationship_options($filters[1])['source-21'] === 'Source 21',
+    'missing short title falls back' => sp_archive_relationship_options($filters[1])['source-22'] === 'Source 22',
     'no selection leaves archive unrestricted' => ! isset($args([])['post__in']),
     'one filter restricts IDs' => $args(['industry' => '10'])['post__in'] === [1, 2, 3],
     'separate filters intersect' => $both['post__in'] === [2, 3],
@@ -48,8 +55,8 @@ $checks = [
     'relationship does not create a taxonomy query' => ! isset($both['tax_query']),
     'taxonomy scope remains applied' => isset($args(['service' => '20'], ['term_scope' => ['category' => ['news']]])['tax_query']),
     'paging remains in SQL' => $args(['service' => '20'], ['per_page' => 2, 'paged' => 3])['paged'] === 3,
-    'custom URL argument is parsed' => sp_archive_filter_values($filters, ['industry-id' => '10'])['industry'] === '10',
-    'AJAX control name is parsed' => sp_archive_filter_values($filters, ['industry' => '10'])['industry'] === '10',
+    'custom URL argument is parsed' => sp_archive_filter_values($filters, ['industry-id' => '10'])['industry'] === 'source-10',
+    'AJAX control name is parsed' => sp_archive_filter_values($filters, ['industry' => '10'])['industry'] === 'source-10',
     'invalid request remains restrictive' => sp_archive_filter_values($filters, ['service' => '!!!'])['service'] === '__invalid__',
     'all removes restriction' => ! isset($args(['service' => 'all'])['post__in']),
     'invalid definition is rejected' => sp_archive_normalize_relationship_filters(['x' => ['post_type' => 'missing', 'reverse_field' => 'x']]) === [],

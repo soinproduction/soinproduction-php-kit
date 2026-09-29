@@ -38,7 +38,7 @@ function sp_archive_normalize_relationship_filters($filters): array
 }
 
 /** Published source posts only; shared by rendering, validation and availability. */
-function sp_archive_relationship_options(array $filter): array
+function sp_archive_relationship_sources(array $filter): array
 {
     static $cache = [];
     $post_type = $filter['post_type'];
@@ -59,21 +59,43 @@ function sp_archive_relationship_options(array $filter): array
     }
     $options = [];
     foreach (get_posts($args) as $post) {
-        $options[(string) $post->ID] = $post->post_title;
+        $slug = (string) $post->post_name;
+        if ($slug === '' || $slug === 'all') { continue; }
+        $short_title = get_post_meta((int) $post->ID, 'short_title', true);
+        $short_title = is_scalar($short_title) ? trim((string) $short_title) : '';
+        $options[$slug] = [
+            'id' => (int) $post->ID,
+            'label' => $short_title !== '' ? $short_title : get_the_title($post),
+        ];
     }
     return $cache[$key] = $options;
 }
 
+function sp_archive_relationship_options(array $filter): array
+{
+    return array_map(static fn(array $source): string => $source['label'], sp_archive_relationship_sources($filter));
+}
+
 /** Keep malformed non-empty input restrictive instead of turning it into All. */
-function sp_archive_relationship_values($value): array
+function sp_archive_relationship_values($value, ?array $filter = null): array
 {
     $values = is_array($value) ? $value : (is_string($value) ? explode('|', $value) : [$value]);
     $output = [];
+    $sources = $filter !== null ? sp_archive_relationship_sources($filter) : [];
+    $legacy_ids = [];
+    foreach ($sources as $slug => $source) {
+        $legacy_ids[(string) $source['id']] = (string) $slug;
+    }
     foreach ($values as $item) {
         if ($item === null || $item === '' || $item === 'all') { continue; }
         $item = is_string($item) || is_int($item) ? trim((string) $item) : '__invalid__';
         if ($item === '' || $item === 'all') { continue; }
-        $output[] = preg_match('/^[1-9][0-9]*$/', $item) ? $item : '__invalid__';
+        if ($item === '__invalid__' || sanitize_title($item) !== $item) {
+            $output[] = '__invalid__';
+            continue;
+        }
+        // Preserve existing ID-based links, but prefer an actual numeric slug.
+        $output[] = array_key_exists($item, $sources) ? $item : ($legacy_ids[$item] ?? $item);
     }
     return array_values(array_unique($output));
 }
@@ -85,18 +107,17 @@ function sp_archive_relationship_post_ids(array $filters, array $values, ?array 
         if (($filter['type'] ?? '') !== 'relationship') {
             continue;
         }
-        $selected = sp_archive_relationship_values($values[$filter['name']] ?? '');
+        $selected = sp_archive_relationship_values($values[$filter['name']] ?? '', $filter);
         if (! $selected) {
             continue;
         }
-        $options = sp_archive_relationship_options($filter);
+        $sources = sp_archive_relationship_sources($filter);
         $matched = [];
-        foreach ($selected as $id) {
-            // Do not coerce a malformed value into a different, valid post ID.
-            if (! preg_match('/^[1-9][0-9]*$/', $id) || ! array_key_exists($id, $options)) {
+        foreach ($selected as $slug) {
+            if (! array_key_exists($slug, $sources)) {
                 continue;
             }
-            $related = get_post_meta((int) $id, $filter['reverse_field'], true);
+            $related = get_post_meta($sources[$slug]['id'], $filter['reverse_field'], true);
             if (is_array($related)) {
                 $matched = array_merge($matched, array_filter(array_map('absint', $related)));
             }

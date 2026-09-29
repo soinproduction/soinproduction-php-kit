@@ -67,11 +67,20 @@ try {
     update_post_meta($draft_service, 'linked_sp_arc_item', [$a]);
     wp_set_object_terms($b, 'Included', 'sp_arc_category');
 
+    $market_slug = get_post_field('post_name', $market);
+    $service_slug = get_post_field('post_name', $service);
+    $empty_service_slug = get_post_field('post_name', $empty_service);
+    update_post_meta($service, 'short_title', 'Short service');
+    update_post_meta($empty_service, 'short_title', '   ');
+
     $definitions = [
         'industry' => ['post_type' => 'sp_arc_market', 'reverse_field' => 'linked_sp_arc_item', 'query_arg' => 'industry-id', 'all_label' => 'Industries'],
         'service' => ['post_type' => 'sp_arc_service', 'reverse_field' => 'linked_sp_arc_item'],
     ];
     $filters = sp_archive_normalize_relationship_filters($definitions);
+    $check(sp_archive_relationship_options($filters[1])[$service_slug] === 'Short service', 'Short title takes precedence');
+    $check(sp_archive_relationship_options($filters[1])[$empty_service_slug] === 'Empty', 'Whitespace short title falls back');
+    $check(sp_archive_relationship_options($filters[0])[$market_slug] === 'Market', 'Missing short title falls back');
     $base = ['post_type' => 'sp_arc_item', 'filters' => $filters, 'sort' => 'az', 'per_page' => -1];
     $query = static fn(array $values, array $extra = []) => new WP_Query(sp_archive_query_args(array_merge($base, ['filter_values' => $values], $extra)));
     $post_ids = static fn($query) => array_map('intval', wp_list_pluck($query->posts, 'ID'));
@@ -79,7 +88,9 @@ try {
     $check(count($filters) === 2 && $filters[0]['type'] === 'relationship', 'Definitions normalize');
     $check(sp_archive_normalize_relationship_filters(['bad' => ['post_type' => 'missing', 'reverse_field' => 'x']]) === [], 'Unknown source type rejected');
     $check(sp_archive_normalize_relationship_filters(['bad' => ['post_type' => 'sp_arc_market']]) === [], 'Missing reverse field rejected');
-    $check(! isset(sp_archive_relationship_options($filters[1])[$draft_service]), 'Draft sources excluded');
+    $check(! isset(sp_archive_relationship_options($filters[1])[get_post_field('post_name', $draft_service)]), 'Draft sources excluded');
+    $check($post_ids($query(['industry' => $market_slug, 'service' => $service_slug])) === [$b, $c], 'Slug filters intersect');
+    $check($post_ids($query(['service' => $service_slug . '|' . get_post_field('post_name', $other_service)])) === [$a, $b, $c, $d], 'Multiple slugs union');
     $check($post_ids($query([])) === [$a, $b, $c, $d], 'No filters return all published archive posts');
     $check($post_ids($query(['industry' => (string) $market])) === [$a, $b, $c], 'One relationship excludes draft target');
     $check($post_ids($query(['industry' => (string) $market, 'service' => (string) $service])) === [$b, $c], 'Two relationships intersect');
@@ -99,11 +110,11 @@ try {
     $check($post_ids($query(['service' => (string) $service, 'category' => 'included'], ['filters' => array_merge($filters, [$taxonomy_filter])])) === [$b], 'Taxonomy filter combines with relationships');
     $paged = $query(['service' => (string) $service], ['per_page' => 1, 'paged' => 2, 'sort' => 'za']);
     $check($post_ids($paged) === [$c] && (int) $paged->found_posts === 3 && (int) $paged->max_num_pages === 3, 'SQL sorting, pagination and totals');
-    $check(sp_archive_filter_values($filters, ['industry-id' => (string) $market])['industry'] === (string) $market, 'Custom URL argument works');
+    $check(sp_archive_filter_values($filters, ['industry-id' => (string) $market])['industry'] === $market_slug, 'Custom URL argument works');
 
     $availability = sp_archive_filter_availability(array_merge($base, ['filter_values' => ['industry' => (string) $market]]));
-    $check($availability['service'][$service] === true && $availability['service'][$empty_service] === false, 'Availability uses relationship intersections');
-    $config = ['post_type' => 'sp_arc_item', 'filters_enabled' => 1, 'relationship_filters' => $definitions, 'per_page' => 1, 'order_mode' => 'az'];
+    $check($availability['service'][$service_slug] === true && $availability['service'][$empty_service_slug] === false, 'Availability uses relationship intersections');
+    $config = ['post_type' => 'sp_arc_item', 'filters_enabled' => 1, 'relationship_filters' => $definitions, 'per_page' => 1, 'order_mode' => 'az', 'reset' => 1];
     $legacy = new WP_Query(sp_archive_builder_query_args(array_merge($config, ['per_page' => -1]), ['industry-id' => (string) $market, 'service' => (string) $service]));
     $check($post_ids($legacy) === [$b, $c], 'Low-level builder query helper supports relationship values');
     $_GET = ['industry-id' => (string) $market, 'service' => (string) $service];
@@ -111,6 +122,10 @@ try {
     $ctx = _sp_archive_ctx();
     $tokens[] = $ctx['archive_token'];
     $check($post_ids($ctx['query']) === [$b] && $ctx['total_pages'] === 2, 'Initial setup applies relationships');
+    ob_start();
+    sp_archive_reset('Reset filters');
+    $reset_html = ob_get_clean();
+    $check(str_contains($reset_html, 'data-sp-archive-reset') && ! str_contains($reset_html, ' disabled'), 'Reset renders enabled for active filters');
     $stored = sp_archive_get_config($ctx['archive_token']);
     $check($stored['filters'][0]['reverse_field'] === 'linked_sp_arc_item', 'Server token retains trusted definition');
     ob_start();
@@ -125,7 +140,7 @@ try {
     sp_archive_filters();
     ob_end_clean();
     remove_action('get_template_part_' . $select_template, $capture, 10);
-    $check(count($rendered) === 2 && isset($rendered[0]['options'][$market]) && $rendered[0]['value'] === (string) $market, 'Relationship controls render published options and selection');
+    $check(count($rendered) === 2 && isset($rendered[0]['options'][$market_slug]) && $rendered[0]['value'] === $market_slug, 'Relationship controls render published options and selection');
 
     $ajax = true;
     $request = static function (array $extra) use (&$ctx): array {
@@ -144,6 +159,8 @@ try {
     };
     $response = $request(['industry' => (string) $market, 'service' => (string) $service, 'paged' => 2]);
     $check($response['success'] && $response['data']['found'] === 2 && $response['data']['max_pages'] === 2 && str_contains($response['data']['html'], 'data-test-id="' . $c . '"'), 'AJAX returns second page of intersection');
+    $response = $request(['industry' => $market_slug, 'service' => $service_slug, 'paged' => 2]);
+    $check($response['success'] && $response['data']['found'] === 2 && str_contains($response['data']['html'], 'data-test-id="' . $c . '"'), 'AJAX accepts slugs');
     $response = $request(['service' => (string) $empty_service]);
     $check($response['success'] && $response['data']['found'] === 0 && $response['data']['html'] === '<p>No matches</p>', 'AJAX empty state');
     $response = $request(['service' => (string) $service, 'sort' => 'za']);
@@ -178,6 +195,9 @@ try {
     $ctx = _sp_archive_ctx();
     $tokens[] = $ctx['archive_token'];
     $check($ctx['archive_filters'] === [], 'Reserved payload name rejected');
+    ob_start();
+    sp_archive_reset('Reset filters');
+    $check(str_contains(ob_get_clean(), ' disabled'), 'Reset is disabled when filters are clear');
     $field_type = acf_get_field_type('archive_builder');
     $formatted = $field_type->format_value([], 0, array_merge($field_type->defaults, $config));
     $check(count($formatted['relationship_filters']) === 2, 'ACF formatting preserves field-level relationship definitions');

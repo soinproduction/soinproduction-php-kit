@@ -814,7 +814,7 @@ if (! function_exists('sp_archive_filter_values')) {
             if (array_key_exists($query_arg, $source))      { $value = $source[$query_arg]; }
             elseif (array_key_exists($name, $source))       { $value = $source[$name]; }
             $terms = ($filter['type'] ?? '') === 'relationship'
-                ? sp_archive_relationship_values($value)
+                ? sp_archive_relationship_values($value, $filter)
                 : sp_archive_normalize_filter_terms($value);
             $output[$name]   = count($terms) > 1 ? $terms : ($terms[0] ?? '');
         }
