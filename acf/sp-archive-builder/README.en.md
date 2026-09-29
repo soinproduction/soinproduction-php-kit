@@ -67,12 +67,14 @@ sp_archive_setup($archive, 'php/cards/testimonial-card', [
         'testimonial_industry' => [
             'post_type' => 'markets',
             'reverse_field' => 'linked_testimonials',
+            'alt_title' => 'short_title',
             'all_label' => 'Industries',
             'ui' => 'select',
         ],
         'testimonial_service' => [
             'post_type' => 'services',
             'reverse_field' => 'linked_testimonials',
+            'alt_title' => 'short_title',
             'all_label' => 'Service',
             'ui' => 'select',
         ],
@@ -102,8 +104,11 @@ markup into a custom template automatically.
   fields; other integrations must maintain their own reverse arrays.
 - `ui` accepts `select`, `multiselect`, `buttons`, `radio` and `checkbox`.
   Optional `label` is the control title; `all_label` is its empty-choice label.
-- Option labels use non-empty `short_title` post metadata, falling back to
-  `get_the_title()`. Values in controls, AJAX and URLs are source post slugs
+- `alt_title` sets the post metadata field used for option labels independently
+  for each filter (default: `short_title`). Missing, blank or non-scalar values
+  fall back to `get_the_title()`. Set `alt_title` to an empty string to always
+  use the regular post title.
+- Values in controls, AJAX and URLs are source post slugs
   (`post_name`), for example `?testimonial_service=energy-audits-for-buildings`.
   Existing numeric-ID links remain accepted and are normalized to slugs in
   the archive state; a real numeric slug takes precedence over a legacy ID.

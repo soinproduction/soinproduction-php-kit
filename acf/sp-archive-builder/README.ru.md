@@ -41,12 +41,14 @@ sp_archive_setup($archive, 'php/cards/testimonial-card', [
         'testimonial_industry' => [
             'post_type' => 'markets',
             'reverse_field' => 'linked_testimonials',
+            'alt_title' => 'short_title',
             'all_label' => 'Industries',
             'ui' => 'select',
         ],
         'testimonial_service' => [
             'post_type' => 'services',
             'reverse_field' => 'linked_testimonials',
+            'alt_title' => 'short_title',
             'all_label' => 'Service',
             'ui' => 'select',
         ],
@@ -65,7 +67,10 @@ sp_archive_setup($archive, 'php/cards/testimonial-card', [
 Значения опций и параметры URL — слаги (`post_name`) записей, например
 `?testimonial_service=energy-audits-for-buildings`. Старые ссылки с ID также
 принимаются и преобразуются в слаги в состоянии архива. Для названий опций
-используется непустое метаполе `short_title`, иначе — `get_the_title()`.
+можно указать имя метаполя через `alt_title` отдельно для каждого фильтра
+(по умолчанию `short_title`). Если значение отсутствует, пустое или не скалярное,
+используется `get_the_title()`. Значение `'alt_title' => ''` отключает
+альтернативное поле и всегда использует обычный заголовок записи.
 
 Кнопка сброса требует и включённого `reset` в настройках ACF, и вызова
 `sp_archive_reset()` в шаблоне секции: переключатель сам не добавляет разметку.

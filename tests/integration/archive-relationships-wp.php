@@ -71,6 +71,7 @@ try {
     $service_slug = get_post_field('post_name', $service);
     $empty_service_slug = get_post_field('post_name', $empty_service);
     update_post_meta($service, 'short_title', 'Short service');
+    update_post_meta($service, 'menu_title', 'Menu service');
     update_post_meta($empty_service, 'short_title', '   ');
 
     $definitions = [
@@ -81,6 +82,12 @@ try {
     $check(sp_archive_relationship_options($filters[1])[$service_slug] === 'Short service', 'Short title takes precedence');
     $check(sp_archive_relationship_options($filters[1])[$empty_service_slug] === 'Empty', 'Whitespace short title falls back');
     $check(sp_archive_relationship_options($filters[0])[$market_slug] === 'Market', 'Missing short title falls back');
+    $custom_filter = sp_archive_normalize_relationship_filters([array_merge($filters[1], ['alt_title' => 'menu_title'])])[0];
+    $check($custom_filter['alt_title'] === 'menu_title', 'Normalization preserves alternate field');
+    $check(sp_archive_relationship_options($custom_filter)[$service_slug] === 'Menu service', 'Custom alternate field wins');
+    $check(sp_archive_relationship_options($filters[1])[$service_slug] === 'Short service', 'Label cache is isolated per alternate field');
+    $check(sp_archive_relationship_options(array_merge($custom_filter, ['alt_title' => '']))[$service_slug] === 'Service', 'Empty alternate field uses regular title');
+    $check(sp_archive_relationship_options(array_merge($custom_filter, ['alt_title' => 'missing']))[$service_slug] === 'Service', 'Missing custom alternate field falls back');
     $base = ['post_type' => 'sp_arc_item', 'filters' => $filters, 'sort' => 'az', 'per_page' => -1];
     $query = static fn(array $values, array $extra = []) => new WP_Query(sp_archive_query_args(array_merge($base, ['filter_values' => $values], $extra)));
     $post_ids = static fn($query) => array_map('intval', wp_list_pluck($query->posts, 'ID'));

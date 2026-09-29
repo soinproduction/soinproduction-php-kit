@@ -28,6 +28,7 @@ function sp_archive_normalize_relationship_filters($filters): array
             'query_arg'     => sanitize_key((string) ($filter['query_arg'] ?? $name)) ?: $name,
             'post_type'     => $post_type,
             'reverse_field' => $reverse_field,
+            'alt_title'     => sanitize_key((string) ($filter['alt_title'] ?? 'short_title')),
             'ui'            => in_array($ui, ['select', 'multiselect', 'buttons', 'radio', 'checkbox'], true) ? $ui : 'select',
             'label'         => sanitize_text_field((string) ($filter['label'] ?? '')),
             'all_label'     => sanitize_text_field((string) ($filter['all_label'] ?? '')),
@@ -43,7 +44,8 @@ function sp_archive_relationship_sources(array $filter): array
     static $cache = [];
     $post_type = $filter['post_type'];
     $language = $filter['lang'] ?? '';
-    $key = $post_type . ':' . $language;
+    $alt_title = sanitize_key((string) ($filter['alt_title'] ?? 'short_title'));
+    $key = $post_type . ':' . $language . ':' . $alt_title;
     if (isset($cache[$key])) {
         return $cache[$key];
     }
@@ -61,11 +63,11 @@ function sp_archive_relationship_sources(array $filter): array
     foreach (get_posts($args) as $post) {
         $slug = (string) $post->post_name;
         if ($slug === '' || $slug === 'all') { continue; }
-        $short_title = get_post_meta((int) $post->ID, 'short_title', true);
-        $short_title = is_scalar($short_title) ? trim((string) $short_title) : '';
+        $alternate_title = $alt_title !== '' ? get_post_meta((int) $post->ID, $alt_title, true) : '';
+        $alternate_title = is_scalar($alternate_title) ? trim((string) $alternate_title) : '';
         $options[$slug] = [
             'id' => (int) $post->ID,
-            'label' => $short_title !== '' ? $short_title : get_the_title($post),
+            'label' => $alternate_title !== '' ? $alternate_title : get_the_title($post),
         ];
     }
     return $cache[$key] = $options;

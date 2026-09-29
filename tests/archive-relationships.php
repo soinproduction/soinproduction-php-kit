@@ -20,6 +20,7 @@ function get_posts(array $args): array {
 }
 function get_the_title($post): string { return $post->post_title; }
 function get_post_meta(int $id, string $key, bool $single) {
+    if ($key === 'menu_title') { return [20 => 'Menu service', 21 => ['not text']][$id] ?? ''; }
     if ($key === 'short_title') { return [20 => 'Short service', 21 => '   '][$id] ?? ''; }
     if ($key !== 'linked_testimonials') { return []; }
     return [10 => [1, 2, 3], 20 => ['2', '3', '4'], 21 => [1], 22 => []][$id] ?? [];
@@ -36,6 +37,11 @@ $args = static fn(array $values, array $extra = []) => sp_archive_query_args(arr
 $both = $args(['industry' => '10', 'service' => '20']);
 $manual = $args(['service' => '20'], ['post__in' => [4, 1, 3, 2], 'sort' => 'manual']);
 $checks = [
+    'per-filter alternate field is used' => sp_archive_relationship_options(array_merge($filters[1], ['alt_title' => 'menu_title']))['source-20'] === 'Menu service',
+    'different fields do not share cached labels' => sp_archive_relationship_options($filters[1])['source-20'] === 'Short service',
+    'empty alt_title opts out' => sp_archive_relationship_options(array_merge($filters[1], ['alt_title' => '']))['source-20'] === 'Source 20',
+    'non-text alternate value falls back' => sp_archive_relationship_options(array_merge($filters[1], ['alt_title' => 'menu_title']))['source-21'] === 'Source 21',
+    'missing custom field falls back' => sp_archive_relationship_options(array_merge($filters[1], ['alt_title' => 'missing']))['source-20'] === 'Source 20',
     'slugs filter relationships' => $args(['industry' => 'source-10', 'service' => 'source-20'])['post__in'] === [2, 3],
     'slug multiselect unions' => $args(['service' => 'source-20|source-21'])['post__in'] === [2, 3, 4, 1],
     'short title takes precedence' => sp_archive_relationship_options($filters[1])['source-20'] === 'Short service',
