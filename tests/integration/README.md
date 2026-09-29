@@ -10,3 +10,15 @@ wp eval-file /path/to/php-kit/tests/integration/post-relationships-taxonomy-togg
 ```
 
 Running these scripts without WP-CLI remains an error. A fixture-backed CI job is needed before these can run in GitHub Actions.
+
+## Archive relationship filters
+
+```sh
+wp eval-file /path/to/php-kit/tests/integration/archive-relationships-wp.php
+```
+
+Requires this PHP Kit version, ACF, and a theme with compatible archive select
+and pagination templates plus a writable `php/cards/` directory. The test
+creates its own private post types and relationships; it does not require the
+leadership/news fixture above. Temporary posts, terms, template files and
+archive transients are removed in `finally`.

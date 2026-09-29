@@ -153,6 +153,8 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
+require_once __DIR__ . '/relationships.php';
+
 // ---------------------------------------------------------------------------
 // sp_archive — core archive helpers (moved from core/helpers/archive.php)
 // ---------------------------------------------------------------------------
@@ -463,6 +465,10 @@ if (! function_exists('sp_archive_normalize_filters')) {
         $output  = [];
         foreach ($filters as $filter) {
             if (! is_array($filter)) { continue; }
+            if (($filter['type'] ?? '') === 'relationship') {
+                $output = array_merge($output, sp_archive_normalize_relationship_filters([$filter]));
+                continue;
+            }
             $name     = sanitize_key($filter['name']     ?? $filter['key'] ?? '');
             $taxonomy = sanitize_key($filter['taxonomy'] ?? '');
             if ($name === '' || $taxonomy === '' || ! taxonomy_exists($taxonomy)) { continue; }
@@ -789,6 +795,7 @@ if (! function_exists('sp_archive_normalize_filter_terms')) {
         $values = is_array($value) ? $value : [$value];
         $output = [];
         foreach ($values as $item) {
+            if (! is_scalar($item)) { continue; }
             $item = sp_archive_normalize_choice($item);
             if ($item !== '') { $output[] = $item; }
         }
@@ -806,7 +813,9 @@ if (! function_exists('sp_archive_filter_values')) {
             $value = '';
             if (array_key_exists($query_arg, $source))      { $value = $source[$query_arg]; }
             elseif (array_key_exists($name, $source))       { $value = $source[$name]; }
-            $terms           = sp_archive_normalize_filter_terms($value);
+            $terms = ($filter['type'] ?? '') === 'relationship'
+                ? sp_archive_relationship_values($value)
+                : sp_archive_normalize_filter_terms($value);
             $output[$name]   = count($terms) > 1 ? $terms : ($terms[0] ?? '');
         }
         return $output;
@@ -838,9 +847,10 @@ if (! function_exists('sp_archive_filter_availability')) {
 
         foreach ($filters as $filter) {
             $name     = $filter['name'];
-            $taxonomy = $filter['taxonomy'];
+            $taxonomy = $filter['taxonomy'] ?? '';
+            $is_relationship = ($filter['type'] ?? '') === 'relationship';
 
-            if (! taxonomy_exists($taxonomy)) {
+            if (! $is_relationship && ! taxonomy_exists($taxonomy)) {
                 continue;
             }
 
@@ -856,7 +866,9 @@ if (! function_exists('sp_archive_filter_availability')) {
                 $terms_args['slug'] = $include;
             }
 
-            $terms = get_terms($terms_args);
+            $terms = $is_relationship
+                ? array_map('strval', array_keys(sp_archive_relationship_options($filter)))
+                : get_terms($terms_args);
 
             if (is_wp_error($terms) || empty($terms)) {
                 $output[$name] = ['all' => true];
@@ -928,6 +940,7 @@ if (! function_exists('sp_archive_query_args')) {
             $tax_query[] = ['taxonomy' => $taxonomy, 'field' => 'slug', 'terms' => $terms, 'operator' => 'IN'];
         }
         foreach ($filters as $filter) {
+            if (($filter['type'] ?? '') === 'relationship') { continue; }
             $terms = sp_archive_normalize_filter_terms($values[$filter['name']] ?? '');
             if (empty($terms)) { continue; }
             $tax_query[] = ['taxonomy' => $filter['taxonomy'], 'field' => $filter['field'], 'terms' => $terms, 'operator' => $filter['operator']];
@@ -940,11 +953,14 @@ if (! function_exists('sp_archive_query_args')) {
         if (is_array($orderby)) { $qa['orderby'] = $orderby; } else { $qa['orderby'] = $orderby; $qa['order'] = $order['order']; }
         if ($tax_query) { $qa['tax_query'] = $tax_query; }
 
-        // An explicit array means the archive is in Manual mode. WordPress treats
-        // an empty post__in as "no restriction", so use [0] to correctly return
-        // no posts when Manual mode has no selected items.
-        if (is_array($args['post__in'])) {
-            $included_posts = array_values(array_unique(array_filter(array_map('absint', $args['post__in']))));
+        // Relationships narrow the manual selection without changing its order.
+        // WordPress treats an empty post__in as unrestricted; use [0] instead.
+        $post_ids = is_array($args['post__in'])
+            ? array_values(array_unique(array_filter(array_map('absint', $args['post__in']))))
+            : null;
+        $post_ids = sp_archive_relationship_post_ids($filters, $values, $post_ids);
+        if (is_array($post_ids)) {
+            $included_posts = $post_ids;
             $qa['post__in'] = $included_posts ?: [0];
         }
 
@@ -1598,6 +1614,7 @@ function sp_archive_builder_defaults(): array
         'disable_empty'   => 0,
         'term_scope'      => [],
         'filters'         => [],
+        'relationship_filters' => [],
         'per_page'        => 9,
         'load_more_label' => 'Show More',
         'all_label'       => 'All',
@@ -1694,6 +1711,7 @@ function sp_archive_builder_normalize($value): array
     }
 
     $value['filters'] = $filters;
+    $value['relationship_filters'] = sp_archive_normalize_relationship_filters($value['relationship_filters'] ?? []);
 
     return $value;
 }
@@ -1752,7 +1770,22 @@ function sp_archive_builder_query_args($value, array $selected_terms = [], int $
     }
 
     if (! empty($config['filters_enabled']) && $selected_terms) {
+        $relationship_filters = $config['relationship_filters'];
+        foreach ($relationship_filters as &$filter) {
+            $filter['lang'] = sp_archive_current_language();
+        }
+        unset($filter);
+        $related_ids = sp_archive_relationship_post_ids(
+            $relationship_filters,
+            sp_archive_filter_values($relationship_filters, $selected_terms),
+            $args['post__in'] ?? null
+        );
+        if (is_array($related_ids)) {
+            $args['post__in'] = $related_ids ?: [0];
+        }
+        $relationship_args = array_merge(array_column($relationship_filters, 'name'), array_column($relationship_filters, 'query_arg'));
         foreach ($selected_terms as $taxonomy => $terms) {
+            if (in_array($taxonomy, $relationship_args, true)) { continue; }
             $taxonomy = sanitize_key($taxonomy);
             $terms    = array_filter(array_map('sanitize_title', (array) $terms));
 
@@ -1831,6 +1864,7 @@ function sp_archive_builder_data_config($value): string
         'postType'       => $config['post_type'],
         'filtersEnabled' => (bool) $config['filters_enabled'],
         'filters'        => $config['filters'],
+        'relationshipFilters' => $config['relationship_filters'],
         'termScope'      => $config['term_scope'],
         'disableEmpty'   => (bool) $config['disable_empty'],
         'disable_empty'  => (bool) $config['disable_empty'],
@@ -1870,6 +1904,7 @@ add_action('acf/include_field_types', function (): void {
                 'disable_empty'   => 0,
                 'term_scope'      => [],
                 'filters'         => [],
+                'relationship_filters' => [],
                 'per_page'        => 9,
                 'per_page_choices' => [],
                 'load_more_label' => 'Show More',
@@ -2385,6 +2420,7 @@ add_action('acf/include_field_types', function (): void {
             $value['group_on_all']    = sp_archive_builder_field_bool($field, 'group_on_all') ? 1 : 0;
             $value['term_scope']      = $field['term_scope'] ?? [];
             $value['filters']         = $field['filters'] ?? [];
+            $value['relationship_filters'] = $field['relationship_filters'] ?? [];
             $value['load_more_label'] = sp_archive_builder_field_load_more_label($field);
             $value['all_label']       = sp_archive_builder_field_all_label($field);
             $value['action']          = sp_archive_builder_field_query_arg($field, 'action', 'sp_archive_query');
@@ -3206,22 +3242,29 @@ if (! function_exists('sp_archive_render_filter')) {
     function sp_archive_render_filter(array $filter, array $current_filters, string $all_label = '', string $class = '', array $disabled_options = []): void
     {
         $taxonomy = $filter['taxonomy'] ?? '';
+        $is_relationship = ($filter['type'] ?? '') === 'relationship';
 
-        if (! $taxonomy || ! taxonomy_exists($taxonomy)) {
+        if (! $is_relationship && (! $taxonomy || ! taxonomy_exists($taxonomy))) {
             return;
         }
 
-        $tax_obj   = get_taxonomy($taxonomy);
+        $tax_obj   = $taxonomy !== '' ? get_taxonomy($taxonomy) : null;
         $tax_label = $tax_obj ? ($tax_obj->labels->singular_name ?? $taxonomy) : $taxonomy;
-        $title     = $tax_label . ':';
+        $title     = $is_relationship ? ($filter['label'] ?? '') : $tax_label . ':';
         $all_label = $all_label !== '' ? $all_label : __('All', THEME_SLUG);
-        $options   = sp_archive_filter_options($taxonomy, $all_label, $filter['terms'] ?? [], $filter['terms_mode'] ?? 'children');
-        $raw_value = $current_filters[$taxonomy] ?? '';
+        if ($is_relationship && ! empty($filter['all_label'])) {
+            $all_label = $filter['all_label'];
+        }
+        $options = $is_relationship
+            ? ['all' => $all_label] + sp_archive_relationship_options($filter)
+            : sp_archive_filter_options($taxonomy, $all_label, $filter['terms'] ?? [], $filter['terms_mode'] ?? 'children');
+        $name = $filter['name'] ?? $taxonomy;
+        $raw_value = $current_filters[$name] ?? '';
         $value     = $raw_value !== '' ? $raw_value : 'all';
         $ui        = $filter['ui'] ?? 'select';
 
         $common = [
-            'name'      => $taxonomy,
+            'name'      => $name,
             'value'     => $value,
             'options'   => $options,
             'title'     => $title,
@@ -3388,6 +3431,9 @@ if (! function_exists('sp_archive_setup')) {
      */
     function sp_archive_setup(array $config, string $card_template, array $opts = []): void
     {
+        if (isset($opts['relationship_filters'])) {
+            $config['relationship_filters'] = $opts['relationship_filters'];
+        }
         $config = sp_archive_builder_normalize($config);
 
         $is_manual = $config['source_mode'] === 'manual';
@@ -3431,6 +3477,30 @@ if (! function_exists('sp_archive_setup')) {
             ];
         }
 
+        $language = sp_archive_current_language();
+        $filter_names = array_column($archive_filters, 'name');
+        $query_args = array_merge(array_column($archive_filters, 'query_arg'), [
+            $page_arg, $url_page_arg, $sort_arg, $per_page_arg, 'nonce', 'archive_token',
+            'action', 'paged', 'sort', 'per_page', 'post_type', 'template', 'filters',
+            'query_arg', 'url_query_arg', 'pagination_mode',
+        ]);
+        if (! empty($config['filters_enabled'])) {
+            foreach ($config['relationship_filters'] as $filter) {
+                if (in_array($filter['name'], $query_args, true) || in_array($filter['query_arg'], $query_args, true) || in_array($filter['name'], $filter_names, true)) {
+                    continue;
+                }
+                $filter['lang'] = $language;
+                $archive_filters[] = $filter;
+                $filter_names[] = $filter['name'];
+                $query_args[] = $filter['name'];
+                $query_args[] = $filter['query_arg'];
+            }
+        }
+        // Grouping is defined only for taxonomy filters.
+        if ($archive_filters && ($archive_filters[0]['type'] ?? '') === 'relationship') {
+            $config['group_on_all'] = 0;
+        }
+
         $current_filters = sp_archive_filter_values($archive_filters, wp_unslash($_GET));
 
         $default_sort = $is_manual ? 'manual' : $config['order_mode'];
@@ -3444,8 +3514,6 @@ if (! function_exists('sp_archive_setup')) {
         if ($current_per_page === -1 && (int) $config['per_page'] !== -1) {
             $current_per_page = (int) $config['per_page'];
         }
-
-        $language = sp_archive_current_language();
 
         $paged = sp_archive_current_page($page_arg, $url_page_arg);
 
@@ -3621,7 +3689,7 @@ if (! function_exists('sp_archive_filters')) {
     {
         $ctx = _sp_archive_ctx();
 
-        if (! $ctx || empty($ctx['config']['filters']) || ! $ctx['config']['filters_enabled']) {
+        if (! $ctx || empty($ctx['archive_filters']) || ! $ctx['config']['filters_enabled']) {
             return;
         }
 
@@ -3630,8 +3698,8 @@ if (! function_exists('sp_archive_filters')) {
             : sanitize_text_field((string) ($ctx['config']['all_label'] ?? 'All'));
 
         foreach ($ctx['archive_filters'] as $filter) {
-            $taxonomy = $filter['taxonomy'] ?? '';
-            $disabled_options = $ctx['filter_availability'][$taxonomy] ?? [];
+            $name = $filter['name'] ?? $filter['taxonomy'] ?? '';
+            $disabled_options = $ctx['filter_availability'][$name] ?? [];
             sp_archive_render_filter($filter, $ctx['current_filters'], $all_label, $class, $disabled_options);
         }
     }

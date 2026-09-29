@@ -28,3 +28,49 @@ ACF-поля/factories `archive_builder()` и `taxonomy_archive_builder()` на�
 Для `per_page` поддерживаются положительное число, `-1` и строка `all`; два последних значения выводят все найденные записи без pagination. Шаблоны карточек могут находиться в `template_parts/`, `templates/`, `php/cards/` или `php/templates/`. UI-шаблоны автоматически ищутся в структурах Alexandra, Keramida и LDW, а путь можно переопределить через `sp_archive_component_template`.
 
 Текущий язык Polylang/WPML сохраняется в серверной конфигурации и применяется также к AJAX-запросам. По умолчанию проверяется nonce `ajax_global`; для LDW или другой темы с отдельным nonce добавьте `add_filter('sp_archive_nonce_action', static fn(): string => 'sp_ajax_nonce');`.
+
+## Фильтры по связанным записям
+
+Для архивов записей доступна настройка `relationship_filters` в `archive_builder()`,
+конфигурации ACF-поля или третьем аргументе `sp_archive_setup()`. Это настройка
+разработчика, отдельной панели в редакторе ACF нет. Требуется `filters_enabled => 1`.
+
+```php
+sp_archive_setup($archive, 'php/cards/testimonial-card', [
+    'relationship_filters' => [
+        'testimonial_industry' => [
+            'post_type' => 'markets',
+            'reverse_field' => 'linked_testimonials',
+            'all_label' => 'Industries',
+            'ui' => 'select',
+        ],
+        'testimonial_service' => [
+            'post_type' => 'services',
+            'reverse_field' => 'linked_testimonials',
+            'all_label' => 'Service',
+            'ui' => 'select',
+        ],
+    ],
+]);
+```
+
+Варианты — опубликованные записи указанного типа. `reverse_field` — метаполе
+на выбранной записи Service/Market с массивом ID отзывов. Модуль
+`sp-post-relationships` поддерживает эти обратные связи автоматически.
+Несколько значений одного фильтра объединяются; разные фильтры пересекаются.
+Результат также ограничивается ручной выборкой и фильтрами таксономий.
+Сортировка, пагинация, Show More и `disable_empty` применяются к итоговой выборке.
+Пустое пересечение возвращает ноль записей, ручной порядок сохраняется.
+
+Вывод выполняет обычный `sp_archive_filters()`. Поддерживаются все пять видов
+контролов. Можно задать `label` и `query_arg`; имена не должны совпадать с
+параметрами сортировки, пагинации, другими фильтрами или служебными AJAX-полями.
+
+**Нужна совместимая JS-логика темы:** при чтении конфигурации разрешите
+`type === "relationship"` наряду с `taxonomy`, затем пересоберите JS:
+
+```js
+.filter(({name, taxonomy, type}) => name && (taxonomy || type === "relationship"))
+```
+
+Полный контракт, пример и команда интеграционного теста — в `README.en.md`.

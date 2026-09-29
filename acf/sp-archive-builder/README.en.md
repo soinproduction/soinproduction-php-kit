@@ -53,6 +53,83 @@ Use the field in section `fields.php`:
 
 In Manual mode, editors select and drag posts into the required order with Smart Relationship. Pagination and filters stay limited to that selection. Public and editor sorting controls are disabled because the manual order is authoritative.
 
+## Relationship filters for post archives
+
+Use `relationship_filters` to filter archive posts through existing reverse
+relationships. This is a developer-defined field/setup option, not a new ACF
+settings panel. It works alongside the existing taxonomy `filters`.
+
+```php
+sp_archive_setup($archive, 'php/cards/testimonial-card', [
+    'url_page_arg' => 'testimonials-page',
+    'sort_arg' => 'testimonials-sort',
+    'relationship_filters' => [
+        'testimonial_industry' => [
+            'post_type' => 'markets',
+            'reverse_field' => 'linked_testimonials',
+            'all_label' => 'Industries',
+            'ui' => 'select',
+        ],
+        'testimonial_service' => [
+            'post_type' => 'services',
+            'reverse_field' => 'linked_testimonials',
+            'all_label' => 'Service',
+            'ui' => 'select',
+        ],
+    ],
+]);
+```
+
+Enable `filters_enabled` in the archive field/config. The same definitions can
+be supplied as `relationship_filters` to `archive_builder()` or an ACF field
+definition; ACF `format_value()` merges them into the returned archive config.
+Setup options override field-level relationship definitions for that instance.
+Use `sp_archive_filters()` to render the controls and `sp_archive_sort()` for
+sorting. Keep the usual cards, pagination and JSON config wrappers.
+
+- The key is the control name. Optional `name` overrides it; optional `query_arg`
+  sets a different public URL parameter. Use unique names that do not collide
+  with taxonomy controls, pagination, sort, per-page or AJAX payload fields.
+  Setup skips conflicting definitions.
+- `post_type` supplies published source posts, ordered by title. The current
+  archive language also applies to the source options.
+- `reverse_field` names post metadata **on the source post** containing an array
+  of archive post IDs. For example, a Service's `linked_testimonials` contains
+  testimonial IDs. `sp-post-relationships` already maintains these reverse
+  fields; other integrations must maintain their own reverse arrays.
+- `ui` accepts `select`, `multiselect`, `buttons`, `radio` and `checkbox`.
+  Optional `label` is the control title; `all_label` is its empty-choice label.
+- Values are source post IDs. Multiple choices in one filter use OR; separate
+  filters use AND. Manual selection, taxonomy filters and `term_scope` further
+  restrict that intersection. Manual order remains authoritative.
+- No selection means no relationship restriction. Empty matches return zero
+  results; draft, deleted, wrong-type and malformed source IDs cannot broaden
+  the query. Draft target posts are excluded by the normal published-post query.
+- Relationship constraints run before SQL pagination and sorting. Load more,
+  infinite scroll, confirm/reset and `disable_empty` use the same constraints.
+  `group_on_all` remains a taxonomy-only feature.
+- Definitions are stored in the server-side archive token. AJAX only supplies
+  selected IDs; client-provided source types and metadata keys are ignored.
+
+**Frontend compatibility:** the frontend controller lives in the consuming
+theme. A controller that previously admitted only taxonomy filters must accept
+the new `type: "relationship"` discriminator, then be rebuilt:
+
+```js
+this.filters = (this.cfg.filters || parseJson(section.dataset.filters || "", []))
+    .filter(({name, taxonomy, type}) => name && (taxonomy || type === "relationship"));
+```
+
+The existing name-based control handling, AJAX payload and URL/history logic
+remain shared. Do not invent a taxonomy name for a relationship filter.
+
+Regression checks: `php tests/archive-builder.php`,
+`php tests/archive-relationships.php` and `php tests/taxonomy-archive-builder.php`. On a disposable local WordPress site
+with ACF, this package and compatible theme UI templates loaded, run
+`wp eval-file tests/integration/archive-relationships-wp.php`. The integration test creates
+temporary private post types and template fixtures under `php/cards/`, exercises
+queries/setup/AJAX, and removes its records, files and transients in `finally`.
+
 ## Taxonomy Archive Field
 
 ```php
