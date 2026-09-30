@@ -41,3 +41,19 @@ Inside the form textarea, `Tab` indents the current line or every selected line,
 ## Frontend
 
 The rendered control requires the project's frontend Custom Select JavaScript, which creates the submitted hidden input using `data-name`. Required validation checks for a nonempty value; add a server-side allow-list when the value affects pricing, permissions, or other trusted logic.
+
+### Editing existing tags
+
+Place the cursor inside a `custom_select` tag (or select the tag) before opening Select. The generator restores its settings and Insert Tag replaces the original. Required field names retain their case in both server validation and SWV rules.
+
+### Theme arrow icon
+
+Override the arrow without changing the shared markup or adding wrappers:
+
+```php
+add_filter('sp_cf7_select_arrow_markup', static function ($markup, $attributes) {
+    return '<span class="icon icon-chevron-down" aria-hidden="true"></span>';
+}, 10, 2);
+```
+
+The default `sprite(24, 24, 'chevron-down')` remains unchanged when the filter returns `null`. Override markup is sanitized with `wp_kses_post`. Remove-button appearance belongs to the theme's frontend Custom Select styles.

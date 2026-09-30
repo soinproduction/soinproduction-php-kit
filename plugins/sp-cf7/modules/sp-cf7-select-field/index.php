@@ -43,7 +43,14 @@
 			<div class="select-field custom-select-field">
 				<div class="selected-options"><span class="placeholder"></span></div>
 				<div class="arrow-down">
-					<?php sprite(24, 24, 'chevron-down'); ?>
+					<?php
+                        $arrow = apply_filters( 'sp_cf7_select_arrow_markup', null, $a );
+                        if ( $arrow !== null ) {
+                            echo wp_kses_post( $arrow );
+                        } else {
+                            sprite(24, 24, 'chevron-down');
+                        }
+                    ?>
 				</div>
 			</div>
 			<ul class="options-container" role="listbox">
@@ -183,7 +190,7 @@
 
 		preg_match_all( '/\[custom_select\*\s+([^\s\]"]+)/i', $template, $matches );
 
-		return array_values( array_unique( array_filter( array_map( 'sanitize_key', $matches[1] ?? [] ) ) ) );
+		return array_values( array_unique( array_filter( array_map( 'trim', $matches[1] ?? [] ) ) ) );
 	}
 
 	add_filter( 'wpcf7_validate', function ( $result ) {
@@ -222,7 +229,7 @@
 
 		foreach ( $tags as $tag ) {
 			if ( ! empty( $tag->name ) ) {
-				$required_names[] = sanitize_key( $tag->name );
+				$required_names[] = $tag->name;
 			}
 		}
 
@@ -1082,7 +1089,7 @@
                     if (disabled) parts.push('disabled "' + escq(disabled) + '"');
 
                     var cls = ($('#cf7cs-class').val() || '').trim();
-                    if (cls) parts.push('class:' + cls);
+                    if (cls) parts.push('class "' + escq(cls) + '"');
 
                     return '[custom_select' + req + ' ' + name + ' ' + parts.join(' ') + ']';
                 }
@@ -1130,10 +1137,62 @@
                     refresh();
                 });
 
-                $(document).on('click', '[data-target*="-custom_select"]', function() {
-                    refresh();
-                });
+                var editRange = null;
 
+                function loadExistingTag() {
+                    var editor = document.getElementById('wpcf7-form');
+                    if (!editor) return;
+                    editRange = null;
+                    var pattern = /\[custom_select(\*)?\s+([^\s\]]+)((?:"[^"]*"|'[^']*'|[^\]"'])*)\]/g;
+                    var match;
+                    while ((match = pattern.exec(editor.value))) {
+                        if (editor.selectionStart < match.index || editor.selectionEnd > pattern.lastIndex) continue;
+                        editRange = {start: match.index, end: pattern.lastIndex, text: match[0]};
+                        var attrs = {};
+                        var token = /([\w-]+)(?:\s*[:=]\s*|\s+)(?:"([^"]*)"|'([^']*)'|([^\s]+))/g;
+                        var part;
+                        while ((part = token.exec(match[3]))) {
+                            attrs[part[1]] = $('<textarea>').html(part[2] ?? part[3] ?? part[4] ?? '').text();
+                        }
+                        $('#cf7cs-name').val(match[2]);
+                        $('#cf7cs-required').prop('checked', !!match[1]);
+                        $('input[name="cf7cs-type"]').prop('checked', false).filter('[value="' + (attrs.type === 'multiple' ? 'multiple' : 'single') + '"]').prop('checked', true);
+                        ['id', 'placeholder', 'class', 'options', 'active', 'disabled'].forEach(function(key) {
+                            var value = attrs[key] || '';
+                            if (['options', 'active', 'disabled'].includes(key)) value = value.split('|').join('\n');
+                            $('#cf7cs-' + key).val(value);
+                        });
+                        nameDirty = true;
+                        break;
+                    }
+                    refresh();
+                }
+
+                // Read the editor selection before the dialog takes focus.
+                document.addEventListener('click', function(event) {
+                    if (event.target.closest('[data-target*="-custom_select"]')) {
+                        loadExistingTag();
+                    }
+                    if (!event.target.closest('.cf7cs-insert-btn')) return;
+                    var editor = document.getElementById('wpcf7-form');
+                    if (editor && editRange && editor.value.slice(editRange.start, editRange.end) === editRange.text) {
+                        event.preventDefault();
+                        event.stopImmediatePropagation();
+                        editor.setRangeText(build(), editRange.start, editRange.end, 'select');
+                        editor.dispatchEvent(new Event('input', {bubbles: true}));
+                        editor.dispatchEvent(new Event('change', {bubbles: true}));
+                        var dialog = event.target.closest('dialog');
+                        if (dialog) dialog.close('');
+                        editor.focus();
+                        editRange = null;
+                    }
+                    refresh();
+                }, true);
+
+
+                // Run in the bubble phase, after CF7's target handler replaces
+                // the legacy preview with its default [custom_select] value.
+                $(document).on('click', '[data-target*="-custom_select"]', refresh);
 
                 $(document).on('click', '#cf7cs-copy', function() {
                     var $btn = $(this);
