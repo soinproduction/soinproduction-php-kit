@@ -546,6 +546,10 @@
 			update_post_meta( $post_id, $field, _pr_normalize_ids( $ids ) );
 			// ACF reference meta lets get_field() find the local field before a manual post save.
 			update_post_meta( $post_id, '_' . $field, $field_key );
+			// Reverse writes bypass acf_update_value(), which normally clears these caches.
+			if ( function_exists( 'acf_flush_value_cache' ) ) {
+				acf_flush_value_cache( $post_id, $field );
+			}
 		}
 	}
 
