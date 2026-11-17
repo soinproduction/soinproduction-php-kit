@@ -31,6 +31,7 @@
 		'sp-admin-ui-thumbnail-column',
 		'sp-admin-ui-taxonomy-checklist',
 		'sp-admin-ui-taxonomy-radio',
+		'_sp-admin-ui-taxonomy-parent-child',
 	];
 	$sp_admin_ui_aliases = [
 		'menu-title-item'   => 'sp-admin-ui-menu-heading',

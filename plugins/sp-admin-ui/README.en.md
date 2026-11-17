@@ -11,8 +11,9 @@ The package base also enhances a compatible Builder Widgets catalogue (`.wsb-rad
 | `sp-admin-ui-thumbnail-column` | Adds editable image columns to post-type and taxonomy list tables. |
 | `sp-admin-ui-taxonomy-checklist` | Renders and saves a multi-select taxonomy metabox. |
 | `sp-admin-ui-taxonomy-radio` | Renders and saves a single-select taxonomy metabox. |
+| `sp-admin-ui-taxonomy-parent-child` | Opt-in: selects one root term and multiple descendants; see [module documentation](modules/sp-admin-ui-taxonomy-parent-child/README.en.md). |
 
-All submodules load by default. Configure individual submodules directly in the PHP Kit `plugins` array; prefix a name with `_` to keep it listed but disabled:
+The five existing submodules load by default; `sp-admin-ui-taxonomy-parent-child` is opt-in. Configure individual submodules directly in the PHP Kit `plugins` array; prefix a name with `_` to keep it listed but disabled:
 
 ```php
 'plugins' => [

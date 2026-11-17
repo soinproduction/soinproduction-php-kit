@@ -125,6 +125,7 @@ $plugins = [
 		'sp-admin-ui-thumbnail-column',
 		'sp-admin-ui-taxonomy-checklist',
 		'sp-admin-ui-taxonomy-radio',
+		'_sp-admin-ui-taxonomy-parent-child',
 	],
 	'sp-cf7' => [
 		'sp-cf7-core',

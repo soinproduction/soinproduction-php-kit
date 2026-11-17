@@ -41,6 +41,7 @@ $plugins = [
 		'sp-admin-ui-thumbnail-column',
 		'sp-admin-ui-taxonomy-checklist',
 		'sp-admin-ui-taxonomy-radio',
+		'_sp-admin-ui-taxonomy-parent-child',
 	],
 	// Alternatively: 'sp-cf7' => ['submit_actions' => ['none', 'redirect', 'modal', 'message']],
 	'sp-cf7' => [
