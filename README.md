@@ -104,6 +104,7 @@ $platform = [
 	'sp-motion-settings',
 	'sp-content-type-converter',
 	'sp-reading-time',
+	'_sp-media-renderer',
 	'sp-permalink-manager',
 	'sp-wordpress-baseline'
 ];
