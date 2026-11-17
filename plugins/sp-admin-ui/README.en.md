@@ -36,3 +36,18 @@ add_filter( 'sp_admin_ui_modules', static fn(): array => [
 ```
 
 An empty `sp-admin-ui` array loads no submodules. The taxonomy modules share guarded helpers from `includes/taxonomy.php`. The package provides behavior and semantic class names; project-specific admin CSS may style those classes.
+
+### Ancestor terms
+
+Taxonomy controls keep their default selection behavior. Projects that store
+selected terms together with their ancestors can opt in:
+
+```php
+add_filter('sp_taxonomy_include_ancestors', '__return_true');
+```
+
+The filter receives the default `false`, taxonomy slug and post ID. With it
+enabled for a hierarchical taxonomy, checklist and radio saves retain ancestor
+terms, radio controls display the deepest selected term, and other post-save
+taxonomy assignments are expanded at `save_post` priority 20. Existing saved
+terms are not migrated. Return `false` to retain the default behavior.

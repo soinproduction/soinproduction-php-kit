@@ -42,7 +42,10 @@
 					}
 
 					if ( $term_id > 0 ) {
-						wp_set_object_terms( $post_id, [ $term_id ], $taxonomy );
+						$ids = sp_taxonomy_include_ancestors( $taxonomy, (int) $post_id )
+							? sp_taxonomy_expand_ancestors( [ $term_id ], $taxonomy )
+							: [ $term_id ];
+						wp_set_object_terms( $post_id, $ids, $taxonomy );
 					}
 				}
 			}
@@ -66,6 +69,9 @@
 
 			$terms      = get_terms( [ 'taxonomy' => $taxonomy, 'hide_empty' => false ] );
 			$current    = wp_get_object_terms( $post->ID, $taxonomy, [ 'fields' => 'ids' ] );
+			if ( sp_taxonomy_include_ancestors( $taxonomy, (int) $post->ID ) && is_array( $current ) ) {
+				usort( $current, static fn( $a, $b ) => count( get_ancestors( $b, $taxonomy, 'taxonomy' ) ) <=> count( get_ancestors( $a, $taxonomy, 'taxonomy' ) ) );
+			}
 			$current_id = ( is_array( $current ) && ! empty( $current ) ) ? (int) reset( $current ) : 0;
 			?>
 

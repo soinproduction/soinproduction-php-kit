@@ -29,3 +29,35 @@
 			return $post instanceof WP_Post && current_user_can( 'edit_post', $post_id );
 		}
 	}
+
+	/** Keep hierarchy expansion opt-in for projects that store ancestor terms. */
+	function sp_taxonomy_include_ancestors(string $taxonomy, int $post_id): bool {
+		return is_taxonomy_hierarchical($taxonomy)
+			&& (bool) apply_filters('sp_taxonomy_include_ancestors', false, $taxonomy, $post_id);
+	}
+
+	function sp_taxonomy_expand_ancestors(array $ids, string $taxonomy): array {
+		$ids = array_values(array_unique(array_filter(array_map('intval', $ids), static fn($id) => $id > 0)));
+		$expanded = $ids;
+		foreach ($ids as $id) {
+			$expanded = array_merge($expanded, get_ancestors($id, $taxonomy, 'taxonomy'));
+		}
+		return array_values(array_unique(array_filter(array_map('intval', $expanded), static fn($id) => $id > 0)));
+	}
+
+	if (!function_exists('sp_taxonomy_add_selected_parent_terms')) {
+	function sp_taxonomy_add_selected_parent_terms($post_id, $post = null): void {
+		$post = $post instanceof WP_Post ? $post : get_post($post_id);
+		if (!sp_taxonomy_is_valid_save_context((int) $post_id, $post)) return;
+		foreach (get_object_taxonomies($post->post_type, 'objects') as $taxonomy) {
+			if (!sp_taxonomy_include_ancestors($taxonomy->name, (int) $post_id)) continue;
+			$ids = wp_get_object_terms($post_id, $taxonomy->name, ['fields' => 'ids']);
+			if (is_wp_error($ids) || !$ids) continue;
+			$expanded = sp_taxonomy_expand_ancestors($ids, $taxonomy->name);
+			if (array_diff($expanded, array_map('intval', $ids))) {
+				wp_set_object_terms($post_id, $expanded, $taxonomy->name);
+			}
+		}
+	}
+	}
+	add_action('save_post', 'sp_taxonomy_add_selected_parent_terms', 20, 2);

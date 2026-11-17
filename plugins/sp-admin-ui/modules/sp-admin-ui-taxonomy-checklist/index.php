@@ -41,6 +41,10 @@
 				$ids = isset( $tax_input[ $tax ] ) ? (array) $tax_input[ $tax ] : [];
 				$ids = array_values( array_filter( array_map( 'intval', $ids ), static fn( $v ) => $v > 0 ) );
 
+				if ( sp_taxonomy_include_ancestors( $tax, (int) $post_id ) ) {
+					$ids = sp_taxonomy_expand_ancestors( $ids, $tax );
+				}
+
 				$result = wp_set_object_terms( $post_id, $ids, $tax, false );
 				if ( is_wp_error( $result ) ) {
 					continue;
@@ -58,6 +62,10 @@
 
 			$is_hierarchical = is_taxonomy_hierarchical( $tax );
 			$selected_ids    = array_map( 'intval', (array) wp_get_object_terms( $post->ID, $tax, [ 'fields' => 'ids' ] ) );
+			$include_ancestors = sp_taxonomy_include_ancestors( $tax, (int) $post->ID );
+			if ( $include_ancestors ) {
+				$selected_ids = sp_taxonomy_expand_ancestors( $selected_ids, $tax );
+			}
 			$terms           = get_terms( [ 'taxonomy' => $tax, 'hide_empty' => false, 'orderby' => 'name', 'order' => 'ASC' ] );
 			$uid             = 'taxonomy-' . sanitize_html_class( $tax );
 
@@ -182,15 +190,32 @@
                         updateCounter();
                     });
 
+                    var includeAncestors = <?= $include_ancestors ? 'true' : 'false' ?>;
                     wrap.querySelectorAll('.sp-tax-item:not(.sp-tax-child)').forEach(function (parentCb) {
                         parentCb.addEventListener('change', function () {
-                            var parentId = parentCb.value;
-                            wrap.querySelectorAll('.sp-tax-child[data-parent="' + parentId + '"]').forEach(function (childCb) {
-                                childCb.checked = parentCb.checked;
-                            });
+                            if (!includeAncestors) {
+                                var parentId = parentCb.value;
+                                wrap.querySelectorAll('.sp-tax-child[data-parent="' + parentId + '"]').forEach(function (childCb) {
+                                    childCb.checked = parentCb.checked;
+                                });
+                            }
                             updateSelectAll();
                         });
                     });
+                    if (includeAncestors) {
+                        wrap.querySelectorAll('.sp-tax-child').forEach(function (childCb) {
+                            childCb.addEventListener('change', function () {
+                                var parent = wrap.querySelector('.sp-tax-item[value="' + childCb.dataset.parent + '"]');
+                                if (parent) {
+                                    parent.checked = Array.prototype.some.call(
+                                        wrap.querySelectorAll('.sp-tax-child[data-parent="' + childCb.dataset.parent + '"]'),
+                                        function (sibling) { return sibling.checked; }
+                                    );
+                                }
+                                updateSelectAll();
+                            });
+                        });
+                    }
 
                     items.forEach(function (cb) {
                         cb.addEventListener('change', updateSelectAll);
