@@ -829,11 +829,13 @@ if (! function_exists('sp_archive_filter_availability')) {
             'post_type'     => 'post',
             'filters'       => [],
             'filter_values' => [],
+            'search'        => '',
             'term_scope'    => [],
             'sort'          => 'newest',
             'favorite_first' => false,
             'lang'          => '',
             'post__in'      => null,
+            'count_options' => false,
         ]);
 
         $filters = sp_archive_normalize_filters($args['filters']);
@@ -876,7 +878,9 @@ if (! function_exists('sp_archive_filter_availability')) {
             }
 
             $current_terms = sp_archive_normalize_filter_terms($values[$name] ?? '');
-            $is_multiple   = in_array($filter['ui'], ['checkbox', 'multiselect'], true);
+            $requires_all_terms = ! $is_relationship
+                && ($filter['operator'] ?? 'IN') === 'AND'
+                && in_array($filter['ui'], ['checkbox', 'multiselect'], true);
 
             $output[$name] = ['all' => true];
 
@@ -887,13 +891,14 @@ if (! function_exists('sp_archive_filter_availability')) {
                     continue;
                 }
 
-                if (in_array($slug, $current_terms, true)) {
+                if (empty($args['count_options']) && in_array($slug, $current_terms, true)) {
                     $output[$name][$slug] = true;
                     continue;
                 }
 
                 $candidate_values = $values;
-                $candidate_values[$name] = $is_multiple
+                // An OR facet must check the candidate independently of its selected siblings.
+                $candidate_values[$name] = $requires_all_terms
                     ? array_values(array_unique(array_merge($current_terms, [$slug])))
                     : $slug;
 
@@ -901,6 +906,7 @@ if (! function_exists('sp_archive_filter_availability')) {
                     'post_type'     => $args['post_type'],
                     'filters'       => $filters,
                     'filter_values' => $candidate_values,
+                    'search'        => $args['search'],
                     'term_scope'    => $term_scope,
                     'per_page'      => 1,
                     'paged'         => 1,
@@ -912,10 +918,10 @@ if (! function_exists('sp_archive_filter_availability')) {
 
                 $query_args['posts_per_page'] = 1;
                 $query_args['fields']         = 'ids';
-                $query_args['no_found_rows']  = true;
+                $query_args['no_found_rows']  = empty($args['count_options']);
 
                 $query = new WP_Query($query_args);
-                $output[$name][$slug] = $query->have_posts();
+                $output[$name][$slug] = empty($args['count_options']) ? $query->have_posts() : (int) $query->found_posts;
                 wp_reset_postdata();
             }
         }
@@ -952,6 +958,7 @@ if (! function_exists('sp_archive_query_args')) {
         if ($language !== '') { $qa['lang'] = $language; }
         if (is_array($orderby)) { $qa['orderby'] = $orderby; } else { $qa['orderby'] = $orderby; $qa['order'] = $order['order']; }
         if ($tax_query) { $qa['tax_query'] = $tax_query; }
+        if (($args['search'] ?? '') !== '') { $qa['s'] = $args['search']; }
 
         // Relationships narrow the manual selection without changing its order.
         // WordPress treats an empty post__in as unrestricted; use [0] instead.
@@ -991,10 +998,12 @@ if (! function_exists('sp_archive_query_args')) {
 
 if (! function_exists('sp_archive_prepare_query')) {
     function sp_archive_prepare_query(array $args = []): array {
-        $args = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'term_scope' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'menu_order', 'pagination_mode' => 'pagination', 'group_filter' => [], 'favorite_first' => false, 'lang' => '', 'post__in' => null]);
+        $args = wp_parse_args($args, ['post_type' => 'post', 'filters' => [], 'filter_values' => [], 'search' => '', 'term_scope' => [], 'per_page' => 9, 'paged' => 1, 'sort' => 'menu_order', 'pagination_mode' => 'pagination', 'group_filter' => [], 'favorite_first' => false, 'lang' => '', 'post__in' => null]);
         $mode        = sp_archive_normalize_mode($args['pagination_mode']);
         $per_page    = sp_archive_normalize_per_page($args['per_page']);
         $paged       = $per_page === -1 ? 1 : max(1, (int) $args['paged']);
+        $cumulative = ($mode === 'infinity_scroll' || $mode === 'load_more')
+            && (! wp_doing_ajax() || ! empty($args['restore_loaded']));
         $filter_values = is_array($args['filter_values']) ? $args['filter_values'] : [];
         $group_filter = is_array($args['group_filter']) ? $args['group_filter'] : [];
         if ($group_filter) {
@@ -1002,6 +1011,7 @@ if (! function_exists('sp_archive_prepare_query')) {
                 'post_type'     => $args['post_type'],
                 'filters'       => $args['filters'],
                 'filter_values' => $filter_values,
+                'search'        => $args['search'],
                 'term_scope'    => $args['term_scope'],
                 'per_page'      => -1,
                 'paged'         => 1,
@@ -1026,7 +1036,7 @@ if (! function_exists('sp_archive_prepare_query')) {
             $slice_offset = $per_page === -1 ? 0 : ($current_page - 1) * $per_page;
             $slice_limit  = $per_page === -1 ? null : $per_page;
 
-            if (! wp_doing_ajax() && ($mode === 'infinity_scroll' || $mode === 'load_more') && $current_page > 1) {
+            if ($cumulative && $current_page > 1) {
                 $slice_offset = 0;
                 $slice_limit  = $per_page * $current_page;
             }
@@ -1045,11 +1055,11 @@ if (! function_exists('sp_archive_prepare_query')) {
 
         $query_page  = $paged;
         $query_limit = $per_page;
-        if (! wp_doing_ajax() && ($mode === 'infinity_scroll' || $mode === 'load_more') && $paged > 1) {
+        if ($cumulative && $paged > 1) {
             $query_page  = 1;
             $query_limit = $per_page * $paged;
         }
-        $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $filter_values, 'term_scope' => $args['term_scope'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang'], 'post__in' => $args['post__in']]);
+        $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $filter_values, 'search' => $args['search'], 'term_scope' => $args['term_scope'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang'], 'post__in' => $args['post__in']]);
         $query        = new WP_Query($qa);
         $total_found  = (int) $query->found_posts;
         $total_pages  = $per_page === -1 ? 1 : max(1, (int) ceil($total_found / $per_page));
@@ -1058,11 +1068,11 @@ if (! function_exists('sp_archive_prepare_query')) {
             wp_reset_postdata();
             $query_page  = $current_page;
             $query_limit = $per_page;
-            if (! wp_doing_ajax() && ($mode === 'infinity_scroll' || $mode === 'load_more') && $current_page > 1) {
+            if ($cumulative && $current_page > 1) {
                 $query_page  = 1;
                 $query_limit = $per_page * $current_page;
             }
-            $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $filter_values, 'term_scope' => $args['term_scope'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang'], 'post__in' => $args['post__in']]);
+            $qa           = sp_archive_query_args(['post_type' => $args['post_type'], 'filters' => $args['filters'], 'filter_values' => $filter_values, 'search' => $args['search'], 'term_scope' => $args['term_scope'], 'per_page' => $query_limit, 'paged' => $query_page, 'sort' => sp_archive_normalize_sort($args['sort']), 'favorite_first' => ! empty($args['favorite_first']), 'lang' => $args['lang'], 'post__in' => $args['post__in']]);
             $query        = new WP_Query($qa);
             $total_found  = (int) $query->found_posts;
             $total_pages  = $per_page === -1 ? 1 : max(1, (int) ceil($total_found / $per_page));
@@ -3502,6 +3512,8 @@ if (! function_exists('sp_archive_setup')) {
         }
 
         $current_filters = sp_archive_filter_values($archive_filters, wp_unslash($_GET));
+        $search_arg = sanitize_key($opts['search_arg'] ?? '');
+        $search = $search_arg !== '' ? sanitize_text_field(wp_unslash($_GET[$search_arg] ?? '')) : '';
 
         $default_sort = $is_manual ? 'manual' : $config['order_mode'];
         $current_sort = ! $is_manual && isset($_GET[$sort_arg]) && $sort_arg !== ''
@@ -3521,6 +3533,7 @@ if (! function_exists('sp_archive_setup')) {
             'post_type'       => $config['post_type'],
             'filters'         => $archive_filters,
             'filter_values'   => $current_filters,
+            'search'          => $search,
             'term_scope'      => $config['term_scope'],
             'per_page'        => $current_per_page,
             'paged'           => $paged,
@@ -3532,11 +3545,14 @@ if (! function_exists('sp_archive_setup')) {
             'post__in'        => $manual_post_ids,
         ]);
 
-        $filter_availability = ! empty($config['disable_empty'])
+        $count_options = ! empty($opts['count_filter_options']);
+        $filter_availability = (! empty($config['disable_empty']) || $count_options)
             ? sp_archive_filter_availability([
                 'post_type'     => $config['post_type'],
                 'filters'       => $archive_filters,
+                'count_options' => $count_options,
                 'filter_values' => $current_filters,
+                'search'        => $search,
                 'term_scope'    => $config['term_scope'],
                 'sort'          => $current_sort,
                 'favorite_first' => $favorite_first,
@@ -3555,6 +3571,7 @@ if (! function_exists('sp_archive_setup')) {
             'confirm'          => $config['confirm'],
             'reset'            => $config['reset'],
             'disable_empty'    => $config['disable_empty'],
+            'count_filter_options' => $count_options,
             'group_on_all'     => $config['group_on_all'],
             'favorite_first'   => $favorite_first,
             'post__in'         => $manual_post_ids,
@@ -3569,6 +3586,7 @@ if (! function_exists('sp_archive_setup')) {
             'url_page_arg'     => $url_page_arg,
             'sort_arg'         => $sort_arg,
             'per_page_arg'     => $per_page_arg,
+            'search_arg'       => $search_arg,
         ]);
 
         $pagination_data = array_merge(
@@ -3597,6 +3615,7 @@ if (! function_exists('sp_archive_setup')) {
             'empty_template'  => $empty_template,
             'archive_filters' => $archive_filters,
             'current_filters' => $current_filters,
+            'search'          => $search,
             'filter_availability' => $filter_availability,
             'default_sort'    => $default_sort,
             'current_sort'    => $current_sort,
@@ -3854,7 +3873,7 @@ if (! function_exists('sp_archive_reset')) {
 
         $label = $label !== '' ? $label : __('Clear filters', THEME_SLUG);
         $class = sp_archive_sanitize_class_string($class);
-        $disabled = sp_archive_has_active_controls(
+        $disabled = $ctx['search'] !== '' || sp_archive_has_active_controls(
             $ctx['current_filters'],
             $ctx['current_sort'],
             $ctx['default_sort'],
@@ -4045,21 +4064,31 @@ if (! function_exists('sp_archive_ajax_query')) {
 
         // Client provides: paged, sort (only if sort_arg configured), and filter values
         $paged         = max(1, (int) ($source['paged'] ?? 1));
+        $restore_loaded = ($source['restore_loaded'] ?? '') === '1'
+            && in_array($pagination_type, ['load_more', 'infinity_scroll'], true)
+            && $per_page > 0;
+        if ($restore_loaded) {
+            $paged = min($paged, intdiv(1000, $per_page));
+        }
         $sort          = ($sort_arg && isset($source['sort']))
             ? sp_archive_normalize_sort($source['sort'], $default_sort)
             : $default_sort;
         $filter_values = sp_archive_filter_values($archive_filters, $source);
+        $search_arg = $config['search_arg'] ?? '';
+        $search = $search_arg !== '' ? sanitize_text_field($source[$search_arg] ?? '') : '';
 
         // Run query
         $query_data = sp_archive_prepare_query([
             'post_type'       => $post_type,
             'filters'         => $archive_filters,
             'filter_values'   => $filter_values,
+            'search'          => $search,
             'term_scope'      => $term_scope,
             'per_page'        => $per_page,
             'paged'           => $paged,
             'sort'            => $sort,
             'pagination_mode' => $pagination_type,
+            'restore_loaded'  => $restore_loaded,
             'group_filter'    => ! empty($config['group_on_all']) ? ($archive_filters[0] ?? []) : [],
             'favorite_first'  => $favorite_first,
             'lang'            => $language,
@@ -4069,11 +4098,14 @@ if (! function_exists('sp_archive_ajax_query')) {
         $query        = $query_data['query'];
         $total_pages  = $query_data['total_pages'];
         $current_page = $query_data['current_page'];
-        $filter_availability = $disable_empty
+        $count_options = ! empty($config['count_filter_options']);
+        $filter_availability = ($disable_empty || $count_options)
             ? sp_archive_filter_availability([
                 'post_type'     => $post_type,
                 'filters'       => $archive_filters,
+                'count_options' => $count_options,
                 'filter_values' => $filter_values,
+                'search'        => $search,
                 'term_scope'    => $term_scope,
                 'sort'          => $sort,
                 'favorite_first' => $favorite_first,
@@ -4086,7 +4118,7 @@ if (! function_exists('sp_archive_ajax_query')) {
         $html = sp_archive_render_cards($query, $card_template, [
             'empty_template' => $empty_template,
             'template_args'  => $template_args,
-            'start_index'    => ($current_page - 1) * $per_page,
+            'start_index'    => $restore_loaded ? 0 : ($current_page - 1) * $per_page,
             'group_filter'   => ! empty($config['group_on_all']) ? ($archive_filters[0] ?? []) : [],
             'filter_values'  => $filter_values,
         ]);

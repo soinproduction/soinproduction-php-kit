@@ -133,6 +133,25 @@
         }
     }
 
+    if (! function_exists('sp_universal_media_vimeo_preview_url')) {
+        function sp_universal_media_vimeo_preview_url(string $url): string
+        {
+            $cache_key = 'sp_media_vimeo_preview_' . md5($url);
+            $cached = get_transient($cache_key);
+            if ($cached !== false) {
+                return (string) $cached;
+            }
+
+            // Use the provider's oEmbed thumbnail, including private-link hashes.
+            $data = _wp_oembed_get_object()->get_data($url, ['width' => 1920, 'discover' => false]);
+            $preview = is_object($data) && ! empty($data->thumbnail_url)
+                ? esc_url_raw((string) $data->thumbnail_url)
+                : '';
+            set_transient($cache_key, $preview, $preview !== '' ? DAY_IN_SECONDS : 5 * MINUTE_IN_SECONDS);
+            return $preview;
+        }
+    }
+
     if (! function_exists('sp_universal_media_breakpoint_config')) {
         /**
          * Match the three semantic ranges used by SP Background Media.
@@ -492,6 +511,10 @@
 
                 if (! $preview_url && $media['source'] === 'youtube') {
                     $preview_url = sp_universal_media_youtube_preview_url($media['url']);
+                }
+
+                if (! $preview_url && $media['source'] === 'vimeo') {
+                    $preview_url = sp_universal_media_vimeo_preview_url($media['url']);
                 }
 
                 if ($media['media_type'] === 'image') {
