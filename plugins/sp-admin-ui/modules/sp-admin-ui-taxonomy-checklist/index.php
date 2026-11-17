@@ -107,6 +107,26 @@
 						}
 					}
 
+                    $render_children = static function (int $parent_id, int $depth = 1) use (&$render_children, $children, $selected_ids, $tax, $include_ancestors): void {
+                        if ($depth > 1 && !$include_ancestors) return;
+                        foreach ($children[$parent_id] ?? [] as $child):
+                            $child_id = (int) $child->term_id;
+                            ?>
+                            <li class="sp-taxonomy-checklist__item is-child">
+                                <label class="sp-taxonomy-checklist__label">
+                                    <input type="checkbox" class="sp-tax-item sp-tax-child"
+                                           name="sp_tax[<?= esc_attr($tax) ?>][]" value="<?= $child_id ?>"
+                                           data-parent="<?= $parent_id ?>" <?= checked(in_array($child_id, $selected_ids, true), true, false) ?>>
+                                    <?= esc_html($child->name) ?>
+                                </label>
+                                <?php if ($include_ancestors && !empty($children[$child_id])): ?>
+                                    <ul class="sp-taxonomy-checklist__children"><?php $render_children($child_id, $depth + 1); ?></ul>
+                                <?php endif; ?>
+                            </li>
+                            <?php
+                        endforeach;
+                    };
+
 					foreach ( $parents as $parent ):
 						$term_id = (int) $parent->term_id;
 						$checked = in_array( $term_id, $selected_ids, true );
@@ -124,22 +144,7 @@
 
 							<?php if ( ! empty( $children[ $term_id ] ) ): ?>
                                 <ul class="sp-taxonomy-checklist__children">
-									<?php foreach ( $children[ $term_id ] as $child ):
-										$child_id      = (int) $child->term_id;
-										$child_checked = in_array( $child_id, $selected_ids, true );
-										?>
-                                        <li class="sp-taxonomy-checklist__item is-child">
-                                            <label class="sp-taxonomy-checklist__label">
-                                                <input type="checkbox"
-                                                       class="sp-tax-item sp-tax-child"
-                                                       name="sp_tax[<?= esc_attr( $tax ) ?>][]"
-                                                       value="<?= $child_id ?>"
-                                                       data-parent="<?= $term_id ?>"
-													<?= checked( $child_checked, true, false ) ?>>
-												<?= esc_html( $child->name ) ?>
-                                            </label>
-                                        </li>
-									<?php endforeach; ?>
+                                    <?php $render_children($term_id); ?>
                                 </ul>
 							<?php endif; ?>
                         </li>
@@ -205,12 +210,15 @@
                     if (includeAncestors) {
                         wrap.querySelectorAll('.sp-tax-child').forEach(function (childCb) {
                             childCb.addEventListener('change', function () {
-                                var parent = wrap.querySelector('.sp-tax-item[value="' + childCb.dataset.parent + '"]');
-                                if (parent) {
+                                var parentId = childCb.dataset.parent;
+                                while (parentId) {
+                                    var parent = wrap.querySelector('.sp-tax-item[value="' + parentId + '"]');
+                                    if (!parent) break;
                                     parent.checked = Array.prototype.some.call(
-                                        wrap.querySelectorAll('.sp-tax-child[data-parent="' + childCb.dataset.parent + '"]'),
+                                        wrap.querySelectorAll('.sp-tax-child[data-parent="' + parentId + '"]'),
                                         function (sibling) { return sibling.checked; }
                                     );
+                                    parentId = parent.dataset.parent;
                                 }
                                 updateSelectAll();
                             });
