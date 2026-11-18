@@ -138,8 +138,20 @@ function sp_archive_editor_render(array $field, array $value, string $position):
     $name = $field['name'];
     $choices = sp_archive_editor_post_types($field);
     $post_type = $value['post_type'];
+    if ($position === 'type') {
+        ?>
+        <div class="sp-archive-builder-card__field">
+            <label class="sp-archive-editor__type"><?= esc_html__('Content type', 'acf') ?>
+                <select name="<?= esc_attr($name) ?>[post_type]" data-archive-editor-type>
+                    <?php foreach ($choices as $type => $label) : ?><option value="<?= esc_attr($type) ?>" <?= selected($post_type, $type, false) ?>><?= esc_html($label) ?></option><?php endforeach; ?>
+                </select>
+            </label>
+        </div>
+        <?php
+        return;
+    }
     if ($position === 'before') {
-        $strings = ['Edit filter settings', 'Edit', 'Source:', 'Name on website', 'Category options', 'Filter settings', 'Include subcategories', 'Top-level categories', 'Only selected categories', 'Source', 'Label', 'Display', 'Terms', 'Buttons', 'Checkboxes', 'Select', 'Multiple select', 'Radio buttons', 'Include child terms', 'Top-level terms', 'Selected terms only', 'Move filter up', 'Move filter down', 'Remove filter', 'Filter moved up.', 'Filter moved down.', 'Filter removed.', 'Filter order updated.', 'No terms yet. Add terms to this post type first.', 'Unavailable term:'];
+        $strings = ['Source:', 'Name on website', 'Category options', 'Settings', 'Include subcategories', 'Top-level categories', 'Only selected categories', 'Display', 'Buttons', 'Checkboxes', 'Select', 'Multi-select', 'Radio', 'Move filter up', 'Move filter down', 'Filter order updated.', 'No terms yet. Add terms to this post type first.', 'Unavailable term:', 'All', '%d selected'];
         $i18n = array_combine($strings, array_map(static fn(string $text): string => __($text, 'acf'), $strings));
         $sources = [];
         $taxonomies = [];
@@ -158,11 +170,6 @@ function sp_archive_editor_render(array $field, array $value, string $position):
              data-rows="<?= esc_attr(wp_json_encode($value['editor_filters'])) ?>"
              data-scope="<?= esc_attr(wp_json_encode($value['term_scope'])) ?>">
             <input type="hidden" name="<?= esc_attr($name) ?>[editor_configured]" value="1">
-            <label class="sp-archive-editor__type"><?= esc_html__('Content type', 'acf') ?>
-                <select name="<?= esc_attr($name) ?>[post_type]" data-archive-editor-type>
-                    <?php foreach ($choices as $type => $label) : ?><option value="<?= esc_attr($type) ?>" <?= selected($post_type, $type, false) ?>><?= esc_html($label) ?></option><?php endforeach; ?>
-                </select>
-            </label>
         </div>
         <?php
         return;
@@ -179,6 +186,9 @@ function sp_archive_editor_render(array $field, array $value, string $position):
             <h4><?= esc_html__('Filters on website', 'acf') ?></h4>
             <p class="description"><?= esc_html__('Switch on the filters visitors can use. Drag enabled rows or use the arrows to change their order.', 'acf') ?></p>
             <input type="hidden" name="<?= esc_attr($name) ?>[editor_filters]" value="">
+            <div class="sp-archive-editor__table-head" aria-hidden="true">
+                <span><?= esc_html__('Filter', 'acf') ?></span><span><?= esc_html__('Display', 'acf') ?></span><span><?= esc_html__('Order', 'acf') ?></span><span><?= esc_html__('Settings', 'acf') ?></span>
+            </div>
             <div data-archive-editor-rows></div>
             <div data-archive-editor-values></div>
             <p data-archive-editor-empty><?= esc_html__('No filters are available for this content type. Enable sources in the Archive Builder field settings.', 'acf') ?></p>

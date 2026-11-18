@@ -2313,7 +2313,7 @@ add_action('acf/include_field_types', function (): void {
             $choices = sp_archive_builder_post_type_choices();
             $post_type_label = $choices[$post_type] ?? $post_type;
             ?>
-            <div class="sp-archive-builder-card">
+            <div class="sp-archive-builder-card<?= $editor_enabled ? ' sp-archive-builder-card--editor' : '' ?>">
                 <div class="sp-archive-builder-card__header">
                     <span class="dashicons dashicons-layout" style="color: #2271b1; font-size: 18px; margin-right: 6px;"></span>
                     <strong><?php printf(esc_html__('Archive Settings (%s)', 'acf'), $editor_enabled ? '<span data-archive-type-label>' . esc_html($post_type_label) . '</span>' : esc_html($post_type_label)); ?></strong>
@@ -2321,6 +2321,7 @@ add_action('acf/include_field_types', function (): void {
 
                 <?php if ($editor_enabled) { sp_archive_editor_render($field, $value, 'before'); } ?>
                 <div class="sp-archive-builder-card__grid">
+                    <?php if ($editor_enabled) { sp_archive_editor_render($field, $value, 'type'); } ?>
                     <!-- Content source -->
                     <div class="sp-archive-builder-card__field sp-archive-builder-card__field--source">
                         <label><?php esc_html_e('Content source', 'acf'); ?></label>
@@ -2372,9 +2373,9 @@ add_action('acf/include_field_types', function (): void {
                     </div>
 
                     <!-- Order dropdown -->
-                    <div class="sp-archive-builder-card__field sp-archive-builder-card__field--sorting" <?php echo $value['source_mode'] === 'manual' ? 'hidden' : ''; ?>>
+                    <div class="sp-archive-builder-card__field sp-archive-builder-card__field--sorting" <?php echo !$editor_enabled && $value['source_mode'] === 'manual' ? 'hidden' : ''; ?>>
                         <label for="<?php echo esc_attr($name); ?>-order-mode"><?php esc_html_e('Sorting order', 'acf'); ?></label>
-                        <select id="<?php echo esc_attr($name); ?>-order-mode" name="<?php echo esc_attr($name); ?>[order_mode]">
+                        <select id="<?php echo esc_attr($name); ?>-order-mode" name="<?php echo esc_attr($name); ?>[order_mode]" data-manual-label="<?php esc_attr_e('Manual selection order', 'acf'); ?>">
                             <option value="newest" <?php selected($value['order_mode'], 'newest'); ?>><?php esc_html_e('Newest first', 'acf'); ?></option>
                             <option value="oldest" <?php selected($value['order_mode'], 'oldest'); ?>><?php esc_html_e('Oldest first', 'acf'); ?></option>
                             <option value="az" <?php selected($value['order_mode'], 'az'); ?>><?php esc_html_e('Alphabetical (A-Z)', 'acf'); ?></option>
@@ -2385,7 +2386,6 @@ add_action('acf/include_field_types', function (): void {
 
                 </div>
 
-                <?php if ($editor_enabled) { sp_archive_editor_render($field, $value, 'after'); } ?>
                 <div class="sp-archive-builder-card__manual" <?php echo $value['source_mode'] === 'manual' ? '' : 'hidden'; ?>>
                     <div class="sp-archive-builder-card__manual-header">
                         <strong><?php esc_html_e('Selected posts', 'acf'); ?></strong>
@@ -2421,6 +2421,7 @@ add_action('acf/include_field_types', function (): void {
                     }
                     ?>
                 </div>
+                <?php if ($editor_enabled) { sp_archive_editor_render($field, $value, 'after'); } ?>
             </div>
             <?php
         }
@@ -2922,7 +2923,32 @@ CSS;
     function syncContentSource($card) {
         var mode = $card.find('input[name$="[source_mode]"]:checked').val() || 'all';
         $card.find('.sp-archive-builder-card__manual').prop('hidden', mode !== 'manual');
-        $card.find('.sp-archive-builder-card__field--sorting').prop('hidden', mode === 'manual');
+        var $sorting = $card.find('.sp-archive-builder-card__field--sorting');
+        if (!$card.find('[data-sp-archive-editor]').length) {
+            $sorting.prop('hidden', mode === 'manual');
+            return;
+        }
+        // Show manual ordering without discarding the saved automatic sort preference.
+        $sorting.prop('hidden', false);
+        var $select = $sorting.find('select');
+        var $backup = $sorting.find('[data-archive-order-backup]');
+        var original = $backup.length ? $backup.val() : $select.val();
+        if (original === 'manual') original = $select.data('spArchiveOrder') || 'newest';
+        if (mode === 'manual') {
+            if (!$select.find('option[value="manual"]').length) {
+                $select.append(new Option($select.attr('data-manual-label') || 'Manual selection order', 'manual'));
+            }
+            if (!$backup.length) $backup = $('<input type="hidden" data-archive-order-backup>').appendTo($sorting);
+            $backup.attr('name', $select.attr('name')).val(original);
+            $select.val('manual').prop('disabled', true);
+        } else {
+            $select.find('option[value="manual"]').remove();
+            $select.prop('disabled', false);
+            if ($backup.length) $select.val(original);
+            original = $select.val();
+            $backup.remove();
+        }
+        $select.data('spArchiveOrder', original);
     }
 
     function taxonomies($field) {

@@ -1,6 +1,20 @@
 (function ($) {
     'use strict';
     var nextId = 0;
+    function reduceMotion() { return window.matchMedia('(prefers-reduced-motion: reduce)').matches; }
+    function panelState(panel, open, animate) {
+        var start = panel.hidden ? 0 : panel.getBoundingClientRect().height;
+        if (panel.__motion) { panel.__motion.cancel(); panel.__motion = null; }
+        panel.hidden = false; panel.inert = !open;
+        panel.setAttribute('aria-hidden', String(!open));
+        if (!animate || reduceMotion()) { panel.hidden = !open; panel.style.overflow = ''; return Promise.resolve(); }
+        var end = open ? panel.scrollHeight : 0;
+        var motion = panel.animate({height:[start + 'px',end + 'px'],opacity:open?[.3,1]:[1,0]}, {duration:200,easing:'cubic-bezier(.16,1,.3,1)'});
+        panel.__motion = motion; panel.style.overflow = 'hidden';
+        return motion.finished.then(function () {
+            if (panel.__motion === motion) { panel.hidden = !open; panel.style.overflow = ''; panel.__motion = null; }
+        },function () {});
+    }
     function initialize(card) {
         if (card.closest('.acf-clone')) return;
         var root = card.querySelector('[data-sp-archive-editor]');
@@ -12,7 +26,7 @@
         var list = settings.querySelector('[data-archive-editor-rows]');
         var values = settings.querySelector('[data-archive-editor-values]');
         var scope = settings.querySelector('[data-archive-editor-scope]');
-        var typeInput = root.querySelector('[data-archive-editor-type]');
+        var typeInput = card.querySelector('[data-archive-editor-type]');
         var sources = JSON.parse(root.dataset.sources || '{}');
         var taxonomies = JSON.parse(root.dataset.taxonomies || '{}');
         var rowsByType = {}, scopeByType = {};
@@ -69,14 +83,21 @@
                 var enabled = active.includes(row), index = active.indexOf(row);
                 row.classList.toggle('is-active', enabled);
                 row.querySelector('[data-key="ui"]').disabled = !enabled;
+                row.querySelectorAll('.sp-archive-editor__display-options input').forEach(function (input) { input.disabled = !enabled; });
                 row.querySelector('[data-move-up]').disabled = !enabled || index === 0;
                 row.querySelector('[data-move-down]').disabled = !enabled || index === active.length - 1;
                 row.querySelector('[data-details]').disabled = !enabled;
-                if (!enabled) { row.querySelector('[data-details]').setAttribute('aria-expanded', 'false'); row.querySelector('.sp-archive-editor__details').hidden = true; }
+                if (!enabled && row.querySelector('[data-details]').getAttribute('aria-expanded') === 'true') { row.querySelector('[data-details]').setAttribute('aria-expanded', 'false'); panelState(row.querySelector('.sp-archive-editor__details'),false,true); }
                 var label = row.querySelector('[data-key="label"]').value.trim(), original = sources[current][row.dataset.source].label;
                 row.querySelector('[data-title]').textContent = label || original;
-                row.querySelector('[data-details]').setAttribute('aria-label', t('Edit filter settings') + ': ' + (label || original));
+                row.querySelector('.sp-archive-editor__display-field').setAttribute('aria-label', t('Display') + ': ' + (label || original));
+                row.querySelector('[data-details]').setAttribute('aria-label', t('Settings') + ': ' + (label || original));
                 var secondary = row.querySelector('[data-original]'); secondary.textContent = t('Source:') + ' ' + original; secondary.hidden = !label || label === original;
+            });
+            scope.querySelectorAll('.sp-archive-editor__scope').forEach(function (group) {
+                var count = group.querySelectorAll('input:checked').length;
+                var counter = group.querySelector('[data-scope-count]');
+                if (counter) counter.textContent = count ? t('%d selected').replace('%d', String(count)) : t('All');
             });
             settings.querySelector('[data-archive-editor-empty]').hidden = list.children.length > 0;
             remember();
@@ -86,29 +107,49 @@
             var main = document.createElement('div'); main.className = 'sp-archive-editor__main';
             var drag = document.createElement('span'); drag.className = 'dashicons dashicons-menu sp-archive-editor__drag'; drag.setAttribute('aria-hidden', 'true'); main.append(drag);
             var toggle = document.createElement('label'); toggle.className = 'sp-archive-editor__toggle';
-            var enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.dataset.key = 'enabled'; enabled.checked = value.enabled === undefined ? !!value.source : !!Number(value.enabled);
+            var enabled = document.createElement('input'); enabled.type = 'checkbox'; enabled.setAttribute('role','switch'); enabled.dataset.key = 'enabled'; enabled.checked = value.enabled === undefined ? !!value.source : !!Number(value.enabled);
             var copy = document.createElement('span'), title = document.createElement('strong'), original = document.createElement('small'); title.dataset.title = ''; original.dataset.original = ''; copy.append(title, original); toggle.append(enabled, copy); main.append(toggle);
-            var ui = control(main, 'ui', 'Display', document.createElement('select'));
-            Object.entries({buttons:'Buttons', checkbox:'Checkboxes', select:'Select', multiselect:'Multiple select', radio:'Radio buttons'}).forEach(function (entry) { option(ui, entry[0], entry[1], entry[0] === (value.ui || source.definition.ui || 'checkbox')); });
+            var display = document.createElement('fieldset'); display.className = 'sp-archive-editor__display-field';
+            var legend = document.createElement('legend'); legend.textContent = t('Display'); display.append(legend);
+            var ui = document.createElement('input'); ui.type = 'hidden'; ui.dataset.key = 'ui'; ui.value = value.ui || source.definition.ui || 'checkbox'; display.append(ui);
+            var choices = document.createElement('div'); choices.className = 'sp-archive-editor__display-options';
+            var groupName = 'sp-archive-display-' + (++nextId);
+            Object.entries({buttons:'Buttons', checkbox:'Checkboxes', select:'Select', multiselect:'Multi-select', radio:'Radio'}).forEach(function (entry) {
+                var choice = document.createElement('label'), input = document.createElement('input'), caption = document.createElement('span');
+                input.type = 'radio'; input.name = groupName; input.value = entry[0]; input.checked = ui.value === entry[0];
+                caption.textContent = t(entry[1]); choice.append(input,caption); choices.append(choice);
+                input.addEventListener('change',function () { if (input.checked) { ui.value = input.value; refresh(); } });
+            });
+            display.append(choices); main.append(display);
             var actions = document.createElement('div'); actions.className = 'sp-archive-editor__actions';
             function move(direction) {
+                var positions = new Map(Array.from(list.children).map(function (element) { return [element,element.getBoundingClientRect().top]; }));
                 var sibling = direction < 0 ? row.previousElementSibling : row.nextElementSibling;
                 while (sibling && !sibling.querySelector('[data-key="enabled"]').checked) sibling = direction < 0 ? sibling.previousElementSibling : sibling.nextElementSibling;
                 if (sibling) list.insertBefore(row, direction < 0 ? sibling : sibling.nextElementSibling);
-                refresh(); announce('Filter order updated.');
+                refresh();
+                if (!reduceMotion()) Array.from(list.children).forEach(function (element) {
+                    var offset = positions.get(element) - element.getBoundingClientRect().top;
+                    if (offset) element.animate({transform:['translateY(' + offset + 'px)','translateY(0)']},{duration:180,easing:'cubic-bezier(.16,1,.3,1)'});
+                });
+                announce('Filter order updated.');
             }
             tool(actions, 'moveUp', 'arrow-up-alt2', 'Move filter up', function () { move(-1); });
             tool(actions, 'moveDown', 'arrow-down-alt2', 'Move filter down', function () { move(1); });
             var details = document.createElement('div'); details.className = 'sp-archive-editor__details'; details.id = 'sp-archive-filter-details-' + (++nextId); details.hidden = true;
-            var disclosure = tool(actions, 'details', 'arrow-down-alt2', 'Edit filter settings', function () {
-                details.hidden = !details.hidden; disclosure.setAttribute('aria-expanded', String(!details.hidden));
+            var disclosure = tool(actions, 'details', 'arrow-down-alt2', 'Settings', function () {
+                var open = disclosure.getAttribute('aria-expanded') !== 'true'; disclosure.setAttribute('aria-expanded', String(open)); panelState(details,open,true);
             });
-            var disclosureText = document.createElement('span'); disclosureText.textContent = t('Edit'); disclosure.prepend(disclosureText);
+            var disclosureText = document.createElement('span'); disclosureText.textContent = t('Settings'); disclosure.prepend(disclosureText);
             disclosure.setAttribute('aria-controls', details.id); disclosure.setAttribute('aria-expanded', 'false'); main.append(actions); row.append(main);
             var label = control(details, 'label', 'Name on website', document.createElement('input')); label.type = 'text'; label.value = value.label || ''; label.placeholder = source.label;
             var mode = control(details, 'terms_mode', 'Category options', document.createElement('select'));
             Object.entries({children:'Include subcategories', parent:'Top-level categories', selected:'Only selected categories'}).forEach(function (entry) { option(mode, entry[0], entry[1], entry[0] === (value.terms_mode || 'children')); });
             mode.parentElement.hidden = !source.hierarchical;
+            var detailBody = document.createElement('div'); detailBody.className = 'sp-archive-editor__details-body';
+            while (details.firstChild) detailBody.append(details.firstChild); details.append(detailBody);
+            var order = document.createElement('div'); order.className = 'sp-archive-editor__order';
+            order.append(actions.querySelector('[data-move-up]'),actions.querySelector('[data-move-down]')); actions.prepend(order);
             row.append(details); list.append(row);
         }
         function render() {
@@ -118,8 +159,12 @@
             Object.keys(available).forEach(function (key) { if (!seen[key]) addRow(key, {enabled:0}); });
             var selectedScope = scopeByType[current] || {};
             Object.entries(taxonomies[current] || {}).forEach(function (item) {
-                var taxonomy = item[0], data = item[1], details = document.createElement('details'); details.className = 'sp-archive-editor__scope'; details.open = !!(selectedScope[taxonomy] || []).length;
-                var summary = document.createElement('summary'); summary.textContent = data.label; details.append(summary);
+                var taxonomy = item[0], data = item[1], details = document.createElement('details'); details.className = 'sp-archive-editor__scope'; details.open = true;
+                var summary = document.createElement('summary'); summary.setAttribute('aria-expanded','true');
+                var arrow = document.createElement('span'); arrow.className = 'dashicons dashicons-arrow-down-alt2'; arrow.setAttribute('aria-hidden','true');
+                var caption = document.createElement('span'); caption.textContent = data.label;
+                var count = document.createElement('span'); count.dataset.scopeCount = '';
+                summary.append(arrow,caption,count); details.append(summary);
                 var terms = document.createElement('div'), choices = Object.assign({}, data.terms || {});
                 (selectedScope[taxonomy] || []).forEach(function (slug) { if (!Object.prototype.hasOwnProperty.call(choices, slug)) choices[slug] = t('Unavailable term:') + ' ' + slug; });
                 Object.entries(choices).forEach(function (term) {
@@ -127,7 +172,14 @@
                     input.name = prefix() + '[term_scope][' + taxonomy + '][]'; input.checked = (selectedScope[taxonomy] || []).includes(term[0]); label.append(input, document.createTextNode(term[1])); terms.append(label);
                 });
                 if (!terms.children.length) { var empty = document.createElement('p'); empty.className = 'description'; empty.textContent = t('No terms yet. Add terms to this post type first.'); terms.append(empty); }
-                details.append(terms); scope.append(details);
+                terms.className = 'sp-archive-editor__choices';
+                var content = document.createElement('div'); content.className = 'sp-archive-editor__scope-panel'; content.append(terms); details.append(content);
+                summary.addEventListener('click',function (event) {
+                    event.preventDefault(); var open = summary.getAttribute('aria-expanded') !== 'true';
+                    summary.setAttribute('aria-expanded',String(open)); details.open = true;
+                    panelState(content,open,true).then(function () { if (summary.getAttribute('aria-expanded') === 'false') details.open = false; });
+                });
+                scope.append(details);
             });
             card.querySelectorAll('[data-archive-manual-type]').forEach(function (panel) {
                 var active = panel.dataset.archiveManualType === current; panel.hidden = !active; panel.querySelectorAll('[name]').forEach(function (input) { input.disabled = !active; });
@@ -137,7 +189,7 @@
         }
         typeInput.addEventListener('change', function () { rowsByType[current] = readRows(); scopeByType[current] = readScope(); current = typeInput.value; render(); });
         settings.addEventListener('input', refresh); settings.addEventListener('change', refresh);
-        if ($.fn.sortable) $(list).sortable({items:'> .sp-archive-editor__row.is-active', handle:'.sp-archive-editor__drag', axis:'y', update:function () { refresh(); announce('Filter order updated.'); }});
+        if ($.fn.sortable) $(list).sortable({items:'> .sp-archive-editor__row.is-active', handle:'.sp-archive-editor__drag', axis:'y', placeholder:'sp-archive-editor__placeholder', revert:reduceMotion() ? false : 120, forcePlaceholderSize:true, start:function () { $(list).sortable('option','revert',reduceMotion() ? false : 120); }, update:function () { refresh(); announce('Filter order updated.'); }});
         render();
     }
     function organizeFieldSettings(context) {
