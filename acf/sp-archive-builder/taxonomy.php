@@ -510,11 +510,11 @@ if ( ! function_exists( 'sp_taxonomy_archive_sort' ) ) {
 
 		if ( ! $options ) {
 			$options = [
-				'newest'    => __( 'Newest first', THEME_SLUG ),
-				'oldest'    => __( 'Oldest first', THEME_SLUG ),
-				'az'        => __( 'A → Z', THEME_SLUG ),
-				'za'        => __( 'Z → A', THEME_SLUG ),
-				'menu_order' => __( 'Menu order', THEME_SLUG ),
+				'newest'    => __( 'Newest first', sp_archive_text_domain() ),
+				'oldest'    => __( 'Oldest first', sp_archive_text_domain() ),
+				'az'        => __( 'A → Z', sp_archive_text_domain() ),
+				'za'        => __( 'Z → A', sp_archive_text_domain() ),
+				'menu_order' => __( 'Menu order', sp_archive_text_domain() ),
 			];
 		} else {
 			$normalized = [];
@@ -534,7 +534,7 @@ if ( ! function_exists( 'sp_taxonomy_archive_sort' ) ) {
 				'name'    => $context['sort_arg'],
 				'value'   => $context['current_sort'],
 				'options' => $options,
-				'title'   => $title ?: __( 'Sort:', THEME_SLUG ),
+				'title'   => $title ?: __( 'Sort:', sp_archive_text_domain() ),
 				'mode'    => 'single',
 				'class'   => $class,
 			] );
@@ -552,7 +552,7 @@ if ( ! function_exists( 'sp_taxonomy_archive_per_page' ) ) {
 		if ( ! $options ) {
 			$options = array_combine( range( 1, 24 ), range( 1, 24 ) );
 			if ( (int) $context['config']['per_page'] === -1 ) {
-				$options['all'] = __( 'Show all', THEME_SLUG );
+				$options['all'] = __( 'Show all', sp_archive_text_domain() );
 			}
 		}
 		$template = sp_archive_component_template( 'select' );
@@ -561,7 +561,7 @@ if ( ! function_exists( 'sp_taxonomy_archive_per_page' ) ) {
 				'name'    => $context['per_page_arg'],
 				'value'   => $context['current_per_page'] === -1 ? 'all' : (string) $context['current_per_page'],
 				'options' => $options,
-				'title'   => $title ?: __( 'Categories per page:', THEME_SLUG ),
+				'title'   => $title ?: __( 'Categories per page:', sp_archive_text_domain() ),
 				'mode'    => 'single',
 				'class'   => $class,
 			] );
@@ -577,7 +577,7 @@ if ( ! function_exists( 'sp_taxonomy_archive_confirm' ) ) {
 		}
 
 		echo '<button class="' . esc_attr( sp_archive_sanitize_class_string( $class ) ) . '" type="button" data-sp-archive-confirm disabled>'
-			. '<span>' . esc_html( $label ?: __( 'Apply', THEME_SLUG ) ) . '</span></button>';
+			. '<span>' . esc_html( $label ?: __( 'Apply', sp_archive_text_domain() ) ) . '</span></button>';
 	}
 }
 
@@ -592,7 +592,7 @@ if ( ! function_exists( 'sp_taxonomy_archive_reset' ) ) {
 			|| $context['current_sort'] !== $context['default_sort']
 			|| $context['current_per_page'] !== (int) $context['config']['per_page'];
 		echo '<button class="' . esc_attr( sp_archive_sanitize_class_string( $class ) ) . '" type="button" data-sp-archive-reset' . ( $active ? '' : ' disabled' ) . '>'
-			. '<span>' . esc_html( $label ?: __( 'Reset', THEME_SLUG ) ) . '</span></button>';
+			. '<span>' . esc_html( $label ?: __( 'Reset', sp_archive_text_domain() ) ) . '</span></button>';
 	}
 }
 

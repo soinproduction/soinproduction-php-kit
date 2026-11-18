@@ -149,6 +149,7 @@
 							[
 								'key'           => 'fld_' . $from . '_' . $field_from,
 								'name'          => $field_from,
+								'sp_archive_relationship' => !$to_existing ? ['field' => $field_from, 'post_type' => $to, 'reverse_field' => $field_to] : null,
 								'label'         => $label_from,
 								'type'          => 'relationship',
 								'post_type'     => [ $to ],
@@ -173,6 +174,7 @@
 								[
 									'key'           => 'fld_' . $to . '_' . $field_to,
 									'name'          => $field_to,
+									'sp_archive_relationship' => ['field' => $field_to, 'post_type' => $from, 'reverse_field' => $field_from],
 									'label'         => $label_to,
 									'type'          => 'relationship',
 									'post_type'     => [ $from ],
@@ -335,6 +337,7 @@
 					$relationship_field = [
 						'key'           => $field_key,
 						'name'          => $field,
+						'sp_archive_relationship' => ['field' => $field, 'post_type' => $other_type, 'reverse_field' => $reverse_field],
 						'label'         => $label,
 						'type'          => 'relationship',
 						'post_type'     => [ $other_type ],

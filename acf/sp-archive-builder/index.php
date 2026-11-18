@@ -1101,12 +1101,18 @@ if (! function_exists('sp_archive_render_terms')) {
     }
 }
 
+if (!function_exists('sp_archive_text_domain')) {
+    function sp_archive_text_domain(): string {
+        return defined('THEME_SLUG') ? (string) constant('THEME_SLUG') : 'soinproduction-php-kit';
+    }
+}
+
 if (! function_exists('sp_archive_sanitize_template')) {
-    function sp_archive_sanitize_template($template): string {
+    function sp_archive_sanitize_template($template, bool $explicit = false): string {
         $template = trim(str_replace('\\', '/', wp_unslash((string) $template)));
         $template = preg_replace('/\.php$/', '', $template);
         $template = trim((string) $template, '/');
-        if ($template === '' || strpos($template, '..') !== false) { return ''; }
+        if ($template === '' || strpos($template, '..') !== false || strpos($template, ':') !== false || preg_match('/[\x00-\x1f]/', $template)) { return ''; }
         $allowed_prefixes = apply_filters(
             'sp_archive_template_prefixes',
             ['template_parts/', 'templates/', 'php/cards/', 'php/templates/']
@@ -1121,8 +1127,16 @@ if (! function_exists('sp_archive_sanitize_template')) {
             }
         }
 
-        if (! $is_allowed) { return ''; }
-        return is_readable(THEME_DIR . '/' . $template . '.php') ? $template : '';
+        if (!$is_allowed && !$explicit) { return ''; }
+        $file = '';
+        if (function_exists('locate_template')) {
+            $file = (string) locate_template([$template . '.php'], false, false);
+        } elseif (function_exists('get_theme_file_path')) {
+            $file = (string) get_theme_file_path($template . '.php');
+        } elseif (defined('THEME_DIR')) {
+            $file = rtrim((string) constant('THEME_DIR'), '/\\') . '/' . $template . '.php';
+        }
+        return $file !== '' && is_readable($file) ? $template : '';
     }
 }
 
@@ -1132,8 +1146,8 @@ if (! function_exists('sp_archive_component_template')) {
         if ($component === '') { return ''; }
 
         $configured = (string) apply_filters('sp_archive_component_template', '', $component);
+        if ($configured !== '') { return sp_archive_sanitize_template($configured, true); }
         $candidates = array_filter([
-            $configured,
             'templates/ui/' . $component,
             'php/templates/ui/' . $component,
             'php/templates/' . $component,
@@ -1155,7 +1169,7 @@ if (! function_exists('sp_archive_pagination_template')) {
     function sp_archive_pagination_template(): string {
         $configured = (string) apply_filters('sp_archive_pagination_template', '');
         if ($configured !== '') {
-            $configured = sp_archive_sanitize_template($configured);
+            $configured = sp_archive_sanitize_template($configured, true);
             if ($configured !== '') { return $configured; }
         }
 
@@ -1171,7 +1185,7 @@ if (! function_exists('sp_archive_sanitize_class_string')) {
 
 if (! function_exists('sp_archive_render_template')) {
     function sp_archive_render_template(string $template, array $args = []): string {
-        $template = sp_archive_sanitize_template($template);
+        $template = sp_archive_sanitize_template($template, true);
         if ($template === '') { return ''; }
         ob_start();
         get_template_part($template, null, $args);
@@ -1211,8 +1225,8 @@ if (! function_exists('sp_archive_template_args_for_index')) {
 
 if (! function_exists('sp_archive_render_cards')) {
     function sp_archive_render_cards(WP_Query $query, string $template, array $args = []): string {
-        $template       = sp_archive_sanitize_template($template);
-        $empty_template = sp_archive_sanitize_template($args['empty_template'] ?? '');
+        $template       = sp_archive_sanitize_template($template, true);
+        $empty_template = sp_archive_sanitize_template($args['empty_template'] ?? '', true);
         $item_args      = isset($args['template_args']) && is_array($args['template_args']) ? $args['template_args'] : [];
         $start_index    = max(0, (int) ($args['start_index'] ?? 0));
         $group_filter   = is_array($args['group_filter'] ?? null) ? $args['group_filter'] : [];
@@ -1518,7 +1532,7 @@ if (! function_exists('sp_archive_pagination_data')) {
     function sp_archive_pagination_data(array $args): array {
         $data = [
             'post_type'        => sanitize_key($args['post_type'] ?? 'post'),
-            'template'         => sp_archive_sanitize_template($args['template'] ?? ''),
+            'template'         => sp_archive_sanitize_template($args['template'] ?? '', true),
             'filters'          => sp_archive_normalize_filters($args['filters'] ?? []),
             'filter_values'    => is_array($args['filter_values'] ?? null) ? $args['filter_values'] : [],
             'term_scope'       => sp_archive_normalize_term_scope($args['term_scope'] ?? []),
@@ -1912,6 +1926,8 @@ add_action('acf/include_field_types', function (): void {
                 'editor_config'   => 0,
                 'allowed_post_types' => [],
                 'editor_relationships' => [],
+                'editor_sources_configured' => 0,
+                'editor_filter_sources' => [],
                 'post_type'       => 'post',
                 'source_mode'     => 'all',
                 'manual_posts'    => ['mode' => 'manual', 'ids' => []],
@@ -1950,8 +1966,8 @@ add_action('acf/include_field_types', function (): void {
 
             // Target post type setting
             acf_render_field_setting($field, [
-                'label'        => __('Target Post Type', 'acf'),
-                'instructions' => __('Select the post type to query for this archive.', 'acf'),
+                'label'        => __('Default content type', 'acf'),
+                'instructions' => __('Used for new archive sections. Page editors can change it when page configuration is enabled.', 'acf'),
                 'type'         => 'select',
                 'name'         => 'post_type',
                 'choices'      => sp_archive_builder_post_type_choices(),
@@ -1959,16 +1975,19 @@ add_action('acf/include_field_types', function (): void {
             ]);
 
             acf_render_field_setting($field, [
-                'label' => __('Editable archive configuration', 'acf'),
-                'instructions' => __('Allow page editors to choose the post type, content restrictions and visitor filters. Disabled by default.', 'acf'),
+                'label' => __('Configure on each page', 'acf'),
+                'instructions' => __('Let page editors choose content and switch visitor filters on or off. These settings define what is available to them.', 'acf'),
                 'type' => 'true_false', 'name' => 'editor_config', 'ui' => 1,
+                'ui_on_text' => __('Page editor', 'acf'), 'ui_off_text' => __('Field settings', 'acf'),
             ]);
             acf_render_field_setting($field, [
-                'label' => __('Allowed post types', 'acf'),
-                'instructions' => __('Post types available to page editors. Leave empty to allow all available post types.', 'acf'),
+                'label' => __('Available content types', 'acf'),
+                'instructions' => __('Content types page editors can choose. Leave empty to allow all.', 'acf'),
                 'type' => 'select', 'name' => 'allowed_post_types', 'multiple' => 1, 'ui' => 1,
                 'choices' => sp_archive_builder_post_type_choices(),
             ]);
+
+            sp_archive_editor_render_field_catalog($field);
 
             // Enable Filters setting
             acf_render_field_setting($field, [
@@ -3296,7 +3315,7 @@ if (! function_exists('sp_archive_render_filter')) {
         $tax_obj   = $taxonomy !== '' ? get_taxonomy($taxonomy) : null;
         $tax_label = $tax_obj ? ($tax_obj->labels->singular_name ?? $taxonomy) : $taxonomy;
         $title     = !empty($filter['label']) ? $filter['label'] : ($is_relationship ? '' : $tax_label . ':');
-        $all_label = $all_label !== '' ? $all_label : __('All', THEME_SLUG);
+        $all_label = $all_label !== '' ? $all_label : __('All', sp_archive_text_domain());
         if ($is_relationship && ! empty($filter['all_label'])) {
             $all_label = $filter['all_label'];
         }
@@ -3502,7 +3521,7 @@ if (! function_exists('sp_archive_setup')) {
             ? $opts['template_args']
             : [];
         $empty_template = sp_archive_sanitize_template(
-            $opts['empty_template'] ?? dirname($card_template) . '/empty'
+            $opts['empty_template'] ?? dirname($card_template) . '/empty', true
         );
 
         // Build filters — only for registered taxonomies
@@ -3790,11 +3809,11 @@ if (! function_exists('sp_archive_sort')) {
 
         if (empty($options)) {
             $options = [
-                ['value' => 'newest',     'label' => __('Newest first',      THEME_SLUG)],
-                ['value' => 'oldest',     'label' => __('Oldest first',      THEME_SLUG)],
-                ['value' => 'az',         'label' => __('A → Z',             THEME_SLUG)],
-                ['value' => 'za',         'label' => __('Z → A',             THEME_SLUG)],
-                ['value' => 'menu_order', 'label' => __('Featured',          THEME_SLUG)],
+                ['value' => 'newest',     'label' => __('Newest first',      sp_archive_text_domain())],
+                ['value' => 'oldest',     'label' => __('Oldest first',      sp_archive_text_domain())],
+                ['value' => 'az',         'label' => __('A → Z',             sp_archive_text_domain())],
+                ['value' => 'za',         'label' => __('Z → A',             sp_archive_text_domain())],
+                ['value' => 'menu_order', 'label' => __('Featured',          sp_archive_text_domain())],
             ];
         }
 
@@ -3811,7 +3830,7 @@ if (! function_exists('sp_archive_sort')) {
             'name'    => $sort_arg,
             'value'   => $ctx['current_sort'],
             'options' => $select_options,
-            'title'   => $title ?: __('Sort:', THEME_SLUG),
+            'title'   => $title ?: __('Sort:', sp_archive_text_domain()),
             'mode'    => 'single',
             'class'   => $class,
         ]);
@@ -3835,7 +3854,7 @@ if (! function_exists('sp_archive_per_page')) {
 
         if (empty($options)) {
             $options = array_combine(range(1, 24), range(1, 24));
-            $options['all'] = __('Show all', THEME_SLUG);
+            $options['all'] = __('Show all', sp_archive_text_domain());
         }
 
         $select_options = [];
@@ -3853,7 +3872,7 @@ if (! function_exists('sp_archive_per_page')) {
             'name'    => $ctx['per_page_arg'],
             'value'   => $ctx['current_per_page'] === -1 ? 'all' : (string) $ctx['current_per_page'],
             'options' => $select_options,
-            'title'   => $title ?: __('Posts per page:', THEME_SLUG),
+            'title'   => $title ?: __('Posts per page:', sp_archive_text_domain()),
             'mode'    => 'single',
             'class'   => $class,
         ]);
@@ -3871,7 +3890,7 @@ if (! function_exists('sp_archive_confirm')) {
             return;
         }
 
-        $label = $label !== '' ? $label : __('Apply filters', THEME_SLUG);
+        $label = $label !== '' ? $label : __('Apply filters', sp_archive_text_domain());
         $class = sp_archive_sanitize_class_string($class);
 
         echo '<button class="' . esc_attr($class) . '" type="button" data-sp-archive-confirm disabled>'
@@ -3911,7 +3930,7 @@ if (! function_exists('sp_archive_reset')) {
             return;
         }
 
-        $label = $label !== '' ? $label : __('Clear filters', THEME_SLUG);
+        $label = $label !== '' ? $label : __('Clear filters', sp_archive_text_domain());
         $class = sp_archive_sanitize_class_string($class);
         $disabled = $ctx['search'] !== '' || sp_archive_has_active_controls(
             $ctx['current_filters'],
