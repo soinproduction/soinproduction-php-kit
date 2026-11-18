@@ -532,3 +532,23 @@ Options with `false` are disabled because selecting them together with the curre
 - Keep `sp_archive_config()` inside the archive section.
 - Keep `sp_archive_cards()` wrapper present; JS depends on `data-sp-archive-list`.
 - Keep `sp_archive_pagination()` wrapper present; JS depends on `data-sp-archive-pagination`.
+
+## Page-level archive configuration (opt-in)
+
+Set `editor_config => 1` on an `archive_builder` field to let page editors choose the post type, taxonomy restrictions, ordered visitor filters (source, label and UI), and search visibility. `allowed_post_types` limits their choices; an empty list allows the existing post-type choice list. With the flag disabled or absent, the existing field/editor behavior and saved value format are unchanged.
+
+```php
+'editor_config' => 1,
+'allowed_post_types' => ['case_study', 'article'],
+'editor_relationships' => [
+    'case_study' => [
+        'service' => ['post_type' => 'service', 'reverse_field' => 'linked_case_studies', 'label' => 'Services'],
+    ],
+],
+```
+
+Taxonomy sources come from the selected post type. Relationship sources must be supplied per post type through `editor_relationships` in server-side field configuration (or a consuming application's `acf/load_field` filter). Editors choose a source ID; metadata keys and target types submitted in the browser are ignored. Taxonomy and relationship filters can be interleaved. `filter_order` preserves this order in the runtime, while `label` overrides a taxonomy filter's displayed title.
+
+Saved values retain the existing pagination/manual fields and add `editor_configured`, `post_type`, `term_scope`, `editor_filters` and `search_enabled`. Each editor filter stores `source` (`taxonomy:slug` or `relationship:name`), `label`, `ui` and `terms_mode`. Saving zero filters is explicit and does not restore defaults. The manual picker follows the selected post type and drops IDs of other types. `format_value()` resolves these choices against server configuration and returns the standard archive runtime configuration.
+
+Content restrictions (`term_scope`) always constrain the query, even if no corresponding visitor filter is shown. Visitor choices further narrow that scope. Templates must use the formatted field value, respect each filter's `ui` and `label`, and pass an empty `search_arg` when `search_enabled` is false. Templates must not overwrite `filters` or `relationship_filters` after reading the field. Use distinct URL arguments for multiple sections. Old saved values without `editor_configured` inherit field defaults until saved in the new editor; applications may hydrate legacy section values through `acf/load_value` without renaming their keys or changing stored relationships.

@@ -154,6 +154,7 @@ if (! defined('ABSPATH')) {
 }
 
 require_once __DIR__ . '/relationships.php';
+require_once __DIR__ . '/editor.php';
 
 // ---------------------------------------------------------------------------
 // sp_archive — core archive helpers (moved from core/helpers/archive.php)
@@ -1718,6 +1719,9 @@ function sp_archive_builder_normalize($value): array
             'ui'         => in_array($ui, ['buttons', 'select', 'multiselect', 'radio', 'checkbox'], true) ? $ui : 'buttons',
             'terms_mode' => in_array($terms_mode, ['selected', 'children', 'parent'], true) ? $terms_mode : 'children',
         ];
+        if (isset($filter['label']) && is_scalar($filter['label'])) {
+            $filters[count($filters) - 1]['label'] = sanitize_text_field((string) $filter['label']);
+        }
     }
 
     $value['filters'] = $filters;
@@ -1905,6 +1909,9 @@ add_action('acf/include_field_types', function (): void {
             $this->label    = __('Archive Builder', 'acf');
             $this->category = 'layout';
             $this->defaults = [
+                'editor_config'   => 0,
+                'allowed_post_types' => [],
+                'editor_relationships' => [],
                 'post_type'       => 'post',
                 'source_mode'     => 'all',
                 'manual_posts'    => ['mode' => 'manual', 'ids' => []],
@@ -1949,6 +1956,18 @@ add_action('acf/include_field_types', function (): void {
                 'name'         => 'post_type',
                 'choices'      => sp_archive_builder_post_type_choices(),
                 'ui'           => 0,
+            ]);
+
+            acf_render_field_setting($field, [
+                'label' => __('Editable archive configuration', 'acf'),
+                'instructions' => __('Allow page editors to choose the post type, content restrictions and visitor filters. Disabled by default.', 'acf'),
+                'type' => 'true_false', 'name' => 'editor_config', 'ui' => 1,
+            ]);
+            acf_render_field_setting($field, [
+                'label' => __('Allowed post types', 'acf'),
+                'instructions' => __('Post types available to page editors. Leave empty to allow all available post types.', 'acf'),
+                'type' => 'select', 'name' => 'allowed_post_types', 'multiple' => 1, 'ui' => 1,
+                'choices' => sp_archive_builder_post_type_choices(),
             ]);
 
             // Enable Filters setting
@@ -2267,18 +2286,21 @@ add_action('acf/include_field_types', function (): void {
         {
             $value = sp_archive_builder_normalize($field['value'] ?? []);
             $name  = $field['name'];
+            $editor_enabled = !empty($field['editor_config']);
+            if ($editor_enabled) { $value = sp_archive_editor_config($field['value'] ?? [], $field); }
 
             $per_page_choices = self::per_page_choices($field);
-            $post_type = $field['post_type'] ?? 'post';
+            $post_type = $editor_enabled ? $value['post_type'] : ($field['post_type'] ?? 'post');
             $choices = sp_archive_builder_post_type_choices();
             $post_type_label = $choices[$post_type] ?? $post_type;
             ?>
             <div class="sp-archive-builder-card">
                 <div class="sp-archive-builder-card__header">
                     <span class="dashicons dashicons-layout" style="color: #2271b1; font-size: 18px; margin-right: 6px;"></span>
-                    <strong><?php printf(esc_html__('Archive Settings (%s)', 'acf'), esc_html($post_type_label)); ?></strong>
+                    <strong><?php printf(esc_html__('Archive Settings (%s)', 'acf'), $editor_enabled ? '<span data-archive-type-label>' . esc_html($post_type_label) . '</span>' : esc_html($post_type_label)); ?></strong>
                 </div>
 
+                <?php if ($editor_enabled) { sp_archive_editor_render($field, $value, 'before'); } ?>
                 <div class="sp-archive-builder-card__grid">
                     <!-- Content source -->
                     <div class="sp-archive-builder-card__field sp-archive-builder-card__field--source">
@@ -2344,6 +2366,7 @@ add_action('acf/include_field_types', function (): void {
 
                 </div>
 
+                <?php if ($editor_enabled) { sp_archive_editor_render($field, $value, 'after'); } ?>
                 <div class="sp-archive-builder-card__manual" <?php echo $value['source_mode'] === 'manual' ? '' : 'hidden'; ?>>
                     <div class="sp-archive-builder-card__manual-header">
                         <strong><?php esc_html_e('Selected posts', 'acf'); ?></strong>
@@ -2355,13 +2378,16 @@ add_action('acf/include_field_types', function (): void {
                         : null;
 
                     if ($smart_relationship && method_exists($smart_relationship, 'render_field')) {
+                        $manual_types = $editor_enabled ? array_keys(sp_archive_editor_post_types($field)) : [$post_type];
+                        foreach ($manual_types as $manual_type) {
+                            if ($editor_enabled) { echo '<div data-archive-manual-type="' . esc_attr($manual_type) . '"' . ($manual_type !== $post_type ? ' hidden' : '') . '>'; }
                         $smart_relationship->render_field([
-                            'key'           => ($field['key'] ?? 'archive_builder') . '_manual_posts',
-                            'name'          => $name . '[manual_posts]',
+                            'key'           => ($field['key'] ?? 'archive_builder') . '_manual_posts' . ($editor_enabled ? '_' . $manual_type : ''),
+                            'name'          => $editor_enabled ? $name . '[manual_by_type][' . $manual_type . ']' : $name . '[manual_posts]',
                             'type'          => 'smart_relationship',
-                            'value'         => $value['manual_posts'],
-                            'post_type'     => [$post_type],
-                            'taxonomy'      => array_values(get_object_taxonomies($post_type)),
+                            'value'         => $manual_type === $post_type ? $value['manual_posts'] : ['mode' => 'manual', 'ids' => []],
+                            'post_type'     => [$manual_type],
+                            'taxonomy'      => array_values(get_object_taxonomies($manual_type)),
                             'return_format' => 'id',
                             'modes'         => ['manual'],
                             'default_mode'  => 'manual',
@@ -2369,6 +2395,8 @@ add_action('acf/include_field_types', function (): void {
                             'min'           => 0,
                             'max'           => 0,
                         ]);
+                            if ($editor_enabled) { echo '</div>'; }
+                        }
                     } else {
                         echo '<p class="description">' . esc_html__('Enable the Smart Relationship component to use Manual mode.', 'acf') . '</p>';
                     }
@@ -2389,6 +2417,11 @@ add_action('acf/include_field_types', function (): void {
                 $per_page = in_array($default, $allowed, true) ? $default : (int) reset($allowed);
             }
 
+            if (!empty($field['editor_config'])) {
+                $config = sp_archive_editor_config($value, $field);
+                $config['per_page'] = $per_page;
+                return sp_archive_editor_stored_value($config);
+            }
             // Only save the editor-level choices to post meta
             $source_mode = ($value['source_mode'] ?? 'all') === 'manual' ? 'manual' : 'all';
             $manual_value = is_array($value['manual_posts'] ?? null) ? $value['manual_posts'] : [];
@@ -2420,6 +2453,8 @@ add_action('acf/include_field_types', function (): void {
                 $default = sp_archive_normalize_per_page($field['per_page'] ?? 9);
                 $value['per_page'] = in_array($default, $allowed, true) ? $default : (int) reset($allowed);
             }
+
+            if (!empty($field['editor_config'])) { return sp_archive_editor_config($value, $field); }
 
             // Merge field-level structure settings
             $value['post_type']       = $field['post_type'] ?? 'post';
@@ -2497,14 +2532,14 @@ add_action('acf/include_field_types', function (): void {
 
             if (! wp_style_is($handle, 'registered')) {
                 wp_register_style($handle, false);
-                wp_add_inline_style($handle, self::css());
+                wp_add_inline_style($handle, self::css() . "\n" . file_get_contents(__DIR__ . '/assets/editor.css'));
             }
 
             wp_enqueue_style($handle);
 
             if (! wp_script_is($handle, 'registered')) {
-                wp_register_script($handle, false, ['jquery'], null, true);
-                wp_add_inline_script($handle, self::js());
+                wp_register_script($handle, false, ['jquery', 'jquery-ui-sortable'], null, true);
+                wp_add_inline_script($handle, self::js() . "\n" . file_get_contents(__DIR__ . '/assets/editor.js'));
             }
 
             wp_enqueue_script($handle);
@@ -3260,7 +3295,7 @@ if (! function_exists('sp_archive_render_filter')) {
 
         $tax_obj   = $taxonomy !== '' ? get_taxonomy($taxonomy) : null;
         $tax_label = $tax_obj ? ($tax_obj->labels->singular_name ?? $taxonomy) : $taxonomy;
-        $title     = $is_relationship ? ($filter['label'] ?? '') : $tax_label . ':';
+        $title     = !empty($filter['label']) ? $filter['label'] : ($is_relationship ? '' : $tax_label . ':');
         $all_label = $all_label !== '' ? $all_label : __('All', THEME_SLUG);
         if ($is_relationship && ! empty($filter['all_label'])) {
             $all_label = $filter['all_label'];
@@ -3485,6 +3520,7 @@ if (! function_exists('sp_archive_setup')) {
                 'terms_mode' => $filter['terms_mode'] ?? 'children',
                 'terms'     => $config['term_scope'][$tax] ?? [],
             ];
+            if (isset($filter['label'])) { $archive_filters[count($archive_filters) - 1]['label'] = $filter['label']; }
         }
 
         $language = sp_archive_current_language();
@@ -3505,6 +3541,10 @@ if (! function_exists('sp_archive_setup')) {
                 $query_args[] = $filter['name'];
                 $query_args[] = $filter['query_arg'];
             }
+        }
+        if (!empty($config['filter_order']) && is_array($config['filter_order'])) {
+            $filter_order = array_flip(array_values(array_filter($config['filter_order'], 'is_string')));
+            usort($archive_filters, static fn(array $a, array $b): int => ($filter_order[$a['name']] ?? PHP_INT_MAX) <=> ($filter_order[$b['name']] ?? PHP_INT_MAX));
         }
         // Grouping is defined only for taxonomy filters.
         if ($archive_filters && ($archive_filters[0]['type'] ?? '') === 'relationship') {
