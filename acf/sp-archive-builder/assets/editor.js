@@ -15,7 +15,8 @@
         var taxonomies = JSON.parse(root.dataset.taxonomies || '{}');
         var rowsByType = {};
         var scopeByType = {};
-        var current = typeInput.value;
+        var current = root.dataset.currentType && sources[root.dataset.currentType] ? root.dataset.currentType : typeInput.value;
+        typeInput.value = current;
         rowsByType[current] = JSON.parse(root.dataset.rows || '[]');
         scopeByType[current] = JSON.parse(root.dataset.scope || '{}');
         function prefix() { return root.querySelector('input[name$="[editor_configured]"]').name.replace(/\[editor_configured\]$/, ''); }
@@ -59,6 +60,13 @@
             });
             settings.querySelector('[data-archive-editor-empty]').hidden = list.children.length > 0;
             settings.querySelector('[data-archive-editor-add]').disabled = used.length >= Object.keys(sources[current] || {}).length;
+            remember();
+        }
+        function remember() {
+            // ACF duplicates DOM attributes; keep its cloned editor state current.
+            root.dataset.currentType = current;
+            root.dataset.rows = JSON.stringify(readRows());
+            root.dataset.scope = JSON.stringify(readScope());
         }
         function announce(message) { settings.querySelector('[data-archive-editor-status]').textContent = t(message); }
         function tool(row, action, icon, text, handler) {
@@ -167,6 +175,8 @@
             rowsByType[current] = readRows(); scopeByType[current] = readScope();
             current = typeInput.value; render();
         });
+        settings.addEventListener('input', remember);
+        settings.addEventListener('change', remember);
         if ($.fn.sortable) $(list).sortable({items: '> .sp-archive-editor__row', handle: '.sp-archive-editor__drag', axis: 'y', update: function () { renumber(); announce('Filter order updated.'); }});
         render();
     }

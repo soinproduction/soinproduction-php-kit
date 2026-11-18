@@ -40,6 +40,7 @@ function sp_archive_editor_config($value, array $field): array
     $post_type = is_string($value['post_type'] ?? null) ? $value['post_type'] : $default_type;
     if (!isset($choices[$post_type])) { $post_type = isset($choices[$default_type]) ? $default_type : (string) array_key_first($choices); }
     $configured = !empty($value['editor_configured']);
+    if ($configured && !array_key_exists('term_scope', $value)) { $value['term_scope'] = []; }
     $config = sp_archive_builder_normalize(array_merge(array_intersect_key($field, sp_archive_builder_defaults()), $value, ['post_type' => $post_type]));
     $sources = sp_archive_editor_sources($field, $post_type);
     $rows = [];
