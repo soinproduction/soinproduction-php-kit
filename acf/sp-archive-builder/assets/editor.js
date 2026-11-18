@@ -75,7 +75,7 @@
                 if (!enabled) { row.querySelector('[data-details]').setAttribute('aria-expanded', 'false'); row.querySelector('.sp-archive-editor__details').hidden = true; }
                 var label = row.querySelector('[data-key="label"]').value.trim(), original = sources[current][row.dataset.source].label;
                 row.querySelector('[data-title]').textContent = label || original;
-                row.querySelector('[data-details]').setAttribute('aria-label', t('Filter settings') + ': ' + (label || original));
+                row.querySelector('[data-details]').setAttribute('aria-label', t('Edit filter settings') + ': ' + (label || original));
                 var secondary = row.querySelector('[data-original]'); secondary.textContent = t('Source:') + ' ' + original; secondary.hidden = !label || label === original;
             });
             settings.querySelector('[data-archive-editor-empty]').hidden = list.children.length > 0;
@@ -100,9 +100,10 @@
             tool(actions, 'moveUp', 'arrow-up-alt2', 'Move filter up', function () { move(-1); });
             tool(actions, 'moveDown', 'arrow-down-alt2', 'Move filter down', function () { move(1); });
             var details = document.createElement('div'); details.className = 'sp-archive-editor__details'; details.id = 'sp-archive-filter-details-' + (++nextId); details.hidden = true;
-            var disclosure = tool(actions, 'details', 'admin-generic', 'Filter settings', function () {
+            var disclosure = tool(actions, 'details', 'arrow-down-alt2', 'Edit filter settings', function () {
                 details.hidden = !details.hidden; disclosure.setAttribute('aria-expanded', String(!details.hidden));
             });
+            var disclosureText = document.createElement('span'); disclosureText.textContent = t('Edit'); disclosure.prepend(disclosureText);
             disclosure.setAttribute('aria-controls', details.id); disclosure.setAttribute('aria-expanded', 'false'); main.append(actions); row.append(main);
             var label = control(details, 'label', 'Name on website', document.createElement('input')); label.type = 'text'; label.value = value.label || ''; label.placeholder = source.label;
             var mode = control(details, 'terms_mode', 'Category options', document.createElement('select'));

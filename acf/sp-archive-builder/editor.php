@@ -139,7 +139,7 @@ function sp_archive_editor_render(array $field, array $value, string $position):
     $choices = sp_archive_editor_post_types($field);
     $post_type = $value['post_type'];
     if ($position === 'before') {
-        $strings = ['Source:', 'Name on website', 'Category options', 'Filter settings', 'Include subcategories', 'Top-level categories', 'Only selected categories', 'Source', 'Label', 'Display', 'Terms', 'Buttons', 'Checkboxes', 'Select', 'Multiple select', 'Radio buttons', 'Include child terms', 'Top-level terms', 'Selected terms only', 'Move filter up', 'Move filter down', 'Remove filter', 'Filter moved up.', 'Filter moved down.', 'Filter removed.', 'Filter order updated.', 'No terms yet. Add terms to this post type first.', 'Unavailable term:'];
+        $strings = ['Edit filter settings', 'Edit', 'Source:', 'Name on website', 'Category options', 'Filter settings', 'Include subcategories', 'Top-level categories', 'Only selected categories', 'Source', 'Label', 'Display', 'Terms', 'Buttons', 'Checkboxes', 'Select', 'Multiple select', 'Radio buttons', 'Include child terms', 'Top-level terms', 'Selected terms only', 'Move filter up', 'Move filter down', 'Remove filter', 'Filter moved up.', 'Filter moved down.', 'Filter removed.', 'Filter order updated.', 'No terms yet. Add terms to this post type first.', 'Unavailable term:'];
         $i18n = array_combine($strings, array_map(static fn(string $text): string => __($text, 'acf'), $strings));
         $sources = [];
         $taxonomies = [];
@@ -169,6 +169,7 @@ function sp_archive_editor_render(array $field, array $value, string $position):
     }
     ?>
     <div class="sp-archive-editor__settings" data-archive-editor-settings>
+        <div class="sp-archive-editor__layout">
         <div class="sp-archive-editor__block">
             <h4><?= esc_html__('Limit the list', 'acf') ?></h4>
             <p class="description"><?= esc_html__('Choose categories or tags to limit which posts appear. Leave everything unchecked to show all. Visitors cannot change this selection.', 'acf') ?></p>
@@ -182,6 +183,7 @@ function sp_archive_editor_render(array $field, array $value, string $position):
             <div data-archive-editor-values></div>
             <p data-archive-editor-empty><?= esc_html__('No filters are available for this content type. Enable sources in the Archive Builder field settings.', 'acf') ?></p>
             <span class="screen-reader-text" aria-live="polite" data-archive-editor-status></span>
+        </div>
         </div>
         <div class="sp-archive-editor__block sp-archive-editor__options">
             <input type="hidden" name="<?= esc_attr($name) ?>[search_enabled]" value="0">
